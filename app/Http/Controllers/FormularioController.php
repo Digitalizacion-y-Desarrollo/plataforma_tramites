@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Integrations\AccesosClient;
+use App\Models\CampoCondicion;
 use App\Models\Formulario;
 use App\Models\FormularioCampo;
-use App\Models\CampoCondicion;
 use App\Models\FormularioEstado;
 use App\Models\FormularioGrupoCampo;
 use App\Models\FormularioSeccion;
@@ -199,7 +199,7 @@ class FormularioController extends Controller
     {
         $datos = $request->validate([
             'etiqueta' => ['required', 'string', 'max:200'],
-            'tipo' => ['required', 'in:TEXT,TEXTAREA,NUMBER,EMAIL,PHONE,DATE,SELECT,MULTISELECT,RADIO,CHECKBOX,FILE'],
+            'tipo' => ['required', Rule::in(array_keys(config('formulario.tipos_campo')))],
             'requerido' => ['nullable', 'boolean'],
             'opciones' => ['nullable', 'string', 'max:5000'],
         ]);
@@ -210,7 +210,7 @@ class FormularioController extends Controller
             ->unique()
             ->values();
 
-        if (in_array($datos['tipo'], ['SELECT', 'MULTISELECT', 'RADIO'], true) && $opciones->isEmpty()) {
+        if (in_array($datos['tipo'], config('formulario.tipos_con_opciones'), true) && $opciones->isEmpty()) {
             return back()->withInput()->withErrors([
                 'opciones' => 'Agrega al menos una opción para este tipo de campo.',
             ]);
@@ -338,7 +338,7 @@ class FormularioController extends Controller
     {
         $datos = $request->validate([
             'etiqueta' => ['required', 'string', 'max:200'],
-            'tipo' => ['required', 'in:TEXT,TEXTAREA,NUMBER,EMAIL,PHONE,DATE,SELECT,MULTISELECT,RADIO,CHECKBOX,FILE'],
+            'tipo' => ['required', Rule::in(array_keys(config('formulario.tipos_campo')))],
             'requerido' => ['nullable', 'boolean'],
             'opciones' => ['nullable', 'string', 'max:5000'],
         ]);
@@ -354,7 +354,7 @@ class FormularioController extends Controller
 
         $opciones = $this->opcionesCampo($datos['opciones'] ?? '');
 
-        if (in_array($datos['tipo'], ['SELECT', 'MULTISELECT', 'RADIO'], true) && $opciones->isEmpty()) {
+        if (in_array($datos['tipo'], config('formulario.tipos_con_opciones'), true) && $opciones->isEmpty()) {
             return back()->withInput()->withErrors(['opciones' => 'Agrega al menos una opción para este tipo de campo.']);
         }
 
@@ -362,7 +362,7 @@ class FormularioController extends Controller
             $campo->update(['etiqueta' => $datos['etiqueta'], 'tipo' => $datos['tipo'], 'requerido' => $request->boolean('requerido')]);
             $campo->opciones()->delete();
 
-            if (in_array($datos['tipo'], ['SELECT', 'MULTISELECT', 'RADIO'], true)) {
+            if (in_array($datos['tipo'], config('formulario.tipos_con_opciones'), true)) {
                 $opciones->each(function (string $opcion, int $indice) use ($campo): void {
                     $campo->opciones()->create(['id' => (string) Str::uuid(), 'valor' => (string) ($indice + 1), 'etiqueta' => $opcion, 'orden' => $indice + 1, 'activo' => true]);
                 });

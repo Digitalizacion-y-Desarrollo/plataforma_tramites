@@ -195,6 +195,144 @@ document.querySelectorAll('[data-orden-campos]').forEach((constructor) => {
 });
 
 document.querySelectorAll('[data-formulario-preview]').forEach((vista) => {
+document.querySelectorAll('[data-domicilio]').forEach((domicilio) => {
+    const codigoPostal = domicilio.querySelector('[data-domicilio-campo="codigo_postal"]');
+    const colonia = domicilio.querySelector('[data-domicilio-campo="colonia"]');
+    const calle = domicilio.querySelector('[data-domicilio-campo="calle"]');
+    const numero = domicilio.querySelector('[data-domicilio-campo="numero"]');
+    const colonias = domicilio.querySelector('[data-domicilio-colonias]');
+    const calles = domicilio.querySelector('[data-domicilio-calles]');
+    const numeros = domicilio.querySelector('[data-domicilio-numeros]');
+    const latitud = domicilio.querySelector('[data-domicilio-latitud]');
+    const longitud = domicilio.querySelector('[data-domicilio-longitud]');
+    const estado = domicilio.querySelector('[data-domicilio-estado]');
+    const url = domicilio.dataset.indiceUrl;
+    let indice;
+    let cargaIndice;
+    let codigoPostalAnterior = '';
+
+    if (!codigoPostal || !colonia || !calle || !numero || !colonias || !calles || !numeros || !latitud || !longitud || !estado || !url) {
+        return;
+    }
+
+    const normalizar = (valor) => String(valor).trim().toLocaleUpperCase();
+    const opciones = (lista, valores) => lista.replaceChildren(...valores.map((valor) => {
+        const opcion = document.createElement('option');
+        opcion.value = String(valor);
+        return opcion;
+    const limpiarCoordenadas = () => {
+        latitud.value = '';
+        longitud.value = '';
+    };
+
+    }));
+    const cargarIndice = async () => {
+        if (indice) return indice;
+        if (!cargaIndice) {
+            estado.textContent = 'Cargando colonias, calles y coordenadas disponibles...';
+            cargaIndice = fetch(url, { headers: { Accept: 'application/json' } })
+                .then((respuesta) => {
+                    if (!respuesta.ok) throw new Error('No fue posible consultar el catalogo de domicilios.');
+                    return respuesta.json();
+                })
+                .then((datos) => {
+                    indice = datos;
+                    return indice;
+                });
+        }
+
+        return cargaIndice;
+    };
+    const actualizarCalles = () => {
+        const coloniasDelCodigoPostal = indice?.[codigoPostal.value.trim()];
+        const nombreColonia = Object.keys(coloniasDelCodigoPostal ?? {})
+            .find((nombre) => normalizar(nombre) === normalizar(colonia.value));
+        const callesDisponibles = nombreColonia ? Object.keys(coloniasDelCodigoPostal[nombreColonia]) : [];
+
+        opciones(calles, callesDisponibles);
+        opciones(numeros, []);
+        numero.value = '';
+        limpiarCoordenadas();
+        estado.textContent = nombreColonia
+            ? `${callesDisponibles.length} calles disponibles para ${nombreColonia}.`
+            : 'Selecciona una colonia de la lista para consultar sus calles.';
+    };
+    const actualizarNumeros = () => {
+        const coloniasDelCodigoPostal = indice?.[codigoPostal.value.trim()];
+        const nombreColonia = Object.keys(coloniasDelCodigoPostal ?? {})
+            .find((nombre) => normalizar(nombre) === normalizar(colonia.value));
+        const callesDeColonia = nombreColonia ? coloniasDelCodigoPostal[nombreColonia] : {};
+        const nombreCalle = Object.keys(callesDeColonia)
+            .find((nombre) => normalizar(nombre) === normalizar(calle.value));
+        const domiciliosDisponibles = nombreCalle ? callesDeColonia[nombreCalle] : [];
+
+        opciones(numeros, domiciliosDisponibles.map((domicilioDisponible) => domicilioDisponible.numero));
+        numero.value = '';
+        limpiarCoordenadas();
+        estado.textContent = nombreCalle
+            ? `${domiciliosDisponibles.length} numeros disponibles para ${nombreCalle}.`
+            : 'Selecciona una calle de la lista para consultar sus numeros.';
+    };
+    const actualizarCoordenadas = () => {
+        const coloniasDelCodigoPostal = indice?.[codigoPostal.value.trim()];
+        const nombreColonia = Object.keys(coloniasDelCodigoPostal ?? {})
+            .find((nombre) => normalizar(nombre) === normalizar(colonia.value));
+        const callesDeColonia = nombreColonia ? coloniasDelCodigoPostal[nombreColonia] : {};
+        const nombreCalle = Object.keys(callesDeColonia)
+            .find((nombre) => normalizar(nombre) === normalizar(calle.value));
+        const domicilioEncontrado = (nombreCalle ? callesDeColonia[nombreCalle] : [])
+            .find((domicilioDisponible) => normalizar(domicilioDisponible.numero) === normalizar(numero.value));
+
+        latitud.value = domicilioEncontrado?.latitud ?? '';
+        longitud.value = domicilioEncontrado?.longitud ?? '';
+        estado.textContent = domicilioEncontrado
+            ? 'Ubicacion encontrada y coordenadas asignadas.'
+            : 'No se encontro una coordenada exacta para el numero ingresado.';
+    };
+    const actualizarColonias = async () => {
+        const cp = codigoPostal.value.trim();
+
+        if (!/^\d{5}$/.test(cp)) {
+            opciones(colonias, []);
+            opciones(calles, []);
+            estado.textContent = 'Ingresa un c?digo postal de cinco d?gitos para consultar colonias.';
+            opciones(numeros, []);
+            limpiarCoordenadas();
+            return;
+        }
+
+        try {
+            const datos = await cargarIndice();
+            const coloniasDisponibles = Object.keys(datos[cp] ?? {});
+            opciones(colonias, coloniasDisponibles);
+            opciones(calles, []);
+            opciones(numeros, []);
+            limpiarCoordenadas();
+            estado.textContent = coloniasDisponibles.length
+                ? `${coloniasDisponibles.length} colonias disponibles para el c?digo postal ${cp}.`
+                : 'No se encontraron colonias para el c?digo postal ingresado.';
+        } catch {
+            opciones(colonias, []);
+            opciones(calles, []);
+            estado.textContent = 'No fue posible cargar el cat?logo de domicilios. Intenta nuevamente.';
+            opciones(numeros, []);
+            limpiarCoordenadas();
+        }
+    };
+
+    codigoPostal.addEventListener('input', () => {
+        if (codigoPostal.value.trim() !== codigoPostalAnterior) {
+            colonia.value = '';
+            calle.value = '';
+            codigoPostalAnterior = codigoPostal.value.trim();
+            numero.value = '';
+        }
+        actualizarColonias();
+    });
+    colonia.addEventListener('input', actualizarCalles);
+    calle.addEventListener('input', actualizarNumeros);
+    numero.addEventListener('input', actualizarCoordenadas);
+});
     const obtenerValor = (campoId) => {
         const controles = [...vista.querySelectorAll(`[data-campo-control="${campoId}"]`)];
         const control = controles[0];
