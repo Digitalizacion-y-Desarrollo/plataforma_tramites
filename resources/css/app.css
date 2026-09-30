@@ -1,0 +1,273 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap');
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    --color-neza-wine: #681633;
+    --color-neza-wine-soft: #f5e9ee;
+    --color-neza-ink: #1f2937;
+    --color-neza-muted: #6b7280;
+    --color-neza-line: #e5e7eb;
+    --color-neza-canvas: #f8fafc;
+}
+
+/* Layout administrativo compartido. */
+:root {
+            --wine: #681633;
+            --wine-hover: #4c0f26;
+            --ink: #1f2937;
+            --muted: #6b7280;
+            --line: #e5e7eb;
+            --canvas: #f8fafc;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            color: var(--ink);
+            font-family: 'DM Sans', sans-serif;
+            background: var(--canvas);
+        }
+
+        .shell {
+            min-height: 100vh;
+            display: grid;
+            grid-template-columns: 244px minmax(0, 1fr);
+        }
+
+        .sidebar {
+            background: #fff;
+            border-right: 1px solid var(--line);
+            padding: 25px 16px;
+            display: flex;
+            flex-direction: column;
+            gap: 29px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0 10px;
+            color: #3b3340;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .brand-mark {
+            display: grid;
+            place-items: center;
+            height: 32px;
+            width: 32px;
+            border-radius: 10px;
+            color: white;
+            background: var(--wine);
+            font-weight: 700;
+        }
+
+        .side-label {
+            color: #9ca3af;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            padding: 0 12px;
+            text-transform: uppercase;
+        }
+
+        .nav {
+            display: grid;
+            gap: 5px;
+        }
+
+        .nav a {
+            align-items: center;
+            border-radius: 10px;
+            color: #667085;
+            display: flex;
+            font-size: 13px;
+            font-weight: 500;
+            gap: 11px;
+            padding: 11px 12px;
+            text-decoration: none;
+        }
+
+        .nav a.active,
+        .nav a:hover {
+            background: #f5e9ee;
+            color: var(--wine);
+        }
+
+        .nav-icon {
+            width: 18px;
+            text-align: center;
+        }
+
+        .side-footer {
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 12px;
+            margin-top: auto;
+            padding: 20px 12px 0;
+        }
+
+        .workspace {
+            min-width: 0;
+        }
+
+        .topbar {
+            align-items: center;
+            background: #fff;
+            border-bottom: 1px solid var(--line);
+            box-shadow: 0 2px 10px rgba(31, 41, 55, .03);
+            display: flex;
+            height: 76px;
+            justify-content: space-between;
+            padding: 0 36px;
+        }
+
+        .context {
+            color: var(--muted);
+            display: flex;
+            align-items: center;
+            font-size: 12px;
+            font-weight: 600;
+            gap: 9px;
+        }
+
+        .shield {
+            color: #76531f;
+            font-size: 18px;
+        }
+
+        .tools {
+            align-items: center;
+            display: flex;
+            gap: 20px;
+            height: 100%;
+        }
+
+        .search {
+            align-items: center;
+            background: #f3f4f6;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            color: var(--muted);
+            display: flex;
+            font-size: 13px;
+            gap: 10px;
+            height: 42px;
+            padding: 0 14px;
+            width: 480px;
+        }
+
+        .shortcut {
+            background: white;
+            border: 1px solid var(--line);
+            border-radius: 6px;
+            color: #9ca3af;
+            font-size: 10px;
+            font-weight: 700;
+            margin-left: auto;
+            padding: 3px 7px;
+        }
+
+        .notification {
+            background: #f8f9fa;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            display: grid;
+            height: 40px;
+            place-items: center;
+            position: relative;
+            width: 40px;
+        }
+
+        .badge {
+            background: var(--wine);
+            border: 2px solid white;
+            border-radius: 50%;
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            padding: 2px 5px;
+            position: absolute;
+            right: -7px;
+            top: -7px;
+        }
+
+        .divider {
+            background: var(--line);
+            height: 28px;
+            width: 1px;
+        }
+
+        .profile {
+            align-items: center;
+            display: flex;
+            gap: 10px;
+        }
+
+        .profile img {
+            border-radius: 50%;
+            height: 40px;
+            object-fit: cover;
+            width: 40px;
+        }
+
+        .profile-name {
+            font-size: 13px;
+        }
+
+        .profile-role {
+            color: var(--muted);
+            font-size: 11px;
+            margin-top: 2px;
+        }
+
+        .chevron {
+            color: var(--muted);
+            margin-left: 3px;
+        }
+
+        main {
+            padding: 32px 36px 44px;
+        }
+
+        @media(max-width:900px) {
+            .shell {
+                display: block
+            }
+
+            .sidebar {
+                display: none
+            }
+
+            .topbar {
+                padding: 0 20px
+            }
+
+            .context,
+            .search {
+                display: none
+            }
+
+            .tools {
+                gap: 13px
+            }
+
+            main {
+                padding: 26px 20px
+            }
+
+            .profile-role {
+                display: none
+            }
+        }

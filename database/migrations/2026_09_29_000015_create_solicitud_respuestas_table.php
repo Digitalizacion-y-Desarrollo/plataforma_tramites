@@ -1,0 +1,3 @@
+<?php
+use Illuminate\Database\Migrations\Migration; use Illuminate\Database\Schema\Blueprint; use Illuminate\Support\Facades\Schema;
+return new class extends Migration { public function up(): void { Schema::create('solicitud_respuestas', function (Blueprint $t) { $t->engine='InnoDB';$t->charset='utf8mb4';$t->collation='utf8mb4_unicode_ci';$t->uuid('id')->primary();$t->uuid('solicitud_id');$t->uuid('campo_id');$t->json('valor')->nullable();$t->timestamps();$t->unique(['solicitud_id','campo_id']);$t->foreign('solicitud_id')->references('id')->on('solicitudes')->cascadeOnDelete();$t->foreign('campo_id')->references('id')->on('formulario_campos')->restrictOnDelete(); }); } public function down(): void { Schema::dropIfExists('solicitud_respuestas'); } };

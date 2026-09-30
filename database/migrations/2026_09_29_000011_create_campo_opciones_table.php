@@ -1,0 +1,3 @@
+<?php
+use Illuminate\Database\Migrations\Migration; use Illuminate\Database\Schema\Blueprint; use Illuminate\Support\Facades\Schema;
+return new class extends Migration { public function up(): void { Schema::create('campo_opciones', function (Blueprint $t) { $t->engine='InnoDB';$t->charset='utf8mb4';$t->collation='utf8mb4_unicode_ci';$t->uuid('id')->primary();$t->uuid('campo_id');$t->string('valor',150);$t->string('etiqueta',200);$t->unsignedInteger('orden')->default(0);$t->boolean('activo')->default(true);$t->timestamps();$t->unique(['campo_id','valor']);$t->foreign('campo_id')->references('id')->on('formulario_campos')->cascadeOnDelete(); }); } public function down(): void { Schema::dropIfExists('campo_opciones'); } };

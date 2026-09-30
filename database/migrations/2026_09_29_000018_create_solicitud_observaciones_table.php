@@ -1,0 +1,3 @@
+<?php
+use Illuminate\Database\Migrations\Migration; use Illuminate\Database\Schema\Blueprint; use Illuminate\Support\Facades\Schema;
+return new class extends Migration { public function up(): void { Schema::create('solicitud_observaciones', function (Blueprint $t) { $t->engine='InnoDB';$t->charset='utf8mb4';$t->collation='utf8mb4_unicode_ci';$t->uuid('id')->primary();$t->uuid('solicitud_id');$t->text('texto');$t->string('tipo',50)->nullable();$t->boolean('visible_ciudadano')->default(false);$t->string('actor_accesos_id',100);$t->string('actor_nombre_snapshot',200)->nullable();$t->timestamps();$t->foreign('solicitud_id')->references('id')->on('solicitudes')->restrictOnDelete(); }); } public function down(): void { Schema::dropIfExists('solicitud_observaciones'); } };
