@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 
-<body>
+<body data-swal-success="{{ session('success') }}" data-swal-error="{{ $errors->any() ? $errors->first() : '' }}">
     <div class="shell">
         <aside class="sidebar">
             <div class="brand flex flex-col">
@@ -64,11 +64,11 @@
                         </svg>
                     </summary>
                     <div class="mt-1 grid gap-1 border-l border-neza-line pl-3">
-                        <a class="!py-2 !text-xs" href="#">Trámites</a>
-                        <a class="!py-2 !text-xs" href="#">Estados de solicitudes</a>
-                        <a class="!py-2 !text-xs" href="#">Estados de formularios</a>
-                        <a class="!py-2 !text-xs" href="#">Estados de documentos</a>
-                        <a class="!py-2 !text-xs" href="#">Estados de notificaciones</a>
+                        <a href="{{ route('catalogo-tramites.index') }}" class="!py-2 !text-xs">Trámites</a>
+                        <a href="{{ route('catalogo-estados.index') }}" class="!py-2 !text-xs">Estados de solicitudes</a>
+                        <a href="{{ route('catalogo-estados-formularios.index') }}" class="!py-2 !text-xs">Estados de formularios</a>
+                        <a href="#" class="!py-2 !text-xs">Estados de documentos</a>
+                        <a href="#" class="!py-2 !text-xs">Estados de notificaciones</a>
                     </div>
                 </details>
                 <a href="#"><svg class="nav-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24"

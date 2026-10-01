@@ -1,4 +1,137 @@
 import './bootstrap';
+import Swal from 'sweetalert2';
+import 'sweetalert2/dist/sweetalert2.min.css';
+
+const cuerpo = document.body;
+
+if (cuerpo.dataset.swalSuccess) {
+    Swal.fire({
+        icon: 'success',
+        title: 'Operación realizada',
+        text: cuerpo.dataset.swalSuccess,
+        confirmButtonColor: '#7f1d3f',
+    });
+}
+
+if (cuerpo.dataset.swalError) {
+    Swal.fire({
+        icon: 'error',
+        title: 'Revisa la información',
+        text: cuerpo.dataset.swalError,
+        confirmButtonColor: '#7f1d3f',
+    });
+}
+
+const bloquearFormulario = (formulario) => {
+    formulario.dataset.submitting = 'true';
+    formulario.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((boton) => {
+        boton.disabled = true;
+        boton.setAttribute('aria-busy', 'true');
+
+        if (boton.tagName === 'BUTTON' && !boton.querySelector('[data-submit-spinner]')) {
+            const indicador = document.createElement('span');
+            indicador.dataset.submitSpinner = '';
+            indicador.className = 'inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent';
+            indicador.setAttribute('aria-hidden', 'true');
+            boton.append(indicador);
+        }
+    });
+};
+
+document.querySelectorAll('form[method="POST"]').forEach((formulario) => {
+    formulario.addEventListener('submit', async (evento) => {
+        if (formulario.dataset.submitting === 'true') {
+            evento.preventDefault();
+            return;
+        }
+
+        if ((formulario.hasAttribute('data-confirm-delete') || formulario.hasAttribute('data-confirm-action')) && formulario.dataset.confirmed !== 'true') {
+            evento.preventDefault();
+
+            const resultado = await Swal.fire({
+                icon: 'warning',
+                title: formulario.dataset.confirmTitle || '¿Confirmas la eliminación?',
+                text: formulario.dataset.confirmText || 'Esta acción conservará el historial del registro.',
+                showCancelButton: true,
+                confirmButtonText: formulario.dataset.confirmButton || 'Sí, eliminar',
+                cancelButtonText: 'Cancelar',
+                confirmButtonColor: '#b91c1c',
+                cancelButtonColor: '#6b7280',
+                reverseButtons: true,
+            });
+
+            if (!resultado.isConfirmed) return;
+
+            formulario.dataset.confirmed = 'true';
+            formulario.requestSubmit();
+            return;
+        }
+
+        bloquearFormulario(formulario);
+    });
+});
+
+document.querySelectorAll('[data-modal-open]').forEach((boton) => {
+    boton.addEventListener('click', () => {
+        const modal = document.getElementById(boton.dataset.modalOpen);
+
+        if (!modal) return;
+
+        if (boton.dataset.modalOpen === 'tramite-editar') {
+            const formulario = modal.querySelector('#tramite-editar-form');
+            const clave = modal.querySelector('#editar-clave');
+            const nombre = modal.querySelector('#editar-nombre');
+            const descripcion = modal.querySelector('#editar-descripcion');
+            const activo = modal.querySelector('#editar-activo');
+
+            formulario.action = boton.dataset.tramiteUpdateUrl;
+            formulario.querySelector('[name="update_url"]').value = boton.dataset.tramiteUpdateUrl;
+            formulario.querySelector('[name="clave_visual"]').value = boton.dataset.tramiteClave;
+            clave.value = boton.dataset.tramiteClave;
+            nombre.value = boton.dataset.tramiteNombre;
+            descripcion.value = boton.dataset.tramiteDescripcion;
+            activo.checked = boton.dataset.tramiteActivo === '1';
+        }
+
+        if (boton.dataset.modalOpen === 'estado-editar') {
+            const formulario = modal.querySelector('#estado-editar-form');
+
+            formulario.action = boton.dataset.estadoUpdateUrl;
+            formulario.querySelector('[name="update_url"]').value = boton.dataset.estadoUpdateUrl;
+            formulario.querySelector('[name="clave_visual"]').value = boton.dataset.estadoClave;
+            modal.querySelector('#estado-editar-clave').value = boton.dataset.estadoClave;
+            modal.querySelector('#estado-editar-nombre').value = boton.dataset.estadoNombre;
+            modal.querySelector('#estado-editar-descripcion').value = boton.dataset.estadoDescripcion;
+            modal.querySelector('#estado-editar-orden').value = boton.dataset.estadoOrden;
+            modal.querySelector('#estado-editar-final').checked = boton.dataset.estadoFinal === '1';
+            modal.querySelector('#estado-editar-activo').checked = boton.dataset.estadoActivo === '1';
+        }
+
+        if (boton.dataset.modalOpen === 'formulario-estado-editar') {
+            const formulario = modal.querySelector('#formulario-estado-editar-form');
+
+            formulario.action = boton.dataset.feUpdateUrl;
+            formulario.querySelector('[name="update_url"]').value = boton.dataset.feUpdateUrl;
+            formulario.querySelector('[name="clave_visual"]').value = boton.dataset.feClave;
+            modal.querySelector('#fe-editar-clave').value = boton.dataset.feClave;
+            modal.querySelector('#fe-editar-nombre').value = boton.dataset.feNombre;
+            modal.querySelector('#fe-editar-descripcion').value = boton.dataset.feDescripcion;
+            modal.querySelector('#fe-editar-orden').value = boton.dataset.feOrden;
+            modal.querySelector('#fe-editar-activo').checked = boton.dataset.feActivo === '1';
+        }
+
+        modal.showModal();
+    });
+});
+
+document.querySelectorAll('[data-modal-close]').forEach((boton) => {
+    boton.addEventListener('click', () => document.getElementById(boton.dataset.modalClose)?.close());
+});
+
+document.querySelectorAll('dialog[open]').forEach((modal) => {
+    modal.removeAttribute('open');
+    modal.showModal();
+});
 
 const departamentoInput = document.querySelector('[data-departamento-input]');
 const departamentoIdInput = document.querySelector('[data-departamento-id]');
@@ -220,12 +353,11 @@ document.querySelectorAll('[data-domicilio]').forEach((domicilio) => {
         const opcion = document.createElement('option');
         opcion.value = String(valor);
         return opcion;
+    }));
     const limpiarCoordenadas = () => {
         latitud.value = '';
         longitud.value = '';
     };
-
-    }));
     const cargarIndice = async () => {
         if (indice) return indice;
         if (!cargaIndice) {

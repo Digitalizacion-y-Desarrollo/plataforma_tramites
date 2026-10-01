@@ -52,6 +52,221 @@ class FormularioController extends Controller
         return view('formularios.create', compact('departamentos', 'tramites'));
     }
 
+    public function createDuplicado(Formulario $formulario, AccesosClient $accesos)
+    {
+        try {
+            $departamentos = $accesos->departamentosActivos();
+        } catch (\Throwable) {
+            $departamentos = [];
+        }
+
+        $tramitesConFormulario = DB::table('tramite_formulario')->pluck('tramite_id');
+        $tramites = DB::table('tramites')
+            ->where('activo', true)
+            ->whereNotIn('id', $tramitesConFormulario)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+
+        return view('formularios.duplicar', compact('formulario', 'tramites', 'departamentos'));
+    }
+
+    public function storeDuplicado(Request $request, Formulario $formulario, AccesosClient $accesos)
+    {
+        $datos = $request->validate([
+            'tramite_id' => [
+                'required',
+                Rule::exists('tramites', 'id')->where('activo', true),
+                Rule::unique('tramite_formulario', 'tramite_id'),
+            ],
+            'departamento_accesos_id' => ['required', 'string', 'max:100'],
+            'subdepartamento_accesos_id' => ['nullable', 'string', 'max:100'],
+        ], [
+            'tramite_id.unique' => 'El trámite seleccionado ya tiene un formulario asignado.',
+        ]);
+
+        try {
+            $departamentos = collect($accesos->departamentosActivos());
+            $departamento = $departamentos->firstWhere('id', $datos['departamento_accesos_id']);
+        } catch (\Throwable) {
+            return back()->withInput()->withErrors([
+                'departamento_accesos_id' => 'No fue posible validar el departamento con Accesos. Intenta nuevamente.',
+            ]);
+        }
+
+        if (! $departamento || $departamento['parent_id'] !== null) {
+            return back()->withInput()->withErrors([
+                'departamento_accesos_id' => 'Selecciona un departamento válido de la lista proporcionada por Accesos.',
+            ]);
+        }
+
+        $subdepartamento = null;
+
+        if (! empty($datos['subdepartamento_accesos_id'])) {
+            $subdepartamento = $departamentos->firstWhere('id', $datos['subdepartamento_accesos_id']);
+
+            if (! $subdepartamento || $subdepartamento['parent_id'] !== $departamento['id']) {
+                return back()->withInput()->withErrors([
+                    'subdepartamento_accesos_id' => 'Selecciona un subdepartamento válido para el departamento elegido.',
+                ]);
+            }
+        }
+
+        $versionOrigen = $formulario->ultimaVersion()
+            ->with([
+                'secciones.campos.opciones',
+                'secciones.campos.condicionesDestino',
+                'gruposCampos.campos',
+                'gruposCampos.condicionesDestino',
+            ])
+            ->firstOrFail();
+        $requisitosOrigen = DB::table('requisito_documentos')
+            ->where('formulario_version_id', $versionOrigen->id)
+            ->orderBy('orden')
+            ->get();
+        $estadoBorrador = FormularioEstado::query()
+            ->where('clave', 'BORRADOR')
+            ->where('activo', true)
+            ->firstOrFail();
+
+        $duplicado = DB::transaction(function () use ($datos, $formulario, $versionOrigen, $requisitosOrigen, $estadoBorrador, $departamento, $subdepartamento): Formulario {
+            DB::table('tramites')->where('id', $datos['tramite_id'])->lockForUpdate()->firstOrFail();
+
+            abort_if(DB::table('tramite_formulario')->where('tramite_id', $datos['tramite_id'])->exists(), 422, 'El trámite seleccionado ya tiene un formulario asignado.');
+
+            $duplicado = Formulario::create([
+                'id' => (string) Str::uuid(),
+                'nombre' => $formulario->nombre.' (copia)',
+                'descripcion' => $formulario->descripcion,
+                'departamento_accesos_id' => $departamento['id'],
+                'departamento_nombre_snapshot' => $departamento['nombre'],
+                'subdepartamento_accesos_id' => $subdepartamento['id'] ?? null,
+                'subdepartamento_nombre_snapshot' => $subdepartamento['nombre'] ?? null,
+                'creado_por_accesos_id' => null,
+            ]);
+            $versionDuplicada = $duplicado->versiones()->create([
+                'id' => (string) Str::uuid(),
+                'formulario_estado_id' => $estadoBorrador->id,
+                'numero_version' => 1,
+                'creado_por_accesos_id' => null,
+            ]);
+            $secciones = [];
+            $campos = [];
+            $grupos = [];
+
+            foreach ($versionOrigen->secciones as $seccionOrigen) {
+                $seccionDuplicada = $versionDuplicada->secciones()->create([
+                    'id' => (string) Str::uuid(),
+                    'clave' => $seccionOrigen->clave,
+                    'titulo' => $seccionOrigen->titulo,
+                    'descripcion' => $seccionOrigen->descripcion,
+                    'orden' => $seccionOrigen->orden,
+                    'activo' => $seccionOrigen->activo,
+                ]);
+                $secciones[$seccionOrigen->id] = $seccionDuplicada;
+
+                foreach ($seccionOrigen->campos as $campoOrigen) {
+                    $campoDuplicado = $seccionDuplicada->campos()->create([
+                        'id' => (string) Str::uuid(),
+                        'clave' => $campoOrigen->clave,
+                        'etiqueta' => $campoOrigen->etiqueta,
+                        'tipo' => $campoOrigen->tipo,
+                        'requerido' => $campoOrigen->requerido,
+                        'orden' => $campoOrigen->orden,
+                        'configuracion' => $campoOrigen->configuracion,
+                        'activo' => $campoOrigen->activo,
+                    ]);
+                    $campos[$campoOrigen->id] = $campoDuplicado;
+
+                    foreach ($campoOrigen->opciones as $opcionOrigen) {
+                        $campoDuplicado->opciones()->create([
+                            'id' => (string) Str::uuid(),
+                            'valor' => $opcionOrigen->valor,
+                            'etiqueta' => $opcionOrigen->etiqueta,
+                            'orden' => $opcionOrigen->orden,
+                            'activo' => $opcionOrigen->activo,
+                        ]);
+                    }
+                }
+            }
+
+            foreach ($versionOrigen->gruposCampos as $grupoOrigen) {
+                $grupoDuplicado = $versionDuplicada->gruposCampos()->create([
+                    'id' => (string) Str::uuid(),
+                    'titulo' => $grupoOrigen->titulo,
+                    'orden' => $grupoOrigen->orden,
+                    'activo' => $grupoOrigen->activo,
+                ]);
+                $grupos[$grupoOrigen->id] = $grupoDuplicado;
+                $grupoDuplicado->campos()->attach(collect($grupoOrigen->campos)
+                    ->mapWithKeys(fn (FormularioCampo $campoOrigen) => [
+                        $campos[$campoOrigen->id]->id => ['id' => (string) Str::uuid()],
+                    ])->all());
+            }
+
+            foreach ($versionOrigen->secciones as $seccionOrigen) {
+                foreach ($seccionOrigen->campos as $campoOrigen) {
+                    foreach ($campoOrigen->condicionesDestino as $condicionOrigen) {
+                        $campos[$campoOrigen->id]->condicionesDestino()->create([
+                            'id' => (string) Str::uuid(),
+                            'campo_origen_id' => $campos[$condicionOrigen->campo_origen_id]->id,
+                            'operador' => $condicionOrigen->operador,
+                            'valor_comparacion' => $condicionOrigen->valor_comparacion,
+                            'accion' => $condicionOrigen->accion,
+                            'grupo' => $condicionOrigen->grupo,
+                        ]);
+                    }
+                }
+            }
+
+            foreach ($versionOrigen->gruposCampos as $grupoOrigen) {
+                foreach ($grupoOrigen->condicionesDestino as $condicionOrigen) {
+                    $grupos[$grupoOrigen->id]->condicionesDestino()->create([
+                        'id' => (string) Str::uuid(),
+                        'campo_origen_id' => $campos[$condicionOrigen->campo_origen_id]->id,
+                        'operador' => $condicionOrigen->operador,
+                        'valor_comparacion' => $condicionOrigen->valor_comparacion,
+                        'accion' => $condicionOrigen->accion,
+                        'grupo' => $condicionOrigen->grupo,
+                    ]);
+                }
+            }
+
+            foreach ($requisitosOrigen as $requisitoOrigen) {
+                DB::table('requisito_documentos')->insert([
+                    'id' => (string) Str::uuid(),
+                    'formulario_version_id' => $versionDuplicada->id,
+                    'clave' => $requisitoOrigen->clave,
+                    'nombre' => $requisitoOrigen->nombre,
+                    'descripcion' => $requisitoOrigen->descripcion,
+                    'obligatorio' => $requisitoOrigen->obligatorio,
+                    'formatos_permitidos' => $requisitoOrigen->formatos_permitidos,
+                    'tamano_maximo_mb' => $requisitoOrigen->tamano_maximo_mb,
+                    'cantidad_maxima' => $requisitoOrigen->cantidad_maxima,
+                    'orden' => $requisitoOrigen->orden,
+                    'condicion' => $requisitoOrigen->condicion,
+                    'activo' => $requisitoOrigen->activo,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+
+            DB::table('tramite_formulario')->insert([
+                'id' => (string) Str::uuid(),
+                'tramite_id' => $datos['tramite_id'],
+                'formulario_version_id' => $versionDuplicada->id,
+                'fecha_inicio_vigencia' => now(),
+                'activo' => true,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return $duplicado;
+        });
+
+        return redirect()->route('formulario.edit', $duplicado)
+            ->with('success', 'El formulario se duplicó como borrador para el trámite seleccionado.');
+    }
+
     /**
      * Store a newly created resource in storage.
      */
@@ -60,7 +275,11 @@ class FormularioController extends Controller
         $datos = $request->validate([
             'nombre' => ['required', 'string', 'max:200'],
             'descripcion' => ['nullable', 'string'],
-            'tramite_id' => ['required', Rule::exists('tramites', 'id')->where('activo', true)],
+            'tramite_id' => [
+                'required',
+                Rule::exists('tramites', 'id')->where('activo', true),
+                Rule::unique('tramite_formulario', 'tramite_id'),
+            ],
             'departamento_accesos_id' => ['required', 'string', 'max:100'],
             'subdepartamento_accesos_id' => ['nullable', 'string', 'max:100'],
         ]);
@@ -325,7 +544,9 @@ class FormularioController extends Controller
                 $baseClave = $clavesOriginales->get($campo->id);
                 $clave = $baseClave;
                 $sufijo = 2;
-                while (in_array($clave, $clavesPorSeccion[$dato['seccion_id']], true)) $clave = $baseClave.'_'.$sufijo++;
+                while (in_array($clave, $clavesPorSeccion[$dato['seccion_id']], true)) {
+                    $clave = $baseClave.'_'.$sufijo++;
+                }
                 $clavesPorSeccion[$dato['seccion_id']][] = $clave;
                 $campo->update(['seccion_id' => $dato['seccion_id'], 'orden' => $dato['orden'], 'clave' => $clave]);
             }
@@ -577,14 +798,18 @@ class FormularioController extends Controller
      */
     public function update(Request $request, Formulario $formulario, AccesosClient $accesos)
     {
+        $version = $this->versionBorrador($formulario);
         $datos = $request->validate([
             'nombre' => ['required', 'string', 'max:200'],
             'descripcion' => ['nullable', 'string'],
-            'tramite_id' => ['required', Rule::exists('tramites', 'id')->where('activo', true)],
+            'tramite_id' => [
+                'required',
+                Rule::exists('tramites', 'id')->where('activo', true),
+                Rule::unique('tramite_formulario', 'tramite_id')->ignore($version->id, 'formulario_version_id'),
+            ],
             'departamento_accesos_id' => ['required', 'string', 'max:100'],
             'subdepartamento_accesos_id' => ['nullable', 'string', 'max:100'],
         ]);
-        $version = $this->versionBorrador($formulario);
 
         try {
             $departamentos = collect($accesos->departamentosActivos());
@@ -629,6 +854,8 @@ class FormularioController extends Controller
      */
     public function destroy(Formulario $formulario)
     {
-        //
+        $formulario->delete();
+
+        return redirect()->route('formulario.index')->with('success', 'El formulario se eliminó correctamente.');
     }
 }

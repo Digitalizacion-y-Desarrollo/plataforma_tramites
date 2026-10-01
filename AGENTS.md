@@ -1597,3 +1597,14 @@ configurables desde portal administrativo
 Principio fundamental:
 
 > Mantener el sistema simple, trazable y alineado con Laravel MVC tradicional. No introducir tecnologías, patrones o capas que no hayan sido solicitadas.
+
+---
+
+# 59. Formularios CRUD y alertas
+
+Para toda funcionalidad CRUD nueva o modificada:
+
+- Los formularios que creen, actualicen o eliminen registros deben bloquear sus botones de envío al enviarse y mostrar un indicador de carga para evitar solicitudes duplicadas.
+- Los errores de validación deben mostrarse debajo del input, select o textarea correspondiente, con texto rojo y usando `@error`.
+- Usar SweetAlert2 para confirmaciones y alertas de éxito, error o consulta; las confirmaciones de acciones destructivas deben requerir aceptación explícita.
+- Las eliminaciones deben ser lógicas mediante `SoftDeletes` únicamente cuando el requerimiento lo solicite expresamente. No eliminar de manera permanente expedientes ni información histórica.
