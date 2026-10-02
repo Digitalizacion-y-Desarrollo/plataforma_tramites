@@ -67,8 +67,8 @@
                         <a href="{{ route('catalogo-tramites.index') }}" class="!py-2 !text-xs">Trámites</a>
                         <a href="{{ route('catalogo-estados.index') }}" class="!py-2 !text-xs">Estados de solicitudes</a>
                         <a href="{{ route('catalogo-estados-formularios.index') }}" class="!py-2 !text-xs">Estados de formularios</a>
-                        <a href="#" class="!py-2 !text-xs">Estados de documentos</a>
-                        <a href="#" class="!py-2 !text-xs">Estados de notificaciones</a>
+                        <a href="{{ route('catalogo-estados-documentos.index') }}" class="!py-2 !text-xs">Estados de documentos</a>
+                        <a href="{{ route('catalogo-estados-notificaciones.index') }}" class="!py-2 !text-xs">Estados de notificaciones</a>
                     </div>
                 </details>
                 <a href="#"><svg class="nav-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24"

@@ -47,3 +47,13 @@ Route::resource('catalogo-estados-formularios', 'App\Http\Controllers\Formulario
     ->parameters(['catalogo-estados-formularios' => 'catalogo_estado_formulario']);
 Route::patch('catalogo-estados-formularios/{catalogo_estado_formulario}/estado', 'App\Http\Controllers\FormularioEstadosController@cambiarEstado')
     ->name('catalogo-estados-formularios.estado');
+
+Route::resource('catalogo-estados-documentos', 'App\Http\Controllers\DocumentoEstadosController')
+    ->parameters(['catalogo-estados-documentos' => 'catalogo_estado_documento']);
+Route::patch('catalogo-estados-documentos/{catalogo_estado_documento}/estado', 'App\Http\Controllers\DocumentoEstadosController@cambiarEstado')
+    ->name('catalogo-estados-documentos.estado');
+
+Route::resource('catalogo-estados-notificaciones', 'App\Http\Controllers\NotificacionEstadosController')
+    ->parameters(['catalogo-estados-notificaciones' => 'catalogo_estado_notificacion']);
+Route::patch('catalogo-estados-notificaciones/{catalogo_estado_notificacion}/estado', 'App\Http\Controllers\NotificacionEstadosController@cambiarEstado')
+    ->name('catalogo-estados-notificaciones.estado');

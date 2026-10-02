@@ -120,6 +120,22 @@ document.querySelectorAll('[data-modal-open]').forEach((boton) => {
             modal.querySelector('#fe-editar-activo').checked = boton.dataset.feActivo === '1';
         }
 
+        if (boton.dataset.catalogUpdateUrl) {
+            const formulario = modal.querySelector('form');
+            const prefijo = boton.dataset.modalOpen;
+
+            formulario.action = boton.dataset.catalogUpdateUrl;
+            formulario.querySelector('[name="update_url"]').value = boton.dataset.catalogUpdateUrl;
+            formulario.querySelector('[name="clave_visual"]').value = boton.dataset.catalogClave;
+            modal.querySelector(`#${prefijo}-clave`).value = boton.dataset.catalogClave;
+            modal.querySelector(`#${prefijo}-nombre`).value = boton.dataset.catalogNombre;
+            modal.querySelector(`#${prefijo}-orden`).value = boton.dataset.catalogOrden;
+            modal.querySelector(`#${prefijo}-activo`).checked = boton.dataset.catalogActivo === '1';
+
+            const descripcion = modal.querySelector(`#${prefijo}-descripcion`);
+            if (descripcion) descripcion.value = boton.dataset.catalogDescripcion;
+        }
+
         modal.showModal();
     });
 });
