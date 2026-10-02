@@ -2,6 +2,12 @@ import './bootstrap';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
+document.querySelectorAll('[data-dismiss-public-notice]').forEach((button) => {
+    button.addEventListener('click', () => {
+        button.closest('[data-public-notice]')?.remove();
+    });
+});
+
 const cuerpo = document.body;
 
 if (cuerpo.dataset.swalSuccess) {

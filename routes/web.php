@@ -1,9 +1,13 @@
 <?php
 
+use App\Http\Controllers\PublicoController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('home');
+Route::get('/', [PublicoController::class, 'index'])->name('portal.publico');
+Route::prefix('tramites')->name('portal.tramites.')->controller(PublicoController::class)->group(function () {
+    Route::get('/', 'tramites')->name('index');
+    Route::get('/pago-predial', 'predial')->name('predial');
+    Route::get('/pago-predial/iniciar', 'iniciarPredial')->name('predial.iniciar');
 });
 
 // Rutas del Creador de Formularios
