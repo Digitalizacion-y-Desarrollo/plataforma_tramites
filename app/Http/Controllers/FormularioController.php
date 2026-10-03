@@ -19,18 +19,35 @@ class FormularioController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $formularios = Formulario::query()
+        $filtro = $request->string('filtro')->toString();
+        $filtrosPermitidos = ['RECIENTES'];
+
+        if (! in_array($filtro, $filtrosPermitidos, true)) {
+            $filtro = '';
+        }
+
+        $consultaBase = Formulario::query();
+        $conteos = [
+            'todos' => (clone $consultaBase)->count(),
+            'RECIENTES' => (clone $consultaBase)->where('updated_at', '>=', now()->subDays(7))->count(),
+        ];
+
+        $consulta = (clone $consultaBase)
             ->with([
                 'ultimaVersion.estado',
                 'ultimaVersion.tramites',
                 'ultimaVersion.secciones.campos',
-            ])
-            ->latest()
-            ->paginate(10);
+            ]);
 
-        return view('formularios.index', compact('formularios'));
+        if ($filtro === 'RECIENTES') {
+            $consulta->where('updated_at', '>=', now()->subDays(7));
+        }
+
+        $formularios = $consulta->latest()->paginate(10)->withQueryString();
+
+        return view('formularios.index', compact('formularios', 'conteos', 'filtro'));
     }
 
     /**
@@ -60,7 +77,11 @@ class FormularioController extends Controller
             $departamentos = [];
         }
 
-        $tramitesConFormulario = DB::table('tramite_formulario')->pluck('tramite_id');
+        $tramitesConFormulario = DB::table('tramite_formulario')
+            ->join('formulario_versiones', 'formulario_versiones.id', '=', 'tramite_formulario.formulario_version_id')
+            ->join('formularios', 'formularios.id', '=', 'formulario_versiones.formulario_id')
+            ->whereNull('formularios.deleted_at')
+            ->pluck('tramite_formulario.tramite_id');
         $tramites = DB::table('tramites')
             ->where('activo', true)
             ->whereNotIn('id', $tramitesConFormulario)
@@ -311,12 +332,12 @@ class FormularioController extends Controller
             }
         }
 
-        $estadoBorrador = FormularioEstado::query()
+        $estadoInicial = FormularioEstado::query()
             ->where('clave', 'BORRADOR')
             ->where('activo', true)
             ->firstOrFail();
 
-        $formulario = DB::transaction(function () use ($datos, $departamento, $subdepartamento, $estadoBorrador): Formulario {
+        $formulario = DB::transaction(function () use ($datos, $departamento, $subdepartamento, $estadoInicial): Formulario {
             $formulario = Formulario::create([
                 'id' => (string) Str::uuid(),
                 'nombre' => $datos['nombre'],
@@ -330,7 +351,7 @@ class FormularioController extends Controller
 
             $version = $formulario->versiones()->create([
                 'id' => (string) Str::uuid(),
-                'formulario_estado_id' => $estadoBorrador->id,
+                'formulario_estado_id' => $estadoInicial->id,
                 'numero_version' => 1,
                 'creado_por_accesos_id' => null,
             ]);

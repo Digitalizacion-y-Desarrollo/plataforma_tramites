@@ -97,6 +97,23 @@ document.querySelectorAll('[data-modal-open]').forEach((boton) => {
             nombre.value = boton.dataset.tramiteNombre;
             descripcion.value = boton.dataset.tramiteDescripcion;
             activo.checked = boton.dataset.tramiteActivo === '1';
+
+            modal.querySelector('#editar-duracion').value = boton.dataset.tramiteDuracion || '';
+            modal.querySelector('#editar-costo').value = boton.dataset.tramiteCosto || '';
+            modal.querySelector('#editar-tiempo').value = boton.dataset.tramiteTiempoEstimado || '';
+            modal.querySelectorAll('[name="modalidades[]"]').forEach((opcion) => {
+                opcion.checked = JSON.parse(boton.dataset.tramiteModalidades || '[]').includes(opcion.value);
+            });
+            modal.querySelectorAll('[data-list-builder]').forEach((builder) => {
+                const fuente = builder.dataset.listName === 'requisitos'
+                    ? boton.dataset.tramiteRequisitos
+                    : boton.dataset.tramiteProceso;
+                builder.dataset.listInicial = fuente || '[]';
+                builder.dispatchEvent(new Event('list-builder:reset'));
+            });
+            const faq = modal.querySelector('[data-faq-builder]');
+            faq.dataset.faqInicial = boton.dataset.tramitePreguntasFrecuentes || '[]';
+            faq.dispatchEvent(new Event('faq-builder:reset'));
         }
 
         if (boton.dataset.modalOpen === 'estado-editar') {
@@ -144,6 +161,93 @@ document.querySelectorAll('[data-modal-open]').forEach((boton) => {
 
         modal.showModal();
     });
+});
+
+const leerJson = (valor, respaldo = []) => {
+    try {
+        const datos = JSON.parse(valor || '[]');
+        return Array.isArray(datos) ? datos : respaldo;
+    } catch {
+        return respaldo;
+    }
+};
+
+document.querySelectorAll('[data-list-builder]').forEach((builder) => {
+    const input = builder.querySelector('[data-list-input]');
+    const agregar = builder.querySelector('[data-list-add]');
+    const lista = builder.querySelector('[data-list-items]');
+    const ocultos = builder.querySelector('[data-list-hidden]');
+    const nombre = builder.dataset.listName;
+    let elementos = leerJson(builder.dataset.listInicial).filter((elemento) => typeof elemento === 'string' && elemento.trim());
+
+    const renderizar = () => {
+        lista.replaceChildren();
+        ocultos.replaceChildren();
+        elementos.forEach((elemento, indice) => {
+            const fila = document.createElement('li');
+            fila.className = 'flex items-center justify-between gap-3 rounded-lg bg-neza-canvas px-3 py-2 text-sm text-neza-ink';
+            fila.append(document.createTextNode(elemento));
+            const eliminar = document.createElement('button');
+            eliminar.type = 'button';
+            eliminar.className = 'shrink-0 font-semibold text-rose-700 hover:text-rose-900';
+            eliminar.textContent = 'Eliminar';
+            eliminar.setAttribute('aria-label', `Eliminar ${elemento}`);
+            eliminar.addEventListener('click', () => { elementos.splice(indice, 1); renderizar(); });
+            fila.append(eliminar);
+            lista.append(fila);
+            const oculto = document.createElement('input');
+            oculto.type = 'hidden';
+            oculto.name = `${nombre}[]`;
+            oculto.value = elemento;
+            ocultos.append(oculto);
+        });
+    };
+    const agregarElemento = () => {
+        const valor = input.value.trim();
+        if (!valor) return;
+        elementos.push(valor);
+        input.value = '';
+        renderizar();
+        input.focus();
+    };
+    agregar.addEventListener('click', agregarElemento);
+    input.addEventListener('keydown', (evento) => {
+        if (evento.key === 'Enter') { evento.preventDefault(); agregarElemento(); }
+    });
+    builder.addEventListener('list-builder:reset', () => { elementos = leerJson(builder.dataset.listInicial).filter((elemento) => typeof elemento === 'string' && elemento.trim()); renderizar(); });
+    renderizar();
+});
+
+document.querySelectorAll('[data-faq-builder]').forEach((builder) => {
+    const pregunta = builder.querySelector('[data-faq-question]');
+    const respuesta = builder.querySelector('[data-faq-answer]');
+    const agregar = builder.querySelector('[data-faq-add]');
+    const lista = builder.querySelector('[data-faq-items]');
+    const ocultos = builder.querySelector('[data-faq-hidden]');
+    let elementos = leerJson(builder.dataset.faqInicial).filter((elemento) => elemento?.pregunta && elemento?.respuesta);
+
+    const renderizar = () => {
+        lista.replaceChildren();
+        ocultos.replaceChildren();
+        elementos.forEach((elemento, indice) => {
+            const tarjeta = document.createElement('article');
+            tarjeta.className = 'rounded-lg bg-neza-canvas p-3 text-sm';
+            const titulo = document.createElement('p'); titulo.className = 'font-semibold text-neza-ink'; titulo.textContent = elemento.pregunta;
+            const texto = document.createElement('p'); texto.className = 'mt-1 text-neza-muted'; texto.textContent = elemento.respuesta;
+            const eliminar = document.createElement('button'); eliminar.type = 'button'; eliminar.className = 'mt-2 font-semibold text-rose-700 hover:text-rose-900'; eliminar.textContent = 'Eliminar';
+            eliminar.addEventListener('click', () => { elementos.splice(indice, 1); renderizar(); });
+            tarjeta.append(titulo, texto, eliminar); lista.append(tarjeta);
+            ['pregunta', 'respuesta'].forEach((campo) => { const oculto = document.createElement('input'); oculto.type = 'hidden'; oculto.name = `preguntas_frecuentes[${indice}][${campo}]`; oculto.value = elemento[campo]; ocultos.append(oculto); });
+        });
+    };
+    const agregarElemento = () => {
+        if (!pregunta.value.trim() || !respuesta.value.trim()) return;
+        elementos.push({ pregunta: pregunta.value.trim(), respuesta: respuesta.value.trim() });
+        pregunta.value = ''; respuesta.value = ''; renderizar(); pregunta.focus();
+    };
+    agregar.addEventListener('click', agregarElemento);
+    builder.addEventListener('faq-builder:reset', () => { elementos = leerJson(builder.dataset.faqInicial).filter((elemento) => elemento?.pregunta && elemento?.respuesta); renderizar(); });
+    renderizar();
 });
 
 document.querySelectorAll('[data-modal-close]').forEach((boton) => {

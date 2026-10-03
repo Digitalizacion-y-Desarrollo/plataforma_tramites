@@ -2,7 +2,7 @@
     <div class="mx-auto grid max-w-[1440px] gap-12 px-4 py-14 sm:px-6 lg:grid-cols-[330px_1fr] lg:gap-16 lg:px-[72px] lg:py-16">
         <div class="space-y-5">
             <div class="flex items-center gap-3">
-                <img src="{{ asset('images/portal/logo-nezahualcoyotl.png') }}" alt="" class="h-[72px] w-[102px] object-contain">
+                <img src="{{ asset('images/logo/logo-sin-fondo.png') }}" alt="" class="h-[72px] w-[102px] object-contain">
                 <div>
                     <p class="text-[13px] font-bold">Gobierno Municipal de Nezahualcóyotl</p>
                     <p class="mt-1 text-[11px] text-white/70">Plataforma de Trámites</p>

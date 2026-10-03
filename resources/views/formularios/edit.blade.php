@@ -15,7 +15,6 @@
                 <h1 class="mt-1 text-3xl font-bold tracking-tight text-neza-ink">{{ $formulario->nombre }}</h1>
                 @if ($formulario->descripcion)<p class="mt-2 text-sm text-neza-muted">{{ $formulario->descripcion }}</p>@endif
             </div>
-            <span class="inline-flex w-fit rounded-full px-3 py-1 text-sm font-semibold {{ $esBorrador ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-700' }}">{{ $version->estado->nombre }}</span>
         </section>
 
         @if (session('success'))

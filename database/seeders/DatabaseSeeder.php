@@ -19,6 +19,7 @@ class DatabaseSeeder extends Seeder
             FormularioEstadoSeeder::class,
             DocumentoEstadoSeeder::class,
             NotificacionEstadoSeeder::class,
+            TramiteEstadoSeeder::class,
             TramiteSeeder::class,
         ]);
     }

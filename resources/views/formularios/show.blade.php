@@ -15,9 +15,7 @@
             <a href="{{ route('formulario.edit', $formulario) }}" class="inline-flex w-fit rounded-lg border border-neza-line px-4 py-2.5 text-sm font-semibold text-neza-muted hover:bg-neza-canvas">Editar formulario</a>
         </div>
 
-        @if ($version->estado->clave !== 'PUBLICADO')
-            <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Esta es una vista previa de la versión {{ $version->numero_version }} en estado {{ $version->estado->nombre }}. Aún no está disponible para ciudadanos.</div>
-        @endif
+        <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Esta es una vista previa administrativa de la versión {{ $version->numero_version }}. La disponibilidad ciudadana depende del estado del trámite.</div>
 
         <section class="overflow-hidden rounded-xl border border-neza-line bg-white shadow-sm">
             <div class="border-b border-neza-line px-6 py-5">

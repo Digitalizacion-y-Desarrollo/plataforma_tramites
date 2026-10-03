@@ -18,7 +18,7 @@
 
     <div class="mx-auto flex min-h-[100px] max-w-[1440px] items-center justify-between gap-5 px-4 py-3 sm:px-6 lg:min-h-[124px] lg:px-[72px]">
         <a href="{{ route('portal.publico') }}" class="flex min-w-0 items-center gap-3" aria-label="Ir al inicio">
-            <img src="{{ asset('images/portal/logo-nezahualcoyotl.png') }}" alt="Gobierno Municipal de Nezahualcóyotl" class="h-[70px] w-[96px] shrink-0 object-contain lg:h-[82px] lg:w-[112px]">
+            <img src="{{ asset('images/logo/logo-sin-fondo.png') }}" alt="Plataforma de Trámites" class="h-[70px] w-[96px] shrink-0 object-contain lg:h-[82px] lg:w-[112px]">
             <span class="hidden min-w-0 sm:block">
                 <span class="block text-xs font-bold text-neza-wine lg:text-[13px]">Gobierno Municipal de</span>
                 <span class="block truncate text-lg font-bold text-[#340c1b] lg:text-[19px]">Nezahualcóyotl</span>

@@ -4,7 +4,7 @@
 
 @section('content')
     @php
-        $tramites = [
+        $tramitesMock = [
             ['nombre' => 'Pago de predial', 'categoria' => 'Vivienda y propiedad', 'descripcion' => 'Consulta tu saldo y realiza el pago del impuesto predial de tu inmueble.', 'dependencia' => 'Tesorería Municipal', 'modalidad' => 'En línea', 'costo' => 'Con costo', 'tiempo' => '5–10 min', 'url' => route('portal.tramites.predial')],
             ['nombre' => 'Licencia de funcionamiento', 'categoria' => 'Negocios y comercio', 'descripcion' => 'Solicita o renueva la licencia para operar un establecimiento comercial.', 'dependencia' => 'Desarrollo Económico', 'modalidad' => 'Mixto', 'costo' => 'Con costo', 'tiempo' => '3–5 días', 'url' => '#'],
             ['nombre' => 'Constancia de residencia', 'categoria' => 'Identidad y documentos', 'descripcion' => 'Acredita tu domicilio actual dentro del municipio de Nezahualcóyotl.', 'dependencia' => 'Secretaría del Ayuntamiento', 'modalidad' => 'Presencial', 'costo' => 'Gratuito', 'tiempo' => '1 día', 'url' => '#'],
@@ -56,9 +56,20 @@
             <div>
                 <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between"><div><h2 class="text-xl font-bold">24 trámites disponibles</h2><p class="text-xs text-neza-muted">Información municipal presentada como propuesta.</p></div><label class="flex items-center gap-2 text-xs text-neza-muted">Ordenar: <select class="h-10 rounded-xl border border-neza-line bg-white px-3 font-bold text-neza-ink"><option>Más consultados</option><option>Nombre</option></select></label></div>
                 <div class="mt-5 grid gap-4 md:grid-cols-2">
-                    @foreach ($tramites as $tramite)
-                        @include('partials.publico.tramite-card', ['tramite' => $tramite])
-                    @endforeach
+                    @forelse ($tramites as $tramite)
+                        @include('partials.publico.tramite-card', ['tramite' => [
+                            'nombre' => $tramite->nombre,
+                            'categoria' => 'Trámite municipal',
+                            'descripcion' => $tramite->descripcion ?: 'Consulta la información de este trámite.',
+                            'dependencia' => 'Municipio de Nezahualcóyotl',
+                            'modalidad' => collect($tramite->modalidades ?? [])->count() > 1 ? 'Mixto' : (collect($tramite->modalidades ?? [])->first() === 'EN_LINEA' ? 'En línea' : 'Presencial'),
+                            'costo' => $tramite->costo ?: 'Costo por definir',
+                            'tiempo' => $tramite->tiempo_estimado ?: 'Tiempo por definir',
+                            'url' => route('portal.tramites.detalle', $tramite),
+                        ]])
+                    @empty
+                        <p class="col-span-full rounded-2xl border border-dashed border-neza-line bg-white p-8 text-center text-sm text-neza-muted">No hay trámites activos y publicados disponibles. <a href="{{ route('portal.tramites.predial') }}" class="font-bold text-neza-wine">Consultar Pago de predial</a></p>
+                    @endforelse
                 </div>
                 <div class="mt-8 flex flex-col gap-4 text-xs text-neza-muted sm:flex-row sm:items-center sm:justify-between"><p>Mostrando 1–12 de 24 trámites</p><nav class="flex gap-2" aria-label="Paginación"><a href="#" class="rounded-lg border border-neza-line bg-white px-4 py-2">Anterior</a><a href="#" class="rounded-lg bg-neza-wine px-4 py-2 font-bold text-white">1</a><a href="#" class="rounded-lg border border-neza-line bg-white px-4 py-2">2</a><a href="#" class="rounded-lg border border-neza-line bg-white px-4 py-2 font-bold text-neza-wine">Siguiente</a></nav></div>
             </div>

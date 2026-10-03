@@ -8,6 +8,9 @@ Route::prefix('tramites')->name('portal.tramites.')->controller(PublicoControlle
     Route::get('/', 'tramites')->name('index');
     Route::get('/pago-predial', 'predial')->name('predial');
     Route::get('/pago-predial/iniciar', 'iniciarPredial')->name('predial.iniciar');
+    Route::get('/{tramite}/iniciar', 'iniciar')->name('iniciar');
+    Route::post('/{tramite}/solicitudes', 'storeSolicitud')->name('solicitudes.store');
+    Route::get('/{tramite}', 'detalle')->name('detalle');
 });
 
 // Rutas del Creador de Formularios

@@ -4,27 +4,44 @@
 
 @section('content')
     <section id="inicio" class="relative isolate min-h-[430px] overflow-hidden bg-[#340c1b]">
-        <img src="{{ asset('images/portal/hero-nezahualcoyotl.jpeg') }}" alt="Vista panorámica del Municipio de Nezahualcóyotl" class="absolute inset-0 -z-20 size-full object-cover">
+        <img src="{{ asset('images/neza-hero.jpg') }}" alt="Vista panorámica del Municipio de Nezahualcóyotl"
+            class="absolute inset-0 -z-20 size-full object-cover">
         <div class="absolute inset-0 -z-10 bg-[#340c1b]/45 mix-blend-multiply"></div>
         <div class="mx-auto flex min-h-[430px] max-w-[1440px] items-center justify-center px-4 py-12 sm:px-6 lg:px-[72px]">
-            <div class="w-full max-w-[980px] rounded-3xl border border-white/50 bg-white/95 p-5 text-center shadow-[0_18px_40px_rgba(52,12,27,0.16)] backdrop-blur-md sm:p-7">
+            <div
+                class="w-full max-w-[980px] rounded-3xl border border-white/50 bg-white/95 p-5 text-center shadow-[0_18px_40px_rgba(52,12,27,0.16)] backdrop-blur-md sm:p-7">
                 <p class="text-xs font-bold uppercase tracking-wide text-[#76531f]">Encuentra tu trámite</p>
                 <h1 class="mt-2 text-3xl font-bold leading-tight text-neza-ink sm:text-[40px]">¿Qué necesitas hacer hoy?</h1>
-                <p class="mx-auto mt-2 max-w-3xl text-sm leading-relaxed text-neza-muted sm:text-[15px]">Busca por palabra clave, selecciona una categoría o explora los servicios más consultados por la ciudadanía.</p>
+                <p class="mx-auto mt-2 max-w-3xl text-sm leading-relaxed text-neza-muted sm:text-[15px]">Busca por palabra
+                    clave, selecciona una categoría o explora los servicios más consultados por la ciudadanía.</p>
 
-                <form method="GET" action="{{ route('portal.publico') }}" class="mt-5 flex flex-col gap-3 sm:flex-row" role="search">
+                <form method="GET" action="{{ route('portal.publico') }}" class="mt-5 flex flex-col gap-3 sm:flex-row"
+                    role="search">
                     <label for="buscar-tramite" class="sr-only">Buscar trámite, servicio o dependencia</label>
-                    <div class="flex h-16 flex-1 items-center gap-3 rounded-2xl border border-neza-line bg-white px-[18px] text-left focus-within:border-neza-wine focus-within:ring-2 focus-within:ring-neza-wine/15">
-                        <svg class="size-5 shrink-0 text-neza-muted" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.35-5.4a6.75 6.75 0 11-13.5 0 6.75 6.75 0 0113.5 0z" /></svg>
-                        <input id="buscar-tramite" name="q" value="{{ request('q') }}" type="search" placeholder="Buscar trámite, servicio o dependencia" class="min-w-0 flex-1 border-0 bg-transparent text-[15px] text-neza-ink outline-none placeholder:text-neza-muted">
+                    <div
+                        class="flex h-16 flex-1 items-center gap-3 rounded-2xl border border-neza-line bg-white px-[18px] text-left focus-within:border-neza-wine focus-within:ring-2 focus-within:ring-neza-wine/15">
+                        <svg class="size-5 shrink-0 text-neza-muted" aria-hidden="true" fill="none" viewBox="0 0 24 24"
+                            stroke-width="1.7" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="m21 21-4.35-4.35m1.35-5.4a6.75 6.75 0 11-13.5 0 6.75 6.75 0 0113.5 0z" />
+                        </svg>
+                        <input id="buscar-tramite" name="q" value="{{ request('q') }}" type="search"
+                            placeholder="Buscar trámite, servicio o dependencia"
+                            class="min-w-0 flex-1 border-0 bg-transparent text-[15px] text-neza-ink outline-none placeholder:text-neza-muted">
                     </div>
-                    <button type="submit" class="h-16 rounded-2xl bg-neza-wine px-8 text-[15px] font-bold text-white transition hover:bg-[#4c0f26] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Buscar</button>
+                    <button type="submit"
+                        class="h-16 rounded-2xl bg-neza-wine px-8 text-[15px] font-bold text-white transition hover:bg-[#4c0f26] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Buscar</button>
                 </form>
 
                 <div class="mt-4 flex flex-wrap justify-center gap-2.5 sm:justify-start">
                     @foreach (['Predial', 'Comercio', 'Residencia', 'Uso de suelo'] as $categoria)
-                        <a href="{{ route('portal.tramites.index') }}" class="inline-flex h-11 items-center gap-2 rounded-full border border-neza-line bg-[#f8f9fa] px-4 text-[13px] font-bold text-neza-ink transition hover:border-neza-wine hover:text-neza-wine">
-                            <svg class="size-4 text-neza-wine" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M6.75 3.75h10.5A2.25 2.25 0 0119.5 6v12a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 18V6a2.25 2.25 0 012.25-2.25z" /></svg>
+                        <a href="{{ route('portal.tramites.index') }}"
+                            class="inline-flex h-11 items-center gap-2 rounded-full border border-neza-line bg-[#f8f9fa] px-4 text-[13px] font-bold text-neza-ink transition hover:border-neza-wine hover:text-neza-wine">
+                            <svg class="size-4 text-neza-wine" aria-hidden="true" fill="none" viewBox="0 0 24 24"
+                                stroke-width="1.7" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 12.75L11.25 15 15 9.75M6.75 3.75h10.5A2.25 2.25 0 0119.5 6v12a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 18V6a2.25 2.25 0 012.25-2.25z" />
+                            </svg>
                             {{ $categoria }}
                         </a>
                     @endforeach
@@ -39,42 +56,68 @@
                 <div>
                     <p class="text-[11px] font-bold uppercase tracking-wide text-[#76531f]">Más consultados</p>
                     <h2 class="mt-1 text-2xl font-bold text-neza-ink sm:text-[30px]">Trámites destacados</h2>
-                    <p class="mt-2 text-sm text-neza-muted">Inicia solicitudes, revisa requisitos y consulta la modalidad de atención.</p>
+                    <p class="mt-2 text-sm text-neza-muted">Inicia solicitudes, revisa requisitos y consulta la modalidad de
+                        atención.</p>
                 </div>
-                <a href="{{ route('portal.tramites.index') }}" class="inline-flex items-center gap-1.5 text-[13px] font-bold text-neza-wine hover:text-[#340c1b]">Ver todos los trámites
-                    <svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+                <a href="{{ route('portal.tramites.index') }}"
+                    class="inline-flex items-center gap-1.5 text-[13px] font-bold text-neza-wine hover:text-[#340c1b]">Ver
+                    todos los trámites
+                    <svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg>
                 </a>
             </div>
 
             @php
-                $tramitesDestacados = [
-                    ['Pago de predial', 'Realiza o consulta el pago de tu impuesto predial.', 'En línea', '10 min'],
-                    ['Licencia de funcionamiento', 'Conoce los requisitos para operar tu establecimiento.', 'Mixto', '5 días hábiles'],
-                    ['Constancia de residencia', 'Solicita el documento que acredita tu domicilio.', 'En línea', '3 días hábiles'],
-                    ['Permiso de uso de suelo', 'Consulta la compatibilidad de uso para un predio.', 'Presencial', '10 días hábiles'],
-                ];
+                $tramitesDestacados = $tramites->take(4)->map(fn ($tramite) => [
+                    $tramite->nombre,
+                    $tramite->descripcion ?: 'Consulta la información de este trámite.',
+                    collect($tramite->modalidades ?? [])->count() > 1 ? 'Mixto' : (collect($tramite->modalidades ?? [])->first() === 'EN_LINEA' ? 'En línea' : 'Presencial'),
+                    $tramite->tiempo_estimado ?: 'Tiempo por definir',
+                    route('portal.tramites.detalle', $tramite),
+                ]);
             @endphp
             <div class="mt-8 grid gap-4 md:grid-cols-2">
-                @foreach ($tramitesDestacados as [$nombre, $descripcion, $modalidad, $tiempo])
-                    <article class="group rounded-2xl border border-neza-line bg-white p-5 shadow-[0_8px_24px_rgba(31,41,55,0.05)] transition hover:-translate-y-0.5 hover:border-neza-wine/30 hover:shadow-[0_12px_30px_rgba(52,12,27,0.09)]">
+                @forelse ($tramitesDestacados as [$nombre, $descripcion, $modalidad, $tiempo, $url])
+                    <article
+                        class="group rounded-2xl border border-neza-line bg-white p-5 shadow-[0_8px_24px_rgba(31,41,55,0.05)] transition hover:-translate-y-0.5 hover:border-neza-wine/30 hover:shadow-[0_12px_30px_rgba(52,12,27,0.09)]">
                         <div class="flex items-start justify-between gap-4">
-                            <div class="grid size-10 shrink-0 place-items-center rounded-xl bg-neza-wine-soft text-neza-wine">
-                                <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5V6.75a3.375 3.375 0 00-3.375-3.375H6.75A2.25 2.25 0 004.5 5.625v12.75a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25v-4.125z" /><path stroke-linecap="round" stroke-linejoin="round" d="M14.625 3.75V8.25h4.5" /></svg>
+                            <div
+                                class="grid size-10 shrink-0 place-items-center rounded-xl bg-neza-wine-soft text-neza-wine">
+                                <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.6"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5V6.75a3.375 3.375 0 00-3.375-3.375H6.75A2.25 2.25 0 004.5 5.625v12.75a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25v-4.125z" />
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M14.625 3.75V8.25h4.5" />
+                                </svg>
                             </div>
-                            <span class="rounded-full bg-[#edf8f1] px-2.5 py-1 text-[10px] font-bold text-[#287a47]">{{ $modalidad }}</span>
+                            <span
+                                class="rounded-full bg-[#edf8f1] px-2.5 py-1 text-[10px] font-bold text-[#287a47]">{{ $modalidad }}</span>
                         </div>
                         <h3 class="mt-4 text-base font-bold text-neza-ink">{{ $nombre }}</h3>
                         <p class="mt-1.5 text-[13px] leading-relaxed text-neza-muted">{{ $descripcion }}</p>
                         <div class="mt-5 flex items-center justify-between border-t border-neza-line pt-4 text-xs">
                             <span class="flex items-center gap-1.5 text-neza-muted">
-                                <svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>{{ $tiempo }}
+                                <svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>{{ $tiempo }}
                             </span>
-                            <a href="{{ $nombre === 'Pago de predial' ? route('portal.tramites.predial') : route('portal.tramites.index') }}" class="inline-flex items-center gap-1 font-bold text-neza-wine">Ver trámite
-                                <svg class="size-3.5 transition group-hover:translate-x-0.5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg>
+                            <a href="{{ $url }}"
+                                class="inline-flex items-center gap-1 font-bold text-neza-wine">Ver trámite
+                                <svg class="size-3.5 transition group-hover:translate-x-0.5" aria-hidden="true"
+                                    fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                                </svg>
                             </a>
                         </div>
                     </article>
-                @endforeach
+                @empty
+                    <p class="col-span-full rounded-xl border border-dashed border-neza-line bg-white p-6 text-sm text-neza-muted">No hay trámites publicados disponibles por el momento.</p>
+                @endforelse
             </div>
         </div>
     </section>
@@ -83,29 +126,50 @@
         <div class="mx-auto grid max-w-[1296px] items-center gap-10 lg:grid-cols-[0.85fr_1.15fr]">
             <div>
                 <div class="grid size-11 place-items-center rounded-xl border border-white/15 bg-white/10 text-[#be985c]">
-                    <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5V6.75a3.375 3.375 0 00-3.375-3.375H6.75A2.25 2.25 0 004.5 5.625v12.75a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25v-4.125z" /></svg>
+                    <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5V6.75a3.375 3.375 0 00-3.375-3.375H6.75A2.25 2.25 0 004.5 5.625v12.75a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25v-4.125z" />
+                    </svg>
                 </div>
                 <p class="mt-5 text-[11px] font-bold uppercase tracking-wide text-[#be985c]">Seguimiento ciudadano</p>
                 <h2 class="mt-2 max-w-md text-3xl font-bold leading-tight">Consulta el estado de tu trámite</h2>
-                <p class="mt-3 max-w-lg text-sm leading-relaxed text-white/70">Ingresa tu CURP y solicita un token temporal en el correo asociado para consultar tus solicitudes de forma segura.</p>
+                <p class="mt-3 max-w-lg text-sm leading-relaxed text-white/70">Ingresa tu CURP y solicita un token temporal
+                    en el correo asociado para consultar tus solicitudes de forma segura.</p>
             </div>
-            <form class="rounded-2xl bg-white p-5 text-neza-ink shadow-2xl sm:p-6" action="{{ route('portal.publico') }}#consulta" method="GET">
+            <form class="rounded-2xl bg-white p-5 text-neza-ink shadow-2xl sm:p-6"
+                action="{{ route('portal.publico') }}#consulta" method="GET">
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                         <label for="curp-consulta" class="text-xs font-bold">CURP</label>
-                        <input id="curp-consulta" name="curp_consulta" type="text" maxlength="18" autocomplete="off" placeholder="Ingresa tu CURP" class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm uppercase outline-none transition focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15">
+                        <input id="curp-consulta" name="curp_consulta" type="text" maxlength="18" autocomplete="off"
+                            placeholder="Ingresa tu CURP"
+                            class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm uppercase outline-none transition focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15">
                     </div>
                     <div>
                         <label for="correo-consulta" class="text-xs font-bold">Correo electrónico</label>
-                        <input id="correo-consulta" name="email_contacto" type="email" autocomplete="email" placeholder="correo@ejemplo.com" class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm outline-none transition focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15">
+                        <input id="correo-consulta" name="email_contacto" type="email" autocomplete="email"
+                            placeholder="correo@ejemplo.com"
+                            class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm outline-none transition focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15">
                     </div>
                 </div>
-                <div class="mt-4 flex flex-col gap-4 border-t border-neza-line pt-4 sm:flex-row sm:items-center sm:justify-between">
+                <div
+                    class="mt-4 flex flex-col gap-4 border-t border-neza-line pt-4 sm:flex-row sm:items-center sm:justify-between">
                     <div class="flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-neza-muted">
-                        <span class="flex items-center gap-1.5"><svg class="size-4 text-[#287a47]" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m6-3.75A2.25 2.25 0 0018.75 3.75H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18V6z" /></svg>Token temporal</span>
-                        <span class="flex items-center gap-1.5"><svg class="size-4 text-[#76531f]" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 00-9 0v3.75m-.75 0h10.5A2.25 2.25 0 0119.5 12.75v6A2.25 2.25 0 0117.25 21H6.75a2.25 2.25 0 01-2.25-2.25v-6a2.25 2.25 0 012.25-2.25z" /></svg>Datos protegidos</span>
+                        <span class="flex items-center gap-1.5"><svg class="size-4 text-[#287a47]" aria-hidden="true"
+                                fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 12.75L11.25 15 15 9.75m6-3.75A2.25 2.25 0 0018.75 3.75H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18V6z" />
+                            </svg>Token temporal</span>
+                        <span class="flex items-center gap-1.5"><svg class="size-4 text-[#76531f]" aria-hidden="true"
+                                fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M16.5 10.5V6.75a4.5 4.5 0 00-9 0v3.75m-.75 0h10.5A2.25 2.25 0 0119.5 12.75v6A2.25 2.25 0 0117.25 21H6.75a2.25 2.25 0 01-2.25-2.25v-6a2.25 2.25 0 012.25-2.25z" />
+                            </svg>Datos protegidos</span>
                     </div>
-                    <button type="submit" class="h-11 shrink-0 rounded-xl bg-neza-wine px-5 text-sm font-bold text-white transition hover:bg-[#4c0f26]">Solicitar token</button>
+                    <button type="submit"
+                        class="h-11 shrink-0 rounded-xl bg-neza-wine px-5 text-sm font-bold text-white transition hover:bg-[#4c0f26]">Solicitar
+                        token</button>
                 </div>
             </form>
         </div>
@@ -115,13 +179,18 @@
         <div class="mx-auto max-w-[1296px] text-center">
             <p class="text-[11px] font-bold uppercase tracking-wide text-[#76531f]">Simple y transparente</p>
             <h2 class="mt-2 text-2xl font-bold sm:text-[30px]">Haz tu trámite en 3 pasos</h2>
-            <p class="mt-2 text-sm text-neza-muted">Una experiencia guiada para avanzar con claridad desde cualquier dispositivo.</p>
+            <p class="mt-2 text-sm text-neza-muted">Una experiencia guiada para avanzar con claridad desde cualquier
+                dispositivo.</p>
             <div class="mt-9 grid gap-4 text-left md:grid-cols-3">
                 @foreach ([['01', 'Encuentra tu trámite', 'Busca por palabra clave y revisa los requisitos antes de comenzar.'], ['02', 'Carga tus documentos', 'Adjunta archivos válidos y completa los datos solicitados.'], ['03', 'Recibe seguimiento', 'Consulta avances y recibe avisos importantes en tu correo.']] as [$numero, $titulo, $texto])
                     <article class="relative rounded-2xl border border-neza-line bg-[#fdfbf8] p-6">
                         <span class="absolute right-5 top-5 text-xs font-bold text-[#be985c]">{{ $numero }}</span>
                         <div class="grid size-11 place-items-center rounded-xl bg-white text-[#76531f] shadow-sm">
-                            <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M6.75 3.75h10.5A2.25 2.25 0 0119.5 6v12a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 18V6a2.25 2.25 0 012.25-2.25z" /></svg>
+                            <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24"
+                                stroke-width="1.6" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round"
+                                    d="M9 12.75L11.25 15 15 9.75M6.75 3.75h10.5A2.25 2.25 0 0119.5 6v12a2.25 2.25 0 01-2.25 2.25H6.75A2.25 2.25 0 014.5 18V6a2.25 2.25 0 012.25-2.25z" />
+                            </svg>
                         </div>
                         <h3 class="mt-5 font-bold">{{ $titulo }}</h3>
                         <p class="mt-2 text-[13px] leading-relaxed text-neza-muted">{{ $texto }}</p>
@@ -129,14 +198,26 @@
                 @endforeach
             </div>
             <div class="mt-7 flex flex-wrap justify-center gap-x-8 gap-y-3 text-xs font-medium text-neza-muted">
-                <span class="flex items-center gap-2"><svg class="size-4 text-neza-wine" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75m6-3.75A2.25 2.25 0 0018.75 3.75H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18V6z" /></svg>Seguimiento por correo</span>
-                <span class="flex items-center gap-2"><svg class="size-4 text-neza-wine" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 00-9 0v3.75m-.75 0h10.5A2.25 2.25 0 0119.5 12.75v6A2.25 2.25 0 0117.25 21H6.75a2.25 2.25 0 01-2.25-2.25v-6a2.25 2.25 0 012.25-2.25z" /></svg>Documentos protegidos</span>
-                <span class="flex items-center gap-2"><svg class="size-4 text-neza-wine" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M12 2.25c-2.49 2.278-5.25 2.25-7.5 2.25v6c0 5.13 3.336 9.177 7.5 11.25 4.164-2.073 7.5-6.12 7.5-11.25v-6c-2.25 0-5.01.028-7.5-2.25z" /></svg>Información verificada</span>
+                <span class="flex items-center gap-2"><svg class="size-4 text-neza-wine" aria-hidden="true"
+                        fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 12.75L11.25 15 15 9.75m6-3.75A2.25 2.25 0 0018.75 3.75H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18V6z" />
+                    </svg>Seguimiento por correo</span>
+                <span class="flex items-center gap-2"><svg class="size-4 text-neza-wine" aria-hidden="true"
+                        fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M16.5 10.5V6.75a4.5 4.5 0 00-9 0v3.75m-.75 0h10.5A2.25 2.25 0 0119.5 12.75v6A2.25 2.25 0 0117.25 21H6.75a2.25 2.25 0 01-2.25-2.25v-6a2.25 2.25 0 012.25-2.25z" />
+                    </svg>Documentos protegidos</span>
+                <span class="flex items-center gap-2"><svg class="size-4 text-neza-wine" aria-hidden="true"
+                        fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M9 12.75L11.25 15 15 9.75M12 2.25c-2.49 2.278-5.25 2.25-7.5 2.25v6c0 5.13 3.336 9.177 7.5 11.25 4.164-2.073 7.5-6.12 7.5-11.25v-6c-2.25 0-5.01.028-7.5-2.25z" />
+                    </svg>Información verificada</span>
             </div>
         </div>
     </section>
 
-    <section id="avisos" class="bg-[#f8f9fa] px-4 py-14 sm:px-6 lg:px-[72px] lg:py-16">
+    {{-- <section id="avisos" class="bg-[#f8f9fa] px-4 py-14 sm:px-6 lg:px-[72px] lg:py-16">
         <div class="mx-auto max-w-[1296px]">
             <p class="text-[11px] font-bold uppercase tracking-wide text-[#76531f]">Mantente informado</p>
             <h2 class="mt-2 text-2xl font-bold sm:text-[30px]">Avisos importantes y próximas fechas</h2>
@@ -165,19 +246,36 @@
                 </article>
             </div>
         </div>
-    </section>
+    </section> --}}
 
     <section id="servicios" class="bg-white px-4 py-14 sm:px-6 lg:px-[72px] lg:py-16">
         <div class="mx-auto max-w-[1296px]">
             <div class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div><p class="text-[11px] font-bold uppercase tracking-wide text-[#76531f]">Más del municipio</p><h2 class="mt-2 text-2xl font-bold sm:text-[30px]">Servicios y enlaces de interés</h2><p class="mt-2 text-sm text-neza-muted">Accesos rápidos a información, pagos y servicios municipales.</p></div>
+                <div>
+                    <p class="text-[11px] font-bold uppercase tracking-wide text-[#76531f]">Más del municipio</p>
+                    <h2 class="mt-2 text-2xl font-bold sm:text-[30px]">Servicios y enlaces de interés</h2>
+                    <p class="mt-2 text-sm text-neza-muted">Accesos rápidos a información, pagos y servicios municipales.
+                    </p>
+                </div>
                 <a href="#" class="text-xs font-bold text-neza-wine">Explorar todos los servicios</a>
             </div>
             <div class="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
                 @foreach (['Pago en línea', 'Directorio de dependencias', 'Transparencia', 'Mapas y cartografía', 'Bolsa de trabajo', 'Programas sociales', 'Quejas y sugerencias', 'Protección de datos'] as $servicio)
-                    <a href="#" class="group flex min-h-24 items-center justify-between gap-3 rounded-xl border border-neza-line bg-[#f8f9fa] p-4 transition hover:border-neza-wine/40 hover:bg-white">
-                        <span><span class="mb-3 grid size-8 place-items-center rounded-lg bg-neza-wine-soft text-neza-wine"><svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 21h16.5M4.5 3h15l-.75 6H5.25L4.5 3zm.75 6v9.75h13.5V9M9 21v-6h6v6" /></svg></span><span class="text-xs font-bold text-neza-ink">{{ $servicio }}</span></span>
-                        <svg class="size-4 shrink-0 text-neza-muted transition group-hover:translate-x-0.5 group-hover:text-neza-wine" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg>
+                    <a href="#"
+                        class="group flex min-h-24 items-center justify-between gap-3 rounded-xl border border-neza-line bg-[#f8f9fa] p-4 transition hover:border-neza-wine/40 hover:bg-white">
+                        <span><span
+                                class="mb-3 grid size-8 place-items-center rounded-lg bg-neza-wine-soft text-neza-wine"><svg
+                                    class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24"
+                                    stroke-width="1.7" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round"
+                                        d="M3.75 21h16.5M4.5 3h15l-.75 6H5.25L4.5 3zm.75 6v9.75h13.5V9M9 21v-6h6v6" />
+                                </svg></span><span
+                                class="text-xs font-bold text-neza-ink">{{ $servicio }}</span></span>
+                        <svg class="size-4 shrink-0 text-neza-muted transition group-hover:translate-x-0.5 group-hover:text-neza-wine"
+                            aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                        </svg>
                     </a>
                 @endforeach
             </div>
@@ -189,31 +287,89 @@
             <div>
                 <p class="text-[11px] font-bold uppercase tracking-wide text-[#76531f]">Orientación y soporte</p>
                 <h2 class="mt-2 text-2xl font-bold sm:text-[30px]">¿Necesitas ayuda?</h2>
-                <p class="mt-2 text-sm text-neza-muted">Resuelve tus dudas frecuentes o comunícate por los canales oficiales.</p>
+                <p class="mt-2 text-sm text-neza-muted">Resuelve tus dudas frecuentes o comunícate por los canales
+                    oficiales.</p>
                 <div class="mt-7 space-y-2">
                     @foreach (['¿Cómo sé si un trámite puede realizarse en línea?', '¿Qué hago si olvidé mi folio?', '¿Cómo corrijo un documento antes de enviar?', '¿Dónde consulto requisitos, costos y tiempos?'] as $pregunta)
                         <details class="group rounded-xl border border-neza-line bg-white px-4 py-3">
-                            <summary class="flex cursor-pointer list-none items-center justify-between gap-4 text-[13px] font-bold [&::-webkit-details-marker]:hidden">{{ $pregunta }}<svg class="size-4 shrink-0 text-neza-wine transition group-open:rotate-45" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6" /></svg></summary>
-                            <p class="mt-3 border-t border-neza-line pt-3 text-[13px] leading-relaxed text-neza-muted">Consulta la ficha del trámite. Ahí encontrarás su modalidad, requisitos, documentos, costo y tiempo estimado de respuesta.</p>
+                            <summary
+                                class="flex cursor-pointer list-none items-center justify-between gap-4 text-[13px] font-bold [&::-webkit-details-marker]:hidden">
+                                {{ $pregunta }}<svg
+                                    class="size-4 shrink-0 text-neza-wine transition group-open:rotate-45"
+                                    aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8"
+                                    stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6" />
+                                </svg></summary>
+                            <p class="mt-3 border-t border-neza-line pt-3 text-[13px] leading-relaxed text-neza-muted">
+                                Consulta la ficha del trámite. Ahí encontrarás su modalidad, requisitos, documentos, costo y
+                                tiempo estimado de respuesta.</p>
                         </details>
                     @endforeach
                 </div>
-                <a href="#" class="mt-5 inline-flex items-center gap-1 text-xs font-bold text-neza-wine">Visitar el centro de ayuda <svg class="size-3.5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg></a>
+                <a href="#" class="mt-5 inline-flex items-center gap-1 text-xs font-bold text-neza-wine">Visitar el
+                    centro de ayuda <svg class="size-3.5" aria-hidden="true" fill="none" viewBox="0 0 24 24"
+                        stroke-width="2" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                    </svg></a>
             </div>
             <aside class="rounded-2xl border border-neza-line bg-white p-6 shadow-[0_10px_30px_rgba(31,41,55,0.06)]">
-                <div class="flex items-start gap-3"><span class="grid size-10 shrink-0 place-items-center rounded-xl bg-neza-wine-soft text-neza-wine"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.142-4.03 7.5-9 7.5a10.3 10.3 0 01-3.555-.62L3 21l1.73-4.61A6.808 6.808 0 013 12c0-4.142 4.03-7.5 9-7.5s9 3.358 9 7.5z" /></svg></span><div><h3 class="font-bold">Canales de atención</h3><p class="mt-1 text-xs text-neza-muted">Comunícate únicamente por medios oficiales.</p></div></div>
-                <div class="mt-5 rounded-xl bg-neza-wine-soft p-4"><p class="text-[10px] font-bold uppercase text-neza-wine">Atención telefónica</p><a href="tel:5557169070" class="mt-1 block text-xl font-bold text-[#340c1b]">55 5716 9070</a></div>
-                <div class="mt-4 space-y-3 text-[13px]"><p class="flex gap-3"><svg class="mt-0.5 size-4 shrink-0 text-neza-wine" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" /></svg><span><strong class="block">Horario de atención</strong><span class="text-neza-muted">Lunes a viernes, 9:00 a 18:00 h.</span></span></p></div>
-                <div class="mt-5 grid gap-2 sm:grid-cols-2"><a href="#" class="flex h-11 items-center justify-center gap-2 rounded-xl border border-neza-wine text-xs font-bold text-neza-wine hover:bg-neza-wine-soft">Enviar mensaje</a><a href="#" class="flex h-11 items-center justify-center gap-2 rounded-xl border border-neza-wine text-xs font-bold text-neza-wine hover:bg-neza-wine-soft">Reportar problema</a></div>
-                <p class="mt-4 rounded-xl bg-[#fdfbf8] p-3 text-[11px] leading-relaxed text-[#76531f]">No compartas contraseñas ni datos bancarios por mensajes o llamadas.</p>
+                <div class="flex items-start gap-3"><span
+                        class="grid size-10 shrink-0 place-items-center rounded-xl bg-neza-wine-soft text-neza-wine"><svg
+                            class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7"
+                            stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M8.625 9.75a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.142-4.03 7.5-9 7.5a10.3 10.3 0 01-3.555-.62L3 21l1.73-4.61A6.808 6.808 0 013 12c0-4.142 4.03-7.5 9-7.5s9 3.358 9 7.5z" />
+                        </svg></span>
+                    <div>
+                        <h3 class="font-bold">Canales de atención</h3>
+                        <p class="mt-1 text-xs text-neza-muted">Comunícate únicamente por medios oficiales.</p>
+                    </div>
+                </div>
+                <div class="mt-5 rounded-xl bg-neza-wine-soft p-4">
+                    <p class="text-[10px] font-bold uppercase text-neza-wine">Atención telefónica</p><a
+                        href="tel:5557169070" class="mt-1 block text-xl font-bold text-[#340c1b]">55 5716 9070</a>
+                </div>
+                <div class="mt-4 space-y-3 text-[13px]">
+                    <p class="flex gap-3"><svg class="mt-0.5 size-4 shrink-0 text-neza-wine" aria-hidden="true"
+                            fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg><span><strong class="block">Horario de atención</strong><span class="text-neza-muted">Lunes
+                                a viernes, 9:00 a 18:00 h.</span></span></p>
+                </div>
+                <div class="mt-5 grid gap-2 sm:grid-cols-2"><a href="#"
+                        class="flex h-11 items-center justify-center gap-2 rounded-xl border border-neza-wine text-xs font-bold text-neza-wine hover:bg-neza-wine-soft">Enviar
+                        mensaje</a><a href="#"
+                        class="flex h-11 items-center justify-center gap-2 rounded-xl border border-neza-wine text-xs font-bold text-neza-wine hover:bg-neza-wine-soft">Reportar
+                        problema</a></div>
+                <p class="mt-4 rounded-xl bg-[#fdfbf8] p-3 text-[11px] leading-relaxed text-[#76531f]">No compartas
+                    contraseñas ni datos bancarios por mensajes o llamadas.</p>
             </aside>
         </div>
     </section>
 
     <section class="bg-white px-4 py-14 sm:px-6 lg:px-[72px] lg:py-[68px]">
-        <div class="mx-auto flex min-h-[220px] max-w-[1296px] flex-col justify-between gap-8 overflow-hidden rounded-2xl bg-neza-wine px-6 py-9 text-white sm:px-10 lg:flex-row lg:items-center lg:px-12 lg:py-10">
-            <div class="max-w-3xl"><p class="text-xs font-bold uppercase tracking-wide text-[#be985c]">Tu tiempo importa</p><h2 class="mt-3 text-3xl font-bold sm:text-[38px]">Realiza tus trámites sin filas</h2><p class="mt-3 text-[15px] text-white/70">Explora el catálogo, prepara tus documentos y da seguimiento con tu CURP y token temporal.</p></div>
-            <div class="flex flex-col gap-3 sm:flex-row"><a href="{{ route('portal.tramites.index') }}" class="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-[#340c1b] hover:bg-[#fdfbf8]"><svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.35-5.4a6.75 6.75 0 11-13.5 0 6.75 6.75 0 0113.5 0z" /></svg>Explorar trámites</a><a href="#consulta" class="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/45 px-5 text-sm font-bold text-white hover:bg-white/10"><svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" /></svg>Consultar trámite</a></div>
+        <div
+            class="mx-auto flex min-h-[220px] max-w-[1296px] flex-col justify-between gap-8 overflow-hidden rounded-2xl bg-neza-wine px-6 py-9 text-white sm:px-10 lg:flex-row lg:items-center lg:px-12 lg:py-10">
+            <div class="max-w-3xl">
+                <p class="text-xs font-bold uppercase tracking-wide text-[#be985c]">Tu tiempo importa</p>
+                <h2 class="mt-3 text-3xl font-bold sm:text-[38px]">Realiza tus trámites sin filas</h2>
+                <p class="mt-3 text-[15px] text-white/70">Explora el catálogo, prepara tus documentos y da seguimiento con
+                    tu CURP y token temporal.</p>
+            </div>
+            <div class="flex flex-col gap-3 sm:flex-row"><a href="{{ route('portal.tramites.index') }}"
+                    class="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-white px-5 text-sm font-bold text-[#340c1b] hover:bg-[#fdfbf8]"><svg
+                        class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="m21 21-4.35-4.35m1.35-5.4a6.75 6.75 0 11-13.5 0 6.75 6.75 0 0113.5 0z" />
+                    </svg>Explorar trámites</a><a href="#consulta"
+                    class="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-white/45 px-5 text-sm font-bold text-white hover:bg-white/10"><svg
+                        class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8"
+                        stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                    </svg>Consultar trámite</a></div>
         </div>
     </section>
 @endsection

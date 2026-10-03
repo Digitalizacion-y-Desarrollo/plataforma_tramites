@@ -62,17 +62,11 @@
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-2 border-b border-neza-line px-5 py-3">
-                    <a class="rounded-md bg-neza-wine px-3 py-1.5 text-xs font-semibold text-white"
+                    <a class="rounded-md px-3 py-1.5 text-xs font-semibold {{ $filtro === '' ? 'bg-neza-wine text-white' : 'bg-neza-wine-soft text-neza-wine hover:bg-neza-wine hover:text-white' }}"
                         href="{{ route('formulario.index') }}">Todos <span
-                            class="ml-1 opacity-80">({{ $formularios->total() }})</span></a>
-                    <a class="rounded-md bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100"
-                        href="#">Publicados <span class="ml-1 opacity-80">(0)</span></a>
-                    <a class="rounded-md bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-700 hover:bg-amber-100"
-                        href="#">Borradores <span class="ml-1 opacity-80">(0)</span></a>
-                    <a class="rounded-md bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-200"
-                        href="#">Archivados <span class="ml-1 opacity-80">(0)</span></a>
-                    <a class="rounded-md bg-rose-50 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
-                        href="#">Con cambios recientes <span class="ml-1 opacity-80">(0)</span></a>
+                            class="ml-1 opacity-80">({{ $conteos['todos'] }})</span></a>
+                    <a class="rounded-md px-3 py-1.5 text-xs font-semibold {{ $filtro === 'RECIENTES' ? 'bg-rose-700 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100' }}"
+                        href="{{ route('formulario.index', ['filtro' => 'RECIENTES']) }}">Con cambios recientes <span class="ml-1 opacity-80">({{ $conteos['RECIENTES'] }})</span></a>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[780px] text-left text-sm">
@@ -83,7 +77,6 @@
                                 <th class="px-4 py-3">Departamento</th>
                                 <th class="px-4 py-3 text-center">Campos</th>
                                 <th class="px-4 py-3">Última edición</th>
-                                <th class="px-4 py-3">Estado</th>
                                 <th class="px-5 py-3 text-right">Acciones</th>
                             </tr>
                         </thead>
@@ -101,12 +94,6 @@
                                             ->join(', ') ?:
                                         'Sin trámite')
                                         : 'Sin trámite';
-                                    $estado = $version?->estado;
-                                    $estadoClase = match ($estado?->clave) {
-                                        'PUBLICADO' => 'bg-emerald-50 text-emerald-700',
-                                        'BORRADOR' => 'bg-amber-50 text-amber-700',
-                                        default => 'bg-slate-100 text-slate-700',
-                                    };
                                 @endphp
                                 <tr class="hover:bg-neza-canvas">
                                     <td class="px-5 py-4">
@@ -124,9 +111,6 @@
                                     <td class="px-4 py-4 text-center text-neza-muted">{{ $campos }}</td>
                                     <td class="px-4 py-4 text-neza-muted">
                                         {{ $formulario->updated_at->format('d/m/Y H:i') }}</td>
-                                    <td class="px-4 py-4"><span
-                                            class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $estadoClase }}">{{ $estado?->nombre ?? 'Sin versión' }}</span>
-                                    </td>
                                     <td class="px-5 py-4">
                                         <div class="flex justify-end gap-3"><a
                                                 href="{{ route('formulario.show', $formulario) }}" title="Ver formulario"
@@ -177,7 +161,7 @@
                                 </tr>
                                 @empty
                                     <tr>
-                                        <td colspan="7" class="px-5 py-16 text-center">
+                                        <td colspan="6" class="px-5 py-16 text-center">
                                             <div class="mx-auto flex max-w-sm flex-col items-center"><span
                                                     class="grid size-12 place-items-center rounded-full bg-neza-wine-soft text-neza-wine"><svg
                                                         class="size-6" aria-hidden="true" fill="none" viewBox="0 0 24 24"
