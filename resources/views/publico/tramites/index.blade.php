@@ -5,7 +5,6 @@
 @section('content')
     @php
         $tramitesMock = [
-            ['nombre' => 'Pago de predial', 'categoria' => 'Vivienda y propiedad', 'descripcion' => 'Consulta tu saldo y realiza el pago del impuesto predial de tu inmueble.', 'dependencia' => 'Tesorería Municipal', 'modalidad' => 'En línea', 'costo' => 'Con costo', 'tiempo' => '5–10 min', 'url' => route('portal.tramites.predial')],
             ['nombre' => 'Licencia de funcionamiento', 'categoria' => 'Negocios y comercio', 'descripcion' => 'Solicita o renueva la licencia para operar un establecimiento comercial.', 'dependencia' => 'Desarrollo Económico', 'modalidad' => 'Mixto', 'costo' => 'Con costo', 'tiempo' => '3–5 días', 'url' => '#'],
             ['nombre' => 'Constancia de residencia', 'categoria' => 'Identidad y documentos', 'descripcion' => 'Acredita tu domicilio actual dentro del municipio de Nezahualcóyotl.', 'dependencia' => 'Secretaría del Ayuntamiento', 'modalidad' => 'Presencial', 'costo' => 'Gratuito', 'tiempo' => '1 día', 'url' => '#'],
             ['nombre' => 'Permiso de uso de suelo', 'categoria' => 'Vivienda y propiedad', 'descripcion' => 'Obtén la autorización municipal para el uso previsto de un predio.', 'dependencia' => 'Desarrollo Urbano', 'modalidad' => 'Mixto', 'costo' => 'Con costo', 'tiempo' => '7–10 días', 'url' => '#'],
@@ -68,7 +67,7 @@
                             'url' => route('portal.tramites.detalle', $tramite),
                         ]])
                     @empty
-                        <p class="col-span-full rounded-2xl border border-dashed border-neza-line bg-white p-8 text-center text-sm text-neza-muted">No hay trámites activos y publicados disponibles. <a href="{{ route('portal.tramites.predial') }}" class="font-bold text-neza-wine">Consultar Pago de predial</a></p>
+                        <p class="col-span-full rounded-2xl border border-dashed border-neza-line bg-white p-8 text-center text-sm text-neza-muted">No hay trámites activos y publicados disponibles.</p>
                     @endforelse
                 </div>
                 <div class="mt-8 flex flex-col gap-4 text-xs text-neza-muted sm:flex-row sm:items-center sm:justify-between"><p>Mostrando 1–12 de 24 trámites</p><nav class="flex gap-2" aria-label="Paginación"><a href="#" class="rounded-lg border border-neza-line bg-white px-4 py-2">Anterior</a><a href="#" class="rounded-lg bg-neza-wine px-4 py-2 font-bold text-white">1</a><a href="#" class="rounded-lg border border-neza-line bg-white px-4 py-2">2</a><a href="#" class="rounded-lg border border-neza-line bg-white px-4 py-2 font-bold text-neza-wine">Siguiente</a></nav></div>

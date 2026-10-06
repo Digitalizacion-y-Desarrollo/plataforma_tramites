@@ -25,18 +25,6 @@ class PublicoController extends Controller
         return view('publico.tramites.index', compact('tramites'));
     }
 
-    public function predial(): View
-    {
-        if (! Schema::hasTable('tramites')) {
-            return view('publico.tramites.predial');
-        }
-
-        $tramite = Tramite::query()->where('activo', true)->where('clave', 'PREDIAL')->first();
-        $formularioVersion = $tramite ? $this->formularioActivo($tramite) : null;
-
-        return view('publico.tramites.detalle', compact('tramite', 'formularioVersion'));
-    }
-
     public function detalle(Tramite $tramite): View
     {
         abort_unless($tramite->activo, 404);
@@ -54,20 +42,6 @@ class PublicoController extends Controller
         abort_unless($formularioVersion, 404);
 
         return view('publico.tramites.formulario', compact('tramite', 'formularioVersion'));
-    }
-
-    public function iniciarPredial()
-    {
-        if (! Schema::hasTable('tramites')) {
-            return view('publico.tramites.predial-iniciar');
-        }
-
-        $tramite = Tramite::query()
-            ->where('clave', 'PREDIAL')
-            ->where('activo', true)
-            ->firstOrFail();
-
-        return redirect()->route('portal.tramites.iniciar', $tramite);
     }
 
     public function storeSolicitud(Request $request, Tramite $tramite)

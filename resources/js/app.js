@@ -254,6 +254,30 @@ document.querySelectorAll('[data-modal-close]').forEach((boton) => {
     boton.addEventListener('click', () => document.getElementById(boton.dataset.modalClose)?.close());
 });
 
+const modalDocumento = document.querySelector('#documento-previsualizador');
+const marcoDocumento = document.querySelector('#documento-previsualizador-marco');
+const tituloDocumento = document.querySelector('#documento-previsualizador-titulo');
+
+if (modalDocumento && marcoDocumento && tituloDocumento) {
+    document.querySelectorAll('[data-document-preview]').forEach((boton) => {
+        boton.addEventListener('click', () => {
+            tituloDocumento.textContent = boton.dataset.documentName || 'Previsualización del documento';
+            marcoDocumento.src = boton.dataset.previewUrl || 'about:blank';
+            modalDocumento.showModal();
+        });
+    });
+
+    const cerrarPrevisualizador = () => {
+        marcoDocumento.src = 'about:blank';
+        modalDocumento.close();
+    };
+
+    modalDocumento.querySelector('[data-document-preview-close]')?.addEventListener('click', cerrarPrevisualizador);
+    modalDocumento.addEventListener('cancel', () => {
+        marcoDocumento.src = 'about:blank';
+    });
+}
+
 document.querySelectorAll('dialog[open]').forEach((modal) => {
     modal.removeAttribute('open');
     modal.showModal();

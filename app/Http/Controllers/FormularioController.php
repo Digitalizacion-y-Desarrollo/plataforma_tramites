@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Integrations\AccesosClient;
 use App\Models\CampoCondicion;
 use App\Models\Formulario;
+use App\Models\Tramite;
 use App\Models\FormularioCampo;
 use App\Models\FormularioEstado;
 use App\Models\FormularioGrupoCampo;
@@ -61,8 +62,15 @@ class FormularioController extends Controller
             $departamentos = [];
         }
 
-        $tramites = DB::table('tramites')
+        $tramitesConFormulario = DB::table('tramite_formulario')
+            ->join('formulario_versiones', 'formulario_versiones.id', '=', 'tramite_formulario.formulario_version_id')
+            ->join('formularios', 'formularios.id', '=', 'formulario_versiones.formulario_id')
+            ->whereNull('formularios.deleted_at')
+            ->pluck('tramite_formulario.tramite_id');
+
+        $tramites = Tramite::query()
             ->where('activo', true)
+            ->whereNotIn('id', $tramitesConFormulario)
             ->orderBy('nombre')
             ->get(['id', 'nombre']);
 
@@ -82,7 +90,7 @@ class FormularioController extends Controller
             ->join('formularios', 'formularios.id', '=', 'formulario_versiones.formulario_id')
             ->whereNull('formularios.deleted_at')
             ->pluck('tramite_formulario.tramite_id');
-        $tramites = DB::table('tramites')
+        $tramites = Tramite::query()
             ->where('activo', true)
             ->whereNotIn('id', $tramitesConFormulario)
             ->orderBy('nombre')
@@ -96,7 +104,7 @@ class FormularioController extends Controller
         $datos = $request->validate([
             'tramite_id' => [
                 'required',
-                Rule::exists('tramites', 'id')->where('activo', true),
+                Rule::exists('tramites', 'id')->where('activo', true)->whereNull('deleted_at'),
                 Rule::unique('tramite_formulario', 'tramite_id'),
             ],
             'departamento_accesos_id' => ['required', 'string', 'max:100'],
@@ -298,7 +306,7 @@ class FormularioController extends Controller
             'descripcion' => ['nullable', 'string'],
             'tramite_id' => [
                 'required',
-                Rule::exists('tramites', 'id')->where('activo', true),
+                Rule::exists('tramites', 'id')->where('activo', true)->whereNull('deleted_at'),
                 Rule::unique('tramite_formulario', 'tramite_id'),
             ],
             'departamento_accesos_id' => ['required', 'string', 'max:100'],
@@ -402,9 +410,34 @@ class FormularioController extends Controller
             $departamentos = [];
         }
 
-        $tramites = DB::table('tramites')->where('activo', true)->orderBy('nombre')->get(['id', 'nombre']);
+        $tramitesConFormulario = DB::table('tramite_formulario')
+            ->join('formulario_versiones', 'formulario_versiones.id', '=', 'tramite_formulario.formulario_version_id')
+            ->join('formularios', 'formularios.id', '=', 'formulario_versiones.formulario_id')
+            ->whereNull('formularios.deleted_at')
+            ->where('tramite_formulario.formulario_version_id', '!=', $version->id)
+            ->pluck('tramite_formulario.tramite_id');
+        $tramiteAsignadoId = DB::table('tramite_formulario')
+            ->where('formulario_version_id', $version->id)
+            ->value('tramite_id');
 
-        return view('formularios.edit', compact('formulario', 'version', 'departamentos', 'tramites'));
+        $tramiteAsignado = $tramiteAsignadoId
+            ? Tramite::withTrashed()->find($tramiteAsignadoId)
+            : null;
+
+        $tramites = Tramite::query()
+            ->where('activo', true)
+            ->whereNotIn('id', $tramitesConFormulario)
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
+
+        return view('formularios.edit', compact(
+            'formulario',
+            'version',
+            'departamentos',
+            'tramites',
+            'tramiteAsignadoId',
+            'tramiteAsignado',
+        ));
     }
 
     public function storeSeccion(Request $request, Formulario $formulario)
@@ -825,7 +858,9 @@ class FormularioController extends Controller
             'descripcion' => ['nullable', 'string'],
             'tramite_id' => [
                 'required',
-                Rule::exists('tramites', 'id')->where('activo', true),
+                Rule::exists('tramites', 'id')
+                    ->where('activo', true)
+                    ->whereNull('deleted_at'),
                 Rule::unique('tramite_formulario', 'tramite_id')->ignore($version->id, 'formulario_version_id'),
             ],
             'departamento_accesos_id' => ['required', 'string', 'max:100'],

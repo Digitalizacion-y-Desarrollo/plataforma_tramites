@@ -25,14 +25,13 @@
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[760px] text-left text-sm">
+                    <table class="w-full min-w-[680px] text-left text-sm">
                         <thead class="bg-neza-canvas text-xs font-semibold text-neza-muted">
                             <tr>
                                 <th class="px-5 py-3">Clave</th>
                                 <th class="px-4 py-3">Nombre</th>
                                 <th class="px-4 py-3">Descripción</th>
                                 <th class="px-4 py-3">Detalles públicos</th>
-                                <th class="px-4 py-3">Publicación</th>
                                 <th class="px-5 py-3 text-right">Estado</th>
                                 <th class="px-5 py-3 text-right">Acciones</th>
                             </tr>
@@ -44,7 +43,6 @@
                                     <td class="px-4 py-4 font-semibold text-neza-ink">{{ $tramite->nombre }}</td>
                                     <td class="max-w-xl px-4 py-4 text-neza-muted">{{ $tramite->descripcion ?: 'Sin descripción' }}</td>
                                     <td class="px-4 py-4 text-xs text-neza-muted"><span class="block">{{ $tramite->duracion ?: 'Sin duración' }}</span><span class="block">{{ $tramite->costo ?: 'Sin costo' }} · {{ $tramite->tiempo_estimado ?: 'Sin tiempo estimado' }}</span><span class="block">{{ collect($tramite->modalidades ?? [])->map(fn ($modalidad) => $modalidad === 'EN_LINEA' ? 'En línea' : 'Presencial')->join(' y ') ?: 'Sin modalidad' }}</span></td>
-                                    <td class="px-4 py-4"><span class="rounded-full px-2.5 py-1 text-xs font-semibold {{ $tramite->estado?->clave === 'PUBLICADO' ? 'bg-emerald-50 text-emerald-700' : ($tramite->estado?->clave === 'ARCHIVADO' ? 'bg-slate-100 text-slate-700' : 'bg-amber-50 text-amber-700') }}">{{ $tramite->estado?->nombre ?? 'Sin estado' }}</span></td>
                                     <td class="px-5 py-4 text-right">
                                         <span @class([
                                             'rounded-full px-2.5 py-1 text-xs font-semibold',
@@ -85,7 +83,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="7" class="px-5 py-16 text-center">
+                                    <td colspan="6" class="px-5 py-16 text-center">
                                         <div class="mx-auto flex max-w-sm flex-col items-center">
                                             <span class="grid size-12 place-items-center rounded-full bg-neza-wine-soft text-neza-wine">
                                                 <svg class="size-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5V6.75a3.375 3.375 0 0 0-3.375-3.375h-3.75A3.375 3.375 0 0 0 4.125 6.75v10.5a3.375 3.375 0 0 0 3.375 3.375H12" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 14.25h3.75m0 0V18m0-3.75-4.5 4.5" /></svg>

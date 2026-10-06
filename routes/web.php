@@ -1,13 +1,18 @@
 <?php
 
 use App\Http\Controllers\PublicoController;
+use App\Http\Controllers\SolicitudController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PublicoController::class, 'index'])->name('portal.publico');
+Route::get('/solicitudes', [SolicitudController::class, 'index'])->name('solicitudes.index');
+Route::get('/solicitudes/{solicitud}', [SolicitudController::class, 'show'])->name('solicitudes.show');
+Route::get('/solicitudes/{solicitud}/documentos/{documento}', [SolicitudController::class, 'descargarDocumento'])->name('solicitudes.documentos.descargar');
+Route::get('/solicitudes/{solicitud}/archivos/{campo}', [SolicitudController::class, 'descargarArchivoRespuesta'])->name('solicitudes.archivos.descargar');
+Route::get('/solicitudes/{solicitud}/documentos/{documento}/previsualizar', [SolicitudController::class, 'previsualizarDocumento'])->name('solicitudes.documentos.previsualizar');
+Route::get('/solicitudes/{solicitud}/archivos/{campo}/previsualizar', [SolicitudController::class, 'previsualizarArchivoRespuesta'])->name('solicitudes.archivos.previsualizar');
 Route::prefix('tramites')->name('portal.tramites.')->controller(PublicoController::class)->group(function () {
     Route::get('/', 'tramites')->name('index');
-    Route::get('/pago-predial', 'predial')->name('predial');
-    Route::get('/pago-predial/iniciar', 'iniciarPredial')->name('predial.iniciar');
     Route::get('/{tramite}/iniciar', 'iniciar')->name('iniciar');
     Route::post('/{tramite}/solicitudes', 'storeSolicitud')->name('solicitudes.store');
     Route::get('/{tramite}', 'detalle')->name('detalle');

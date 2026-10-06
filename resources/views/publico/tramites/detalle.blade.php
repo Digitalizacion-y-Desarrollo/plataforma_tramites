@@ -1,10 +1,10 @@
 @extends('layouts.publico')
 
-@section('title', $tramite?->nombre ?? 'Pago de predial')
+@section('title', $tramite?->nombre ?? 'Trámite no disponible')
 
 @section('content')
     @if (! $tramite)
-        <section class="bg-neza-canvas px-4 py-20"><div class="mx-auto max-w-xl rounded-2xl border border-neza-line bg-white p-8 text-center"><h1 class="text-2xl font-bold">Pago de predial</h1><p class="mt-3 text-sm text-neza-muted">La información del trámite todavía no está disponible.</p></div></section>
+        <section class="bg-neza-canvas px-4 py-20"><div class="mx-auto max-w-xl rounded-2xl border border-neza-line bg-white p-8 text-center"><h1 class="text-2xl font-bold">Trámite no disponible</h1><p class="mt-3 text-sm text-neza-muted">La información del trámite todavía no está disponible.</p></div></section>
     @else
         @php($modalidades = collect($tramite->modalidades ?? [])->map(fn ($valor) => $valor === 'EN_LINEA' ? 'En línea' : 'Presencial'))
         <section class="border-b border-neza-line bg-white px-4 py-8 sm:px-6 lg:px-[72px]"><div class="mx-auto max-w-[1296px]"><nav class="text-xs text-neza-muted"><a href="{{ route('portal.publico') }}" class="font-bold text-neza-wine">Inicio</a><span class="mx-2">/</span><a href="{{ route('portal.tramites.index') }}">Trámites</a><span class="mx-2">/</span>{{ $tramite->nombre }}</nav><h1 class="mt-6 text-3xl font-bold sm:text-[40px]">{{ $tramite->nombre }}</h1><p class="mt-2 max-w-3xl text-sm text-neza-muted">{{ $tramite->descripcion ?: 'Consulta la información de este trámite.' }}</p><div class="mt-6 grid gap-3 rounded-xl border border-neza-line bg-neza-canvas p-5 sm:grid-cols-3">@foreach (['Duración' => $tramite->duracion, 'Costo' => $tramite->costo, 'Tiempo estimado' => $tramite->tiempo_estimado] as $etiqueta => $valor)<div><p class="text-xs font-bold text-neza-muted">{{ $etiqueta }}</p><p class="mt-1 text-sm font-bold">{{ $valor ?: 'Por definir' }}</p></div>@endforeach</div></div></section>
