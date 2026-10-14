@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Mail\SolicitudEnviadaMail;
+use App\Models\Solicitud;
 use App\Models\Tramite;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
@@ -54,6 +58,20 @@ class PublicoController extends Controller
             'email_contacto' => ['required', 'email', 'max:200'],
         ]);
 
+        $solicitudActiva = Solicitud::query()
+            ->where('tramite_id', $tramite->id)
+            ->where('curp_consulta', Str::upper($base['curp_consulta']))
+            ->whereHas('estado', fn ($consulta) => $consulta->whereNotIn('clave', ['APROBADA', 'RECHAZADA']))
+            ->exists();
+
+        if ($solicitudActiva) {
+            return back()
+                ->withInput()
+                ->with('solicitud_activa', [
+                    'consulta_url' => route('portal.publico').'#consulta',
+                ]);
+        }
+
         $campos = $formularioVersion->secciones->where('activo', true)->flatMap(fn ($seccion) => $seccion->campos->where('activo', true))->keyBy('id');
         $respuestas = $request->input('respuestas', []);
         foreach ($campos as $campo) {
@@ -66,13 +84,27 @@ class PublicoController extends Controller
             $requerido = $this->esVisible($campo, $respuestas) && $this->esRequerido($campo, $respuestas);
             $reglas = [$requerido ? 'required' : 'nullable'];
             $valor = $campo->tipo === 'FILE' ? $request->file('respuestas.'.$campo->id) : ($respuestas[$campo->id] ?? null);
-            if ($campo->tipo === 'FILE') $reglas = [$requerido ? 'required' : 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:10240'];
-            if ($campo->tipo === 'ESTADO') $reglas[] = 'in:'.implode(',', array_keys(config('formulario.entidades_federativas')));
-            if ($campo->tipo === 'DOMICILIO') $reglas[] = 'array';
-            if ($campo->tipo === 'EMAIL') $reglas[] = 'email:rfc,dns';
-            if ($campo->tipo === 'NUMBER') $reglas[] = 'numeric';
-            if ($campo->tipo === 'DATE') $reglas[] = 'date';
-            if ($campo->tipo === 'CURP') $reglas[] = 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i';
+            if ($campo->tipo === 'FILE') {
+                $reglas = [$requerido ? 'required' : 'nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:10240'];
+            }
+            if ($campo->tipo === 'ESTADO') {
+                $reglas[] = 'in:'.implode(',', array_keys(config('formulario.entidades_federativas')));
+            }
+            if ($campo->tipo === 'DOMICILIO') {
+                $reglas[] = 'array';
+            }
+            if ($campo->tipo === 'EMAIL') {
+                $reglas[] = 'email:rfc,dns';
+            }
+            if ($campo->tipo === 'NUMBER') {
+                $reglas[] = 'numeric';
+            }
+            if ($campo->tipo === 'DATE') {
+                $reglas[] = 'date';
+            }
+            if ($campo->tipo === 'CURP') {
+                $reglas[] = 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i';
+            }
             $reglasValor = ['valor' => $reglas];
             if ($campo->tipo === 'MULTISELECT') {
                 $reglasValor['valor'] = [$requerido ? 'required' : 'nullable', 'array'];
@@ -81,15 +113,23 @@ class PublicoController extends Controller
                 $reglasValor['valor'][] = 'in:'.$campo->opciones->where('activo', true)->pluck('valor')->implode(',');
             }
             $validacion = validator(['valor' => $valor], $reglasValor);
-            if ($validacion->fails()) $errores['respuestas.'.$campo->id] = $validacion->errors()->first('valor');
+            if ($validacion->fails()) {
+                $errores['respuestas.'.$campo->id] = $validacion->errors()->first('valor');
+            }
         }
-        if ($errores) return back()->withErrors($errores)->withInput();
+        if ($errores) {
+            return back()->withErrors($errores)->withInput();
+        }
 
-        $folio = DB::transaction(function () use ($tramite, $formularioVersion, $campos, $respuestas, $base) {
+        [$solicitudId, $notificacionId] = DB::transaction(function () use ($tramite, $formularioVersion, $campos, $respuestas, $base) {
             $estadoId = DB::table('solicitud_estados')->where('clave', 'ENVIADA')->where('activo', true)->value('id');
             abort_unless($estadoId, 500);
+            $notificacionPendienteId = DB::table('notificacion_estados')->where('clave', 'PENDIENTE')->where('activo', true)->value('id');
+            abort_unless($notificacionPendienteId, 500);
             $id = (string) Str::uuid();
-            do { $folio = 'SOL-'.now()->format('Ymd').'-'.Str::upper(Str::random(6)); } while (DB::table('solicitudes')->where('folio', $folio)->exists());
+            do {
+                $folio = 'SOL-'.now()->format('Ymd').'-'.Str::upper(Str::random(6));
+            } while (DB::table('solicitudes')->where('folio', $folio)->exists());
             DB::table('solicitudes')->insert(['id' => $id, 'folio' => $folio, 'tramite_id' => $tramite->id, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => Str::upper($base['curp_consulta']), 'email_contacto' => $base['email_contacto'], 'fecha_envio' => now(), 'created_at' => now(), 'updated_at' => now()]);
             foreach ($campos as $campo) {
                 $valor = $respuestas[$campo->id] ?? null;
@@ -97,12 +137,30 @@ class PublicoController extends Controller
                     $archivo = request()->file('respuestas.'.$campo->id);
                     $valor = ['nombre_original' => $archivo->getClientOriginalName(), 'storage_key' => $archivo->store('solicitudes/'.$id, 'local'), 'mime_type' => $archivo->getMimeType(), 'tamano_bytes' => $archivo->getSize()];
                 }
-                if (filled($valor)) DB::table('solicitud_respuestas')->insert(['id' => (string) Str::uuid(), 'solicitud_id' => $id, 'campo_id' => $campo->id, 'valor' => json_encode($valor), 'created_at' => now(), 'updated_at' => now()]);
+                if (filled($valor)) {
+                    DB::table('solicitud_respuestas')->insert(['id' => (string) Str::uuid(), 'solicitud_id' => $id, 'campo_id' => $campo->id, 'valor' => json_encode($valor), 'created_at' => now(), 'updated_at' => now()]);
+                }
             }
             DB::table('solicitud_historial_estados')->insert(['id' => (string) Str::uuid(), 'solicitud_id' => $id, 'estado_nuevo_id' => $estadoId, 'comentario' => 'Solicitud enviada por la ciudadanía.', 'actor_tipo' => 'CIUDADANO', 'fecha' => now()]);
-            return $folio;
+            $notificacionId = (string) Str::uuid();
+            DB::table('notificacion_emails')->insert([
+                'id' => $notificacionId,
+                'solicitud_id' => $id,
+                'notificacion_estado_id' => $notificacionPendienteId,
+                'destinatario' => $base['email_contacto'],
+                'tipo' => 'SOLICITUD_ENVIADA',
+                'asunto' => 'Solicitud enviada correctamente · Folio '.$folio,
+                'intentos' => 0,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            return [$id, $notificacionId];
         });
-        return redirect()->route('portal.tramites.iniciar', $tramite)->with('success', 'Tu solicitud fue enviada. Folio: '.$folio);
+        $solicitud = Solicitud::query()->with('tramite')->findOrFail($solicitudId);
+        $this->enviarConfirmacionSolicitud($solicitud, $notificacionId);
+
+        return redirect()->route('portal.tramites.iniciar', $tramite)->with('success', 'Tu solicitud fue enviada. Folio: '.$solicitud->folio);
     }
 
     private function formularioActivo(Tramite $tramite)
@@ -133,9 +191,14 @@ class PublicoController extends Controller
         foreach ($this->condiciones($campo) as $condicion) {
             $valor = $respuestas[$condicion->campo_origen_id] ?? null;
             $coincide = $this->coincideCondicion($condicion, $valor);
-            if ($coincide && $condicion->accion === 'REQUIRE') $requerido = true;
-            if ($coincide && $condicion->accion === 'OPTIONAL') $requerido = false;
+            if ($coincide && $condicion->accion === 'REQUIRE') {
+                $requerido = true;
+            }
+            if ($coincide && $condicion->accion === 'OPTIONAL') {
+                $requerido = false;
+            }
         }
+
         return $requerido;
     }
 
@@ -145,9 +208,14 @@ class PublicoController extends Controller
         $ocultar = [];
         foreach ($this->condiciones($campo) as $condicion) {
             $coincide = $this->coincideCondicion($condicion, $respuestas[$condicion->campo_origen_id] ?? null);
-            if ($condicion->accion === 'SHOW') $mostrar[] = $coincide;
-            if ($condicion->accion === 'HIDE') $ocultar[] = $coincide;
+            if ($condicion->accion === 'SHOW') {
+                $mostrar[] = $coincide;
+            }
+            if ($condicion->accion === 'HIDE') {
+                $ocultar[] = $coincide;
+            }
         }
+
         return ($mostrar === [] || ! in_array(false, $mostrar, true)) && ! in_array(true, $ocultar, true);
     }
 
@@ -155,6 +223,7 @@ class PublicoController extends Controller
     {
         $comparacion = data_get($condicion->valor_comparacion, 'valor');
         $valorVisible = $condicion->campoOrigen?->opciones->firstWhere('valor', $valor)?->etiqueta ?? $valor;
+
         return match ($condicion->operador) {
             'EQUALS' => (string) $valorVisible === (string) $comparacion,
             'NOT_EQUALS' => (string) $valorVisible !== (string) $comparacion,
@@ -171,5 +240,36 @@ class PublicoController extends Controller
             $campo->condicionesDestino->all(),
             $campo->gruposCampos->flatMap(fn ($grupo) => $grupo->condicionesDestino)->all(),
         );
+    }
+
+    private function enviarConfirmacionSolicitud(Solicitud $solicitud, string $notificacionId): void
+    {
+        try {
+            Mail::to($solicitud->email_contacto)->send(new SolicitudEnviadaMail($solicitud));
+
+            DB::table('notificacion_emails')
+                ->where('id', $notificacionId)
+                ->update([
+                    'notificacion_estado_id' => DB::table('notificacion_estados')->where('clave', 'ENVIADO')->value('id'),
+                    'intentos' => 1,
+                    'fecha_envio' => now(),
+                    'updated_at' => now(),
+                ]);
+        } catch (\Throwable $exception) {
+            DB::table('notificacion_emails')
+                ->where('id', $notificacionId)
+                ->update([
+                    'notificacion_estado_id' => DB::table('notificacion_estados')->where('clave', 'ERROR')->value('id'),
+                    'intentos' => 1,
+                    'error' => Str::limit($exception->getMessage(), 65535, ''),
+                    'updated_at' => now(),
+                ]);
+
+            Log::error('No se pudo enviar la confirmación de solicitud.', [
+                'solicitud_id' => $solicitud->id,
+                'notificacion_id' => $notificacionId,
+                'exception' => $exception,
+            ]);
+        }
     }
 }

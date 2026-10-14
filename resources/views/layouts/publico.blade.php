@@ -8,7 +8,7 @@
     <title>@yield('title', 'Portal de Trámites') · Nezahualcóyotl</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="min-h-screen bg-neza-canvas font-sans text-neza-ink antialiased">
+<body class="min-h-screen bg-neza-canvas font-sans text-neza-ink antialiased" data-solicitud-activa='@json(session('solicitud_activa'))'>
     @include('partials.publico.header')
 
     <main>

@@ -28,6 +28,25 @@ if (cuerpo.dataset.swalError) {
     });
 }
 
+if (cuerpo.dataset.solicitudActiva && cuerpo.dataset.solicitudActiva !== 'null') {
+    const solicitudActiva = JSON.parse(cuerpo.dataset.solicitudActiva);
+
+    Swal.fire({
+        icon: 'info',
+        title: 'Ya tienes un trámite en proceso',
+        text: 'Ya existe una solicitud activa para este trámite. Consulta su estado antes de iniciar una nueva.',
+        showCancelButton: true,
+        confirmButtonText: 'Consultar trámite',
+        cancelButtonText: 'Cerrar',
+        confirmButtonColor: '#601633',
+        cancelButtonColor: '#6b7280',
+    }).then((resultado) => {
+        if (resultado.isConfirmed && solicitudActiva.consulta_url) {
+            window.location.assign(solicitudActiva.consulta_url);
+        }
+    });
+}
+
 const bloquearFormulario = (formulario) => {
     formulario.dataset.submitting = 'true';
     formulario.querySelectorAll('button[type="submit"], input[type="submit"]').forEach((boton) => {
