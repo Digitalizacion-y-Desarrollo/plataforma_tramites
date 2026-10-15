@@ -10,6 +10,28 @@ document.querySelectorAll('[data-dismiss-public-notice]').forEach((button) => {
 
 const cuerpo = document.body;
 
+const botonMenuAdministracion = document.querySelector('[data-admin-menu-toggle]');
+const menuAdministracion = document.querySelector('#admin-sidebar');
+const fondoMenuAdministracion = document.querySelector('[data-admin-menu-overlay]');
+
+if (botonMenuAdministracion && menuAdministracion && fondoMenuAdministracion) {
+    const cerrarMenuAdministracion = () => {
+        cuerpo.classList.remove('admin-menu-open');
+        botonMenuAdministracion.setAttribute('aria-expanded', 'false');
+    };
+
+    botonMenuAdministracion.addEventListener('click', () => {
+        const abierto = cuerpo.classList.toggle('admin-menu-open');
+        botonMenuAdministracion.setAttribute('aria-expanded', String(abierto));
+    });
+
+    fondoMenuAdministracion.addEventListener('click', cerrarMenuAdministracion);
+    menuAdministracion.querySelectorAll('a').forEach((enlace) => enlace.addEventListener('click', cerrarMenuAdministracion));
+    document.addEventListener('keydown', (evento) => {
+        if (evento.key === 'Escape') cerrarMenuAdministracion();
+    });
+}
+
 if (cuerpo.dataset.swalSuccess) {
     Swal.fire({
         icon: 'success',
@@ -73,6 +95,11 @@ document.querySelectorAll('form[method="POST"]').forEach((formulario) => {
         if ((formulario.hasAttribute('data-confirm-delete') || formulario.hasAttribute('data-confirm-action')) && formulario.dataset.confirmed !== 'true') {
             evento.preventDefault();
 
+            const dialogo = formulario.closest('dialog');
+            const dialogoAbierto = dialogo && dialogo.open;
+
+            if (dialogoAbierto) dialogo.close();
+
             const resultado = await Swal.fire({
                 icon: 'warning',
                 title: formulario.dataset.confirmTitle || '¿Confirmas la eliminación?',
@@ -85,7 +112,11 @@ document.querySelectorAll('form[method="POST"]').forEach((formulario) => {
                 reverseButtons: true,
             });
 
-            if (!resultado.isConfirmed) return;
+            if (!resultado.isConfirmed) {
+                if (dialogoAbierto) dialogo.showModal();
+
+                return;
+            }
 
             formulario.dataset.confirmed = 'true';
             formulario.requestSubmit();
@@ -120,9 +151,13 @@ document.querySelectorAll('[data-modal-open]').forEach((boton) => {
             modal.querySelector('#editar-duracion').value = boton.dataset.tramiteDuracion || '';
             modal.querySelector('#editar-costo').value = boton.dataset.tramiteCosto || '';
             modal.querySelector('#editar-tiempo').value = boton.dataset.tramiteTiempoEstimado || '';
-            modal.querySelectorAll('[name="modalidades[]"]').forEach((opcion) => {
-                opcion.checked = JSON.parse(boton.dataset.tramiteModalidades || '[]').includes(opcion.value);
+            modal.querySelector('#editar-expira').value = boton.dataset.tramiteExpiraDias || '';
+            modal.querySelectorAll('[name="modalidad"]').forEach((opcion) => {
+                const guardadas = JSON.parse(boton.dataset.tramiteModalidades || '[]');
+                const modalidad = guardadas.length > 1 ? 'MIXTO' : (guardadas[0] || '');
+                opcion.checked = opcion.value === modalidad;
             });
+            modal.querySelector('[name="modalidad"]:checked')?.dispatchEvent(new Event('change', { bubbles: true }));
             modal.querySelectorAll('[data-list-builder]').forEach((builder) => {
                 const fuente = builder.dataset.listName === 'requisitos'
                     ? boton.dataset.tramiteRequisitos
@@ -180,6 +215,21 @@ document.querySelectorAll('[data-modal-open]').forEach((boton) => {
 
         modal.showModal();
     });
+});
+
+document.querySelectorAll('form').forEach((formulario) => {
+    const radios = formulario.querySelectorAll('[name="modalidad"]');
+    const contenedor = formulario.querySelector('[data-expiracion-contenedor]');
+
+    if (!radios.length || !contenedor) return;
+
+    const actualizar = () => {
+        const seleccion = formulario.querySelector('[name="modalidad"]:checked');
+        contenedor.classList.toggle('hidden', seleccion?.value === 'PRESENCIAL');
+    };
+
+    radios.forEach((radio) => radio.addEventListener('change', actualizar));
+    actualizar();
 });
 
 const leerJson = (valor, respaldo = []) => {

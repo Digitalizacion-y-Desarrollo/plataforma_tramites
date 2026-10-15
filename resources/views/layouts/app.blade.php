@@ -14,7 +14,8 @@
 
 <body data-swal-success="{{ session('success') }}" data-swal-error="{{ $errors->any() ? $errors->first() : '' }}">
     <div class="shell">
-        <aside class="sidebar">
+        <div class="fixed inset-0 z-40 hidden bg-neza-ink/40 min-[901px]:hidden" data-admin-menu-overlay></div>
+        <aside id="admin-sidebar" class="sidebar" aria-label="Menú de administración">
             <div class="brand flex flex-col">
                 <span class="">
                     <img src="{{ asset('images/logo/logo-sin-fondo.png') }}" alt="Logo Institucional"
@@ -84,6 +85,12 @@
         </aside>
         <div class="workspace">
             <header class="topbar">
+                <button type="button" class="inline-flex size-10 items-center justify-center rounded-xl border border-neza-line bg-white text-neza-wine transition hover:bg-neza-wine-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine min-[901px]:hidden" data-admin-menu-toggle aria-expanded="false" aria-controls="admin-sidebar">
+                    <span class="sr-only">Abrir menú de administración</span>
+                    <svg class="size-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                    </svg>
+                </button>
                 <div class="context"><span class="shield">♧</span>Administración institucional</div>
                 <div class="tools">
                     <div class="search"><span>⌕</span><span>Buscar solicitudes, trámites, ciudadanos...</span><span

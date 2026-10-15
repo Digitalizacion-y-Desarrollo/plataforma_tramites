@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Solicitud extends Model
 {
@@ -28,5 +29,10 @@ class Solicitud extends Model
     public function estado(): BelongsTo
     {
         return $this->belongsTo(EstadoSolicitud::class, 'solicitud_estado_id');
+    }
+
+    public function documentoEmitido(): HasOne
+    {
+        return $this->hasOne(SolicitudDocumentoEmitido::class);
     }
 }

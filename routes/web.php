@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', [PublicoController::class, 'index'])->name('portal.publico');
 Route::get('/solicitudes', [SolicitudController::class, 'index'])->name('solicitudes.index');
 Route::get('/solicitudes/{solicitud}', [SolicitudController::class, 'show'])->name('solicitudes.show');
+Route::post('/solicitudes/{solicitud}/aprobar', [SolicitudController::class, 'aprobar'])->name('solicitudes.aprobar');
 Route::get('/solicitudes/{solicitud}/documentos/{documento}', [SolicitudController::class, 'descargarDocumento'])->name('solicitudes.documentos.descargar');
 Route::get('/solicitudes/{solicitud}/archivos/{campo}', [SolicitudController::class, 'descargarArchivoRespuesta'])->name('solicitudes.archivos.descargar');
 Route::get('/solicitudes/{solicitud}/documentos/{documento}/previsualizar', [SolicitudController::class, 'previsualizarDocumento'])->name('solicitudes.documentos.previsualizar');
@@ -16,6 +17,12 @@ Route::prefix('tramites')->name('portal.tramites.')->controller(PublicoControlle
     Route::get('/{tramite}/iniciar', 'iniciar')->name('iniciar');
     Route::post('/{tramite}/solicitudes', 'storeSolicitud')->name('solicitudes.store');
     Route::get('/{tramite}', 'detalle')->name('detalle');
+});
+Route::prefix('consulta')->name('consulta.')->controller(PublicoController::class)->group(function () {
+    Route::post('/token', 'solicitarToken')->name('token.solicitar');
+    Route::post('/verificar', 'verificarToken')->name('token.verificar');
+    Route::get('/solicitudes', 'solicitudesConsulta')->name('solicitudes');
+    Route::get('/documentos/{documento}', 'descargarDocumentoEmitido')->name('documentos.descargar');
 });
 
 // Rutas del Creador de Formularios

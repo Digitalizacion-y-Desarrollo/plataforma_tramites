@@ -3,13 +3,16 @@
 namespace App\Http\Controllers;
 
 use App\Mail\SolicitudEnviadaMail;
+use App\Mail\TokenConsultaMail;
 use App\Models\Solicitud;
+use App\Models\SolicitudDocumentoEmitido;
 use App\Models\Tramite;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\View\View;
 
@@ -161,6 +164,80 @@ class PublicoController extends Controller
         $this->enviarConfirmacionSolicitud($solicitud, $notificacionId);
 
         return redirect()->route('portal.tramites.iniciar', $tramite)->with('success', 'Tu solicitud fue enviada. Folio: '.$solicitud->folio);
+    }
+
+    public function solicitarToken(Request $request)
+    {
+        $datos = $request->validate(['curp' => ['required', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i']]);
+        $curp = Str::upper($datos['curp']);
+        $email = Solicitud::query()->where('curp_consulta', $curp)->latest('created_at')->value('email_contacto');
+
+        if (! $email) {
+            return back()->withErrors(['curp' => 'No se encontraron solicitudes para la CURP indicada.'])->withInput();
+        }
+
+        $token = (string) random_int(100000, 999999);
+        DB::table('token_consultas')->where('curp', $curp)->where('utilizado', false)->update(['utilizado' => true, 'updated_at' => now()]);
+        DB::table('token_consultas')->insert(['id' => (string) Str::uuid(), 'curp' => $curp, 'email_destino' => $email, 'token_hash' => hash('sha256', $token), 'fecha_expiracion' => now()->addMinutes(15), 'intentos' => 0, 'utilizado' => false, 'created_at' => now(), 'updated_at' => now()]);
+
+        try {
+            Mail::to($email)->send(new TokenConsultaMail($token));
+        } catch (\Throwable $exception) {
+            Log::error('No se pudo enviar el token de consulta.', ['curp' => $curp, 'exception' => $exception]);
+
+            return back()->withErrors(['curp' => 'No fue posible enviar el token. Intenta nuevamente.'])->withInput();
+        }
+
+        return redirect(route('portal.publico').'#consulta')->with('consulta_curp', $curp)->with('token_solicitado', true);
+    }
+
+    public function verificarToken(Request $request)
+    {
+        $datos = $request->validate([
+            'curp' => ['required', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'],
+            'token' => ['required', 'digits:6'],
+        ]);
+        $curp = Str::upper($datos['curp']);
+        $valido = DB::transaction(function () use ($curp, $datos) {
+            $registro = DB::table('token_consultas')->where('curp', $curp)->where('utilizado', false)->latest('created_at')->lockForUpdate()->first();
+            if (! $registro || now()->greaterThan($registro->fecha_expiracion) || $registro->intentos >= 5) {
+                return false;
+            }
+            if (! hash_equals($registro->token_hash, hash('sha256', $datos['token']))) {
+                $intentos = $registro->intentos + 1;
+                DB::table('token_consultas')->where('id', $registro->id)->update(['intentos' => $intentos, 'utilizado' => $intentos >= 5, 'updated_at' => now()]);
+
+                return false;
+            }
+            DB::table('token_consultas')->where('id', $registro->id)->update(['utilizado' => true, 'fecha_utilizacion' => now(), 'updated_at' => now()]);
+
+            return true;
+        });
+        if (! $valido) {
+            return back()->withErrors(['token' => 'El token es inválido, expiró o alcanzó el límite de intentos.'])->withInput();
+        }
+
+        $request->session()->put('consulta_curp_autorizada', $curp);
+
+        return redirect()->route('consulta.solicitudes');
+    }
+
+    public function solicitudesConsulta(Request $request): View
+    {
+        $curp = $request->session()->get('consulta_curp_autorizada');
+        abort_unless($curp, 403);
+        $solicitudes = Solicitud::query()->where('curp_consulta', $curp)->with(['tramite:id,nombre', 'estado:id,clave,nombre', 'documentoEmitido'])->latest('fecha_envio')->get();
+
+        return view('publico.consulta-solicitudes', compact('solicitudes'));
+    }
+
+    public function descargarDocumentoEmitido(Request $request, SolicitudDocumentoEmitido $documento)
+    {
+        abort_unless($request->session()->get('consulta_curp_autorizada') === $documento->solicitud->curp_consulta, 403);
+        abort_unless(Storage::disk('local')->exists($documento->storage_key), 404);
+        abort_if($documento->fecha_expiracion !== null && now()->greaterThan($documento->fecha_expiracion), 410, 'El documento ya no está disponible por vencimiento de la descarga.');
+
+        return Storage::disk('local')->download($documento->storage_key, $documento->nombre_original);
     }
 
     private function formularioActivo(Tramite $tramite)

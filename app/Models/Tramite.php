@@ -22,6 +22,7 @@ class Tramite extends Model
         'requisitos',
         'proceso',
         'preguntas_frecuentes',
+        'descarga_expira_dias',
         'activo',
         'tramite_estado_id',
     ];
@@ -34,6 +35,7 @@ class Tramite extends Model
             'requisitos' => 'array',
             'proceso' => 'array',
             'preguntas_frecuentes' => 'array',
+            'descarga_expira_dias' => 'integer',
         ];
     }
 

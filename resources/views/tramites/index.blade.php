@@ -68,7 +68,7 @@
                                                     <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25v9m6.364-4.114a9 9 0 1 1-12.728 0" /></svg>
                                                 </button>
                                             </form>
-                                            <button type="button" title="Editar trámite" aria-label="Editar trámite" data-modal-open="tramite-editar" data-tramite-id="{{ $tramite->id }}" data-tramite-clave="{{ $tramite->clave }}" data-tramite-nombre="{{ $tramite->nombre }}" data-tramite-descripcion="{{ $tramite->descripcion }}" data-tramite-duracion="{{ $tramite->duracion }}" data-tramite-costo="{{ $tramite->costo }}" data-tramite-tiempo-estimado="{{ $tramite->tiempo_estimado }}" data-tramite-modalidades='@json($tramite->modalidades ?? [])' data-tramite-requisitos='@json($tramite->requisitos ?? [])' data-tramite-proceso='@json($tramite->proceso ?? [])' data-tramite-preguntas-frecuentes='@json($tramite->preguntas_frecuentes ?? [])' data-tramite-activo="{{ $tramite->activo ? '1' : '0' }}" data-tramite-update-url="{{ route('catalogo-tramites.update', $tramite) }}" class="text-neza-muted transition hover:text-neza-wine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">
+                                            <button type="button" title="Editar trámite" aria-label="Editar trámite" data-modal-open="tramite-editar" data-tramite-id="{{ $tramite->id }}" data-tramite-clave="{{ $tramite->clave }}" data-tramite-nombre="{{ $tramite->nombre }}" data-tramite-descripcion="{{ $tramite->descripcion }}" data-tramite-duracion="{{ $tramite->duracion }}" data-tramite-costo="{{ $tramite->costo }}" data-tramite-tiempo-estimado="{{ $tramite->tiempo_estimado }}" data-tramite-expira-dias="{{ $tramite->descarga_expira_dias }}" data-tramite-modalidades='@json($tramite->modalidades ?? [])' data-tramite-requisitos='@json($tramite->requisitos ?? [])' data-tramite-proceso='@json($tramite->proceso ?? [])' data-tramite-preguntas-frecuentes='@json($tramite->preguntas_frecuentes ?? [])' data-tramite-activo="{{ $tramite->activo ? '1' : '0' }}" data-tramite-update-url="{{ route('catalogo-tramites.update', $tramite) }}" class="text-neza-muted transition hover:text-neza-wine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">
                                                 <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
                                             </button>
                                             <form action="{{ route('catalogo-tramites.destroy', $tramite) }}" method="POST" data-confirm-delete data-confirm-title="¿Eliminar trámite?" data-confirm-text="El trámite se ocultará del catálogo, pero su información histórica se conservará." class="inline-flex">
@@ -130,7 +130,7 @@
             </aside>
         </div>
 
-        <dialog id="tramite-crear" @if ($errors->any() && old('_modal') === 'crear') open @endif class="fixed inset-0 m-auto w-full max-w-xl rounded-xl border border-neza-line p-0 shadow-xl backdrop:bg-neza-ink/40">
+        <dialog id="tramite-crear" @if ($errors->any() && old('_modal') === 'crear') open @endif class="fixed inset-0 m-auto max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-neza-line p-0 shadow-xl backdrop:bg-neza-ink/40">
             <form action="{{ route('catalogo-tramites.store') }}" method="POST" class="bg-white" novalidate>
                 @csrf
                 <input type="hidden" name="_modal" value="crear">
@@ -146,7 +146,7 @@
             </form>
         </dialog>
 
-        <dialog id="tramite-editar" @if ($errors->any() && old('_modal') === 'editar') open @endif class="fixed inset-0 m-auto w-full max-w-xl rounded-xl border border-neza-line p-0 shadow-xl backdrop:bg-neza-ink/40">
+        <dialog id="tramite-editar" @if ($errors->any() && old('_modal') === 'editar') open @endif class="fixed inset-0 m-auto max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-neza-line p-0 shadow-xl backdrop:bg-neza-ink/40">
             <form id="tramite-editar-form" action="{{ old('update_url', '') }}" method="POST" class="bg-white" novalidate>
                 @csrf
                 @method('PUT')

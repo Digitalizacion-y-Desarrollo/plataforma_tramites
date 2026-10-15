@@ -44,8 +44,8 @@ class TramiteController extends Controller
             'duracion' => ['nullable', 'string', 'max:100'],
             'costo' => ['nullable', 'string', 'max:100'],
             'tiempo_estimado' => ['nullable', 'string', 'max:100'],
-            'modalidades' => ['nullable', 'array'],
-            'modalidades.*' => ['string', 'in:EN_LINEA,PRESENCIAL'],
+            'modalidad' => ['nullable', 'string', 'in:EN_LINEA,PRESENCIAL,MIXTO'],
+            'descarga_expira_dias' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'requisitos' => ['nullable', 'array'],
             'requisitos.*' => ['string', 'max:500'],
             'proceso' => ['nullable', 'array'],
@@ -94,8 +94,8 @@ class TramiteController extends Controller
             'duracion' => ['nullable', 'string', 'max:100'],
             'costo' => ['nullable', 'string', 'max:100'],
             'tiempo_estimado' => ['nullable', 'string', 'max:100'],
-            'modalidades' => ['nullable', 'array'],
-            'modalidades.*' => ['string', 'in:EN_LINEA,PRESENCIAL'],
+            'modalidad' => ['nullable', 'string', 'in:EN_LINEA,PRESENCIAL,MIXTO'],
+            'descarga_expira_dias' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'requisitos' => ['nullable', 'array'],
             'requisitos.*' => ['string', 'max:500'],
             'proceso' => ['nullable', 'array'],
@@ -171,14 +171,22 @@ class TramiteController extends Controller
 
     private function datosPublicos(array $datos): array
     {
+        $modalidades = match ($datos['modalidad'] ?? null) {
+            'EN_LINEA' => ['EN_LINEA'],
+            'PRESENCIAL' => ['PRESENCIAL'],
+            'MIXTO' => ['EN_LINEA', 'PRESENCIAL'],
+            default => [],
+        };
+
         return [
             'duracion' => $datos['duracion'] ?? null,
             'costo' => $datos['costo'] ?? null,
             'tiempo_estimado' => $datos['tiempo_estimado'] ?? null,
-            'modalidades' => array_values($datos['modalidades'] ?? []),
+            'modalidades' => $modalidades,
             'requisitos' => array_values(array_filter($datos['requisitos'] ?? [])),
             'proceso' => array_values(array_filter($datos['proceso'] ?? [])),
             'preguntas_frecuentes' => array_values($datos['preguntas_frecuentes'] ?? []),
+            'descarga_expira_dias' => in_array('EN_LINEA', $modalidades, true) ? ($datos['descarga_expira_dias'] ?? null) : null,
         ];
     }
 

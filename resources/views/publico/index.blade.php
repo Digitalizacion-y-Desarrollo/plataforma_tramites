@@ -137,14 +137,15 @@
                 <p class="mt-3 max-w-lg text-sm leading-relaxed text-white/70">Ingresa tu CURP y solicita un token temporal
                     en el correo asociado para consultar tus solicitudes de forma segura.</p>
             </div>
-            <form class="rounded-2xl bg-white p-5 text-neza-ink shadow-2xl sm:p-6"
-                action="{{ route('portal.publico') }}#consulta" method="GET">
-                <div class="grid gap-4 sm:grid-cols-2">
+            <form class="rounded-2xl bg-white p-5 text-neza-ink shadow-2xl sm:p-6" action="{{ route('consulta.token.solicitar') }}" method="POST">
+                @csrf
+                <div class="grid gap-4">
                     <div>
                         <label for="curp-consulta" class="text-xs font-bold">CURP</label>
-                        <input id="curp-consulta" name="curp_consulta" type="text" maxlength="18" autocomplete="off"
+                        <input id="curp-consulta" name="curp" type="text" maxlength="18" autocomplete="off" value="{{ old('curp', session('consulta_curp')) }}"
                             placeholder="Ingresa tu CURP"
                             class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm uppercase outline-none transition focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15">
+                        @error('curp')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label for="correo-consulta" class="text-xs font-bold">Correo electrónico</label>
@@ -172,6 +173,18 @@
                         token</button>
                 </div>
             </form>
+            @if (session('token_solicitado'))
+                <form class="rounded-2xl border border-[#be985c] bg-[#fdfbf8] p-5 text-neza-ink shadow-2xl sm:p-6" action="{{ route('consulta.token.verificar') }}" method="POST">
+                    @csrf
+                    <h3 class="text-lg font-bold">Ingresa tu token temporal</h3>
+                    <p class="mt-1 text-sm text-neza-muted">Enviamos un código de seis dígitos al correo asociado a tu CURP.</p>
+                    <input type="hidden" name="curp" value="{{ session('consulta_curp') }}">
+                    <label for="token-consulta" class="mt-4 block text-xs font-bold">Token</label>
+                    <input id="token-consulta" name="token" type="text" inputmode="numeric" maxlength="6" required class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm outline-none focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15 @error('token') border-rose-600 @enderror">
+                    @error('token')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                    <button type="submit" class="mt-4 h-11 rounded-xl bg-neza-wine px-5 text-sm font-bold text-white hover:bg-[#4c0f26]">Consultar solicitudes</button>
+                </form>
+            @endif
         </div>
     </section>
 
