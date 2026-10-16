@@ -5,6 +5,7 @@
     $contenedor = $movil ? 'flex flex-wrap gap-2 border-t border-neza-line pt-3' : 'flex justify-end gap-2';
     $boton = $movil ? 'flex-1 text-center' : '';
     $modalId = 'aprobar-'.$solicitud->id.($movil ? '-movil' : '-escritorio');
+    $modalRechazoId = 'rechazar-'.$solicitud->id.($movil ? '-movil' : '-escritorio');
 @endphp
 <div class="{{ $contenedor }}">
     <a href="{{ route('solicitudes.show', $solicitud) }}" class="{{ $boton }} rounded-lg border border-neza-wine px-3 py-2 text-xs font-semibold text-neza-wine hover:bg-neza-wine-soft">Ver solicitud</a>
@@ -40,5 +41,17 @@
             </div>
         </dialog>
     @endif
-    <button type="button" disabled title="Disponible al integrar Accesos" class="{{ $boton }} cursor-not-allowed rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 opacity-50">Rechazar</button>
+    @if ($solicitud->estado?->clave === 'ENVIADA')
+        <button type="button" data-modal-open="{{ $modalRechazoId }}" class="{{ $boton }} rounded-lg border border-rose-700 px-3 py-2 text-xs font-semibold text-rose-700 hover:bg-rose-50">Rechazar</button>
+        <dialog id="{{ $modalRechazoId }}" class="m-auto w-[min(96vw,680px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50">
+            <div class="flex items-center justify-between border-b border-neza-line px-6 py-4"><h2 class="text-lg font-bold text-neza-ink">Rechazar solicitud</h2><button type="button" data-modal-close="{{ $modalRechazoId }}" class="rounded-lg p-2 text-neza-muted hover:bg-neza-canvas" aria-label="Cerrar"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button></div>
+            <form action="{{ route('solicitudes.rechazar', $solicitud) }}" method="POST" class="p-6" data-confirm-action data-confirm-title="¿Rechazar solicitud?" data-confirm-text="El motivo se enviará a la ciudadanía y quedará registrado en el expediente." data-confirm-button="Sí, rechazar">
+                @csrf
+                <label for="motivo-{{ $modalRechazoId }}" class="block text-sm font-semibold text-neza-ink">Motivo del rechazo <span class="text-rose-700">*</span></label>
+                <textarea id="motivo-{{ $modalRechazoId }}" name="motivo" required maxlength="5000" placeholder="Describe claramente el motivo del rechazo y, si corresponde, qué debe corregirse." class="mt-2 min-h-32 w-full rounded-lg border border-neza-line px-3 py-2 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('motivo') border-rose-600 @enderror">{{ old('motivo') }}</textarea>
+                @error('motivo')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                <button type="submit" class="mt-4 rounded-lg bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-800">Rechazar solicitud</button>
+            </form>
+        </dialog>
+    @endif
 </div>

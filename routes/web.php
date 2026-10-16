@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CorreccionDocumentoController;
 use App\Http\Controllers\PublicoController;
 use App\Http\Controllers\SolicitudController;
 use Illuminate\Support\Facades\Route;
@@ -8,6 +9,8 @@ Route::get('/', [PublicoController::class, 'index'])->name('portal.publico');
 Route::get('/solicitudes', [SolicitudController::class, 'index'])->name('solicitudes.index');
 Route::get('/solicitudes/{solicitud}', [SolicitudController::class, 'show'])->name('solicitudes.show');
 Route::post('/solicitudes/{solicitud}/aprobar', [SolicitudController::class, 'aprobar'])->name('solicitudes.aprobar');
+Route::post('/solicitudes/{solicitud}/rechazar', [SolicitudController::class, 'rechazar'])->name('solicitudes.rechazar');
+Route::post('/solicitudes/{solicitud}/correcciones', [SolicitudController::class, 'solicitarCorreccion'])->name('solicitudes.correcciones.solicitar');
 Route::get('/solicitudes/{solicitud}/documentos/{documento}', [SolicitudController::class, 'descargarDocumento'])->name('solicitudes.documentos.descargar');
 Route::get('/solicitudes/{solicitud}/archivos/{campo}', [SolicitudController::class, 'descargarArchivoRespuesta'])->name('solicitudes.archivos.descargar');
 Route::get('/solicitudes/{solicitud}/documentos/{documento}/previsualizar', [SolicitudController::class, 'previsualizarDocumento'])->name('solicitudes.documentos.previsualizar');
@@ -23,6 +26,12 @@ Route::prefix('consulta')->name('consulta.')->controller(PublicoController::clas
     Route::post('/verificar', 'verificarToken')->name('token.verificar');
     Route::get('/solicitudes', 'solicitudesConsulta')->name('solicitudes');
     Route::get('/documentos/{documento}', 'descargarDocumentoEmitido')->name('documentos.descargar');
+});
+
+Route::prefix('correcciones')->name('correcciones.')->controller(CorreccionDocumentoController::class)->group(function () {
+    Route::get('/{token}', 'mostrar')->name('mostrar');
+    Route::post('/{token}/acceso', 'verificar')->name('verificar');
+    Route::post('/{token}/documentos', 'actualizar')->name('actualizar');
 });
 
 // Rutas del Creador de Formularios

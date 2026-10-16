@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
 @section('content')
-    @php($estilosEstado = ['BORRADOR' => 'bg-slate-100 text-slate-700', 'ENVIADA' => 'bg-amber-50 text-amber-800', 'APROBADA' => 'bg-emerald-50 text-emerald-700', 'RECHAZADA' => 'bg-rose-50 text-rose-700'])
+    @php($estilosEstado = ['BORRADOR' => 'bg-slate-100 text-slate-700', 'ENVIADA' => 'bg-amber-50 text-amber-800', 'CORRECCION_SOLICITADA' => 'bg-orange-50 text-orange-800', 'APROBADA' => 'bg-emerald-50 text-emerald-700', 'RECHAZADA' => 'bg-rose-50 text-rose-700'])
     <div class="mx-auto max-w-[1440px] space-y-6">
         <section class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p class="text-sm font-semibold text-neza-wine">Administración</p><h1 class="mt-1 text-3xl font-bold tracking-tight text-neza-ink">Solicitudes</h1><p class="mt-2 text-sm text-neza-muted">Consulta y da seguimiento a las solicitudes enviadas por la ciudadanía.</p></div><p class="text-sm font-medium text-neza-muted"><span class="font-bold text-neza-ink">{{ $totalSolicitudes }}</span> registradas</p></section>
         <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="Resumen de solicitudes">@foreach ([['Total', $totalSolicitudes, 'bg-neza-wine-soft text-neza-wine'], ['Por revisar', $solicitudesEnviadas, 'bg-amber-50 text-amber-800'], ['Aprobadas', $solicitudesAprobadas, 'bg-emerald-50 text-emerald-700'], ['Rechazadas', $solicitudesRechazadas, 'bg-rose-50 text-rose-700']] as [$etiqueta, $cantidad, $color])<article class="rounded-xl border border-neza-line bg-white p-5 shadow-sm"><p class="text-sm font-medium text-neza-muted">{{ $etiqueta }}</p><p class="mt-4 text-3xl font-bold {{ $color }}">{{ $cantidad }}</p></article>@endforeach</section>

@@ -127,6 +127,25 @@ document.querySelectorAll('form[method="POST"]').forEach((formulario) => {
     });
 });
 
+document.querySelectorAll('[data-correccion-documento]').forEach((documento) => {
+    const selector = documento.querySelector('[data-correccion-selector]');
+    const contenedorMotivo = documento.querySelector('[data-correccion-motivo]');
+    const motivo = contenedorMotivo?.querySelector('textarea');
+
+    if (!selector || !contenedorMotivo || !motivo) {
+        return;
+    }
+
+    const actualizar = () => {
+        contenedorMotivo.classList.toggle('hidden', !selector.checked);
+        motivo.disabled = !selector.checked;
+        motivo.required = selector.checked;
+    };
+
+    selector.addEventListener('change', actualizar);
+    actualizar();
+});
+
 document.querySelectorAll('[data-modal-open]').forEach((boton) => {
     boton.addEventListener('click', () => {
         const modal = document.getElementById(boton.dataset.modalOpen);

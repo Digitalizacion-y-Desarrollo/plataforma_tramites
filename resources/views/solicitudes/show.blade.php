@@ -5,6 +5,7 @@
         $estilosEstado = [
             'BORRADOR' => 'bg-slate-100 text-slate-700',
             'ENVIADA' => 'bg-amber-50 text-amber-800',
+            'CORRECCION_SOLICITADA' => 'bg-orange-50 text-orange-800',
             'APROBADA' => 'bg-emerald-50 text-emerald-700',
             'RECHAZADA' => 'bg-rose-50 text-rose-700',
         ];
@@ -16,6 +17,43 @@
         <section class="rounded-xl border border-neza-line bg-white p-6 shadow-sm sm:p-8"><div class="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between"><div><p class="font-mono text-sm font-semibold text-neza-wine">{{ $solicitud->folio }}</p><h1 class="mt-2 text-3xl font-bold tracking-tight text-neza-ink">{{ $solicitud->tramite?->nombre ?? 'TrÃ¡mite no disponible' }}</h1><p class="mt-2 text-sm text-neza-muted">Solicitud enviada {{ $solicitud->fecha_envio?->translatedFormat('d \d\e F \d\e Y, H:i') ?? 'sin fecha registrada' }}.</p></div><span class="w-fit rounded-full px-3 py-1.5 text-sm font-semibold {{ $estilosEstado[$solicitud->estado?->clave] ?? 'bg-slate-100 text-slate-700' }}">{{ $solicitud->estado?->nombre ?? 'Sin estado' }}</span></div><dl class="mt-7 grid gap-5 border-t border-neza-line pt-6 sm:grid-cols-3"><div><dt class="text-xs font-medium text-neza-muted">Correo de contacto</dt><dd class="mt-1 text-sm font-semibold text-neza-ink">{{ $solicitud->email_contacto }}</dd></div><div><dt class="text-xs font-medium text-neza-muted">CURP de consulta</dt><dd class="mt-1 font-mono text-sm font-semibold text-neza-ink">{{ $solicitud->curp_consulta }}</dd></div><div><dt class="text-xs font-medium text-neza-muted">Fecha de terminaciÃ³n</dt><dd class="mt-1 text-sm font-semibold text-neza-ink">{{ $solicitud->fecha_terminacion?->translatedFormat('d M Y, H:i') ?? 'Pendiente' }}</dd></div></dl></section>
 
         @php($modalidades = collect($solicitud->tramite?->modalidades ?? []))
+        @if ($solicitud->estado?->clave === 'ENVIADA')
+            <section class="flex flex-wrap justify-end gap-3">
+                @if ($modalidades->contains('EN_LINEA'))
+                    <button type="button" data-modal-open="aprobar" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">Aprobar solicitud</button>
+                @endif
+                @if ($archivosCorregibles->isNotEmpty())
+                    <button type="button" data-modal-open="solicitar-correccion" class="rounded-lg border border-amber-700 px-4 py-2.5 text-sm font-semibold text-amber-800 hover:bg-amber-50">Solicitar corrección</button>
+                @endif
+                <button type="button" data-modal-open="rechazar" class="rounded-lg border border-rose-700 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50">Rechazar solicitud</button>
+            </section>
+            @if ($archivosCorregibles->isNotEmpty())
+                <dialog id="solicitar-correccion" @if ($errors->has('documentos') || $errors->has('documentos.*.motivo')) open @endif class="m-auto w-[min(96vw,760px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50">
+                    <div class="flex items-center justify-between border-b border-neza-line px-6 py-4"><div><h2 class="text-lg font-bold text-neza-ink">Solicitar corrección de documentos</h2><p class="mt-1 text-sm text-neza-muted">Selecciona uno o más archivos e indica el motivo para cada uno.</p></div><button type="button" data-modal-close="solicitar-correccion" class="rounded-lg p-2 text-neza-muted hover:bg-neza-canvas" aria-label="Cerrar"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button></div>
+                    <form action="{{ route('solicitudes.correcciones.solicitar', $solicitud) }}" method="POST" class="space-y-4 p-6" data-confirm-action data-confirm-title="¿Solicitar corrección?" data-confirm-text="La ciudadanía recibirá un correo con acceso para reemplazar los documentos seleccionados." data-confirm-button="Sí, solicitar">
+                        @csrf
+                        @foreach ($archivosCorregibles as $archivo)
+                            <article class="rounded-lg border border-neza-line p-4" data-correccion-documento>
+                                <label class="flex cursor-pointer items-start gap-3"><input type="checkbox" name="documentos[{{ $archivo->campo_id }}][seleccionado]" value="1" data-correccion-selector @checked(old('documentos.'.$archivo->campo_id.'.seleccionado')) class="mt-1 size-4 rounded border-neza-line text-neza-wine focus:ring-neza-wine"><span><span class="block text-sm font-semibold text-neza-ink">{{ $archivo->requisito_nombre }}</span><span class="mt-1 block text-xs text-neza-muted">{{ $archivo->nombre_original }}</span></span></label>
+                                <div class="mt-4 hidden" data-correccion-motivo><label for="motivo-{{ $archivo->campo_id }}" class="block text-sm font-semibold text-neza-ink">Motivo de corrección <span class="text-rose-700">*</span></label><textarea id="motivo-{{ $archivo->campo_id }}" name="documentos[{{ $archivo->campo_id }}][motivo]" disabled maxlength="5000" class="mt-2 min-h-24 w-full rounded-lg border border-neza-line px-3 py-2 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('documentos.'.$archivo->campo_id.'.motivo') border-rose-600 @enderror">{{ old('documentos.'.$archivo->campo_id.'.motivo') }}</textarea>@error('documentos.'.$archivo->campo_id.'.motivo')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
+                            </article>
+                        @endforeach
+                        @error('documentos')<p class="text-sm text-rose-700">{{ $message }}</p>@enderror
+                        <button type="submit" class="rounded-lg bg-neza-wine px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">Enviar solicitud de corrección</button>
+                    </form>
+                </dialog>
+            @endif
+            <dialog id="rechazar" @if ($errors->has('motivo')) open @endif class="m-auto w-[min(96vw,680px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50">
+                <div class="flex items-center justify-between border-b border-neza-line px-6 py-4"><h2 class="text-lg font-bold text-neza-ink">Rechazar solicitud</h2><button type="button" data-modal-close="rechazar" class="rounded-lg p-2 text-neza-muted hover:bg-neza-canvas" aria-label="Cerrar"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button></div>
+                <form action="{{ route('solicitudes.rechazar', $solicitud) }}" method="POST" class="p-6" data-confirm-action data-confirm-title="¿Rechazar solicitud?" data-confirm-text="El motivo se enviará a la ciudadanía y quedará registrado en el expediente." data-confirm-button="Sí, rechazar">
+                    @csrf
+                    <label for="motivo" class="block text-sm font-semibold text-neza-ink">Motivo del rechazo <span class="text-rose-700">*</span></label>
+                    <textarea id="motivo" name="motivo" required maxlength="5000" placeholder="Describe claramente el motivo del rechazo y, si corresponde, qué debe corregirse." class="mt-2 min-h-32 w-full rounded-lg border border-neza-line px-3 py-2 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('motivo') border-rose-600 @enderror">{{ old('motivo') }}</textarea>
+                    @error('motivo')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                    <button type="submit" class="mt-4 rounded-lg bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-800">Rechazar solicitud</button>
+                </form>
+            </dialog>
+        @endif
         @if ($solicitud->estado?->clave === 'ENVIADA' && $modalidades->contains('EN_LINEA'))
             <dialog id="aprobar" @if (request('aprobar')) open @endif class="m-auto w-[min(96vw,680px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50">
                 <div class="flex items-center justify-between border-b border-neza-line px-6 py-4"><h2 class="text-lg font-bold text-neza-ink">Aprobar solicitud</h2><a href="{{ route('solicitudes.show', $solicitud) }}" class="rounded-lg p-2 text-neza-muted hover:bg-neza-canvas" aria-label="Cerrar aprobación"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></a></div>
