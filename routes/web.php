@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\CorreccionDocumentoController;
 use App\Http\Controllers\PublicoController;
+use App\Http\Controllers\ServicioInteresController;
 use App\Http\Controllers\SolicitudController;
 use Illuminate\Support\Facades\Route;
 
@@ -22,9 +23,12 @@ Route::prefix('tramites')->name('portal.tramites.')->controller(PublicoControlle
     Route::get('/{tramite}', 'detalle')->name('detalle');
 });
 Route::prefix('consulta')->name('consulta.')->controller(PublicoController::class)->group(function () {
-    Route::post('/token', 'solicitarToken')->name('token.solicitar');
-    Route::post('/verificar', 'verificarToken')->name('token.verificar');
+    Route::post('/token', 'solicitarToken')->middleware('throttle:5,15')->name('token.solicitar');
+    Route::post('/verificar', 'verificarToken')->middleware('throttle:10,1')->name('token.verificar');
+    Route::post('/cancelar', 'cancelarConsultaPendiente')->name('cancelar');
     Route::get('/solicitudes', 'solicitudesConsulta')->name('solicitudes');
+    Route::get('/solicitudes/{solicitud}', 'detalleSolicitudConsulta')->name('solicitudes.detalle');
+    Route::post('/cerrar', 'cerrarConsulta')->name('cerrar');
     Route::get('/documentos/{documento}', 'descargarDocumentoEmitido')->name('documentos.descargar');
 });
 
@@ -61,6 +65,9 @@ Route::prefix('formulario/{formulario}')
 // Rutas del Catálogo de Trámites
 
 Route::resource('catalogo-tramites', 'App\Http\Controllers\TramiteController');
+Route::resource('servicios-interes', ServicioInteresController::class)
+    ->except('show')
+    ->parameters(['servicios-interes' => 'servicio_interes']);
 Route::patch('catalogo-tramites/{catalogo_tramite}/estado', 'App\Http\Controllers\TramiteController@cambiarEstado')
     ->name('catalogo-tramites.estado');
 

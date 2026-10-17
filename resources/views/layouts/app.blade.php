@@ -67,6 +67,7 @@
                     </summary>
                     <div class="mt-1 grid gap-1 border-l border-neza-line pl-3">
                         <a href="{{ route('catalogo-tramites.index') }}" class="!py-2 !text-xs">Trámites</a>
+                        <a href="{{ route('servicios-interes.index') }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('servicios-interes.*')])>Servicios y enlaces de interés</a>
                         <a href="{{ route('catalogo-estados.index') }}" class="!py-2 !text-xs">Estados de solicitudes</a>
                         <a href="{{ route('catalogo-estados-formularios.index') }}" class="!py-2 !text-xs">Estados de formularios</a>
                         <a href="{{ route('catalogo-estados-documentos.index') }}" class="!py-2 !text-xs">Estados de documentos</a>
@@ -93,6 +94,9 @@
                 </button>
                 <div class="context"><span class="shield">♧</span>Administración institucional</div>
                 <div class="tools">
+                    <button type="button" data-accessibility-open aria-haspopup="dialog" aria-controls="accessibility-dialog" aria-label="Abrir opciones de accesibilidad" class="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-neza-line bg-white text-neza-wine hover:bg-neza-wine-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine" title="Accesibilidad">
+                        <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5a3.75 3.75 0 117.5 0m-9 15.75 1.5-7.5 3.75 3 3.75-3 1.5 7.5M12 7.5v8.25" /></svg>
+                    </button>
                     <div class="search"><span>⌕</span><span>Buscar solicitudes, trámites, ciudadanos...</span><span
                             class="shortcut">⌘ K</span></div>
                     <div class="notification" aria-label="3 notificaciones">♧<span class="badge">3</span></div><span
@@ -115,6 +119,7 @@
             <main>@yield('content')</main>
         </div>
     </div>
+    @include('partials.accesibilidad')
 </body>
 
 </html>

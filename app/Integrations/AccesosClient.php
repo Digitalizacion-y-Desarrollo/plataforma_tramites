@@ -13,8 +13,13 @@ class AccesosClient
         $departamentos = [];
 
         do {
-            $respuesta = Http::acceptJson()
-                ->timeout(config('services.accesos.timeout'))
+            $peticion = Http::acceptJson()->timeout(config('services.accesos.timeout'));
+
+            if ($caBundle = config('services.accesos.ca_bundle')) {
+                $peticion = $peticion->withOptions(['verify' => $caBundle]);
+            }
+
+            $respuesta = $peticion
                 ->get(config('services.accesos.departamentos_url'), ['page' => $pagina])
                 ->throw();
 

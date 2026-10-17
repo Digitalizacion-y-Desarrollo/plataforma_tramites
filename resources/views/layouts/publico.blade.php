@@ -16,5 +16,6 @@
     </main>
 
     @include('partials.publico.footer')
+    @include('partials.accesibilidad')
 </body>
 </html>

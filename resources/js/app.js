@@ -1,4 +1,5 @@
 import './bootstrap';
+import './accessibility';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
@@ -776,4 +777,16 @@ document.querySelectorAll('[data-domicilio]').forEach((domicilio) => {
     });
 
     aplicarCondiciones();
+});
+
+document.querySelectorAll('[data-reenviar-en]').forEach((boton) => {
+    const disponibleEn = Number(boton.dataset.reenviarEn) * 1000;
+    const etiqueta = boton.textContent.trim();
+    const actualizar = () => {
+        const segundos = Math.max(0, Math.ceil((disponibleEn - Date.now()) / 1000));
+        boton.disabled = segundos > 0;
+        boton.textContent = segundos > 0 ? `Reenviar código en ${segundos} s` : etiqueta;
+        if (segundos > 0) window.setTimeout(actualizar, 1000);
+    };
+    actualizar();
 });

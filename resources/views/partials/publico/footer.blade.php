@@ -35,7 +35,13 @@
                     <h2 class="text-[13px] font-bold text-[#be985c]">{{ $titulo }}</h2>
                     <ul class="mt-4 space-y-2.5 text-[13px] text-white/70">
                         @foreach ($enlaces as $texto => $href)
-                            <li><a href="{{ $href }}" class="transition hover:text-white">{{ $texto }}</a></li>
+                            <li>
+                                @if ($texto === 'Accesibilidad')
+                                    <button type="button" data-accessibility-open aria-haspopup="dialog" aria-controls="accessibility-dialog" class="text-left transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">{{ $texto }}</button>
+                                @else
+                                    <a href="{{ $href }}" class="transition hover:text-white">{{ $texto }}</a>
+                                @endif
+                            </li>
                         @endforeach
                     </ul>
                 </div>
@@ -47,7 +53,7 @@
             <p>© {{ date('Y') }} Gobierno Municipal de Nezahualcóyotl · Portal de trámites</p>
             <div class="flex flex-wrap gap-x-5 gap-y-2">
                 <a href="#" class="hover:text-white">Privacidad</a>
-                <a href="#" class="hover:text-white">Accesibilidad</a>
+                <button type="button" data-accessibility-open aria-haspopup="dialog" aria-controls="accessibility-dialog" class="hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Accesibilidad</button>
                 <a href="#" class="hover:text-white">Mapa del sitio</a>
             </div>
             <div class="flex items-center gap-2" aria-label="Redes sociales">

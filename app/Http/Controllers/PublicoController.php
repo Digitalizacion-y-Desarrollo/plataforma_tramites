@@ -4,25 +4,40 @@ namespace App\Http\Controllers;
 
 use App\Mail\SolicitudEnviadaMail;
 use App\Mail\TokenConsultaMail;
+use App\Models\EstadoSolicitud;
 use App\Models\Solicitud;
 use App\Models\SolicitudDocumentoEmitido;
+use App\Models\ServicioInteres;
 use App\Models\Tramite;
+use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 
 class PublicoController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
         $tramites = $this->tramitesPublicados();
+        $servicios = Schema::hasTable('servicios_interes') ? ServicioInteres::query()->orderBy('titulo')->get() : collect();
+        $consultaPendiente = $request->session()->get('consulta_pendiente');
+        if (! is_array($consultaPendiente) || ! isset($consultaPendiente['curp'], $consultaPendiente['email'], $consultaPendiente['expira']) || now()->timestamp >= $consultaPendiente['expira']) {
+            if (is_array($consultaPendiente) && isset($consultaPendiente['expira']) && now()->timestamp >= $consultaPendiente['expira']) {
+                $request->session()->flash('consulta_aviso', 'El código venció. Inicia una nueva consulta.');
+            }
+            $request->session()->forget('consulta_pendiente');
+            $consultaPendiente = null;
+        }
 
-        return view('publico.index', compact('tramites'));
+        return view('publico.index', compact('tramites', 'servicios', 'consultaPendiente'));
     }
 
     public function tramites(): View
@@ -57,6 +72,7 @@ class PublicoController extends Controller
         $formularioVersion = $this->formularioActivo($tramite);
         abort_unless($formularioVersion, 404);
         $base = $request->validate([
+            'nombre_solicitante' => ['required', 'string', 'min:2', 'max:200'],
             'curp_consulta' => ['required', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'],
             'email_contacto' => ['required', 'email', 'max:200'],
         ]);
@@ -133,7 +149,7 @@ class PublicoController extends Controller
             do {
                 $folio = 'SOL-'.now()->format('Ymd').'-'.Str::upper(Str::random(6));
             } while (DB::table('solicitudes')->where('folio', $folio)->exists());
-            DB::table('solicitudes')->insert(['id' => $id, 'folio' => $folio, 'tramite_id' => $tramite->id, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => Str::upper($base['curp_consulta']), 'email_contacto' => $base['email_contacto'], 'fecha_envio' => now(), 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('solicitudes')->insert(['id' => $id, 'folio' => $folio, 'tramite_id' => $tramite->id, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => Str::upper($base['curp_consulta']), 'email_contacto' => Str::lower(trim($base['email_contacto'])), 'nombre_solicitante_snapshot' => trim($base['nombre_solicitante']), 'fecha_envio' => now(), 'created_at' => now(), 'updated_at' => now()]);
             foreach ($campos as $campo) {
                 $valor = $respuestas[$campo->id] ?? null;
                 if ($campo->tipo === 'FILE' && request()->hasFile('respuestas.'.$campo->id)) {
@@ -150,7 +166,7 @@ class PublicoController extends Controller
                 'id' => $notificacionId,
                 'solicitud_id' => $id,
                 'notificacion_estado_id' => $notificacionPendienteId,
-                'destinatario' => $base['email_contacto'],
+                'destinatario' => Str::lower(trim($base['email_contacto'])),
                 'tipo' => 'SOLICITUD_ENVIADA',
                 'asunto' => 'Solicitud enviada correctamente · Folio '.$folio,
                 'intentos' => 0,
@@ -168,42 +184,111 @@ class PublicoController extends Controller
 
     public function solicitarToken(Request $request)
     {
-        $datos = $request->validate(['curp' => ['required', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i']]);
-        $curp = Str::upper($datos['curp']);
-        $email = Solicitud::query()->where('curp_consulta', $curp)->latest('created_at')->value('email_contacto');
+        $datos = $request->validate([
+            'curp' => ['required', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'],
+            'email_contacto' => ['required', 'email', 'max:200'],
+        ]);
+        $curp = Str::upper(trim($datos['curp']));
+        $email = Str::lower(trim($datos['email_contacto']));
+        $clave = 'consulta-token:'.hash('sha256', $curp.'|'.$email);
 
-        if (! $email) {
-            return back()->withErrors(['curp' => 'No se encontraron solicitudes para la CURP indicada.'])->withInput();
+        if (RateLimiter::tooManyAttempts($clave, 3)) {
+            $pendiente = $request->session()->get('consulta_pendiente');
+            if (is_array($pendiente) && ($pendiente['curp'] ?? null) === $curp && ($pendiente['email'] ?? null) === $email) {
+                return redirect(route('portal.publico').'#consulta')->with('consulta_aviso', 'Alcanzaste el límite de envíos. Espera unos minutos para solicitar otro código.');
+            }
+
+            return back()->withErrors(['email_contacto' => 'Espera unos minutos antes de solicitar otro código.'])->withInput();
+        }
+        RateLimiter::hit($clave, 900);
+
+        $solicitud = Solicitud::query()->where('curp_consulta', $curp)->where('email_contacto', $email)->latest('created_at')->first();
+        $aviso = 'Si los datos corresponden a una solicitud, recibirás un código en ese correo. Revisa también la carpeta de spam.';
+        $pendiente = $request->session()->get('consulta_pendiente');
+        $mismosDatos = is_array($pendiente) && ($pendiente['curp'] ?? null) === $curp && ($pendiente['email'] ?? null) === $email;
+        $reciente = DB::table('token_consultas')->where('curp', $curp)->where('email_destino', $email)
+            ->where('utilizado', false)->where('created_at', '>', now()->subMinute())->latest('created_at')->first();
+        if ($reciente || ($mismosDatos && now()->timestamp < ($pendiente['reenviar_en'] ?? 0))) {
+            $request->session()->put('consulta_pendiente', [
+                'curp' => $curp, 'email' => $email,
+                'expira' => $reciente ? Carbon::parse($reciente->fecha_expiracion)->timestamp : $pendiente['expira'],
+                'reenviar_en' => $reciente ? Carbon::parse($reciente->created_at)->addMinute()->timestamp : $pendiente['reenviar_en'],
+            ]);
+
+            return redirect(route('portal.publico').'#consulta')->with('consulta_aviso', $aviso);
+        }
+
+        $request->session()->put('consulta_pendiente', [
+            'curp' => $curp, 'email' => $email,
+            'expira' => now()->addMinutes(15)->timestamp,
+            'reenviar_en' => now()->addMinute()->timestamp,
+        ]);
+        if (! $solicitud) {
+            return redirect(route('portal.publico').'#consulta')->with('consulta_aviso', $aviso);
         }
 
         $token = (string) random_int(100000, 999999);
-        DB::table('token_consultas')->where('curp', $curp)->where('utilizado', false)->update(['utilizado' => true, 'updated_at' => now()]);
-        DB::table('token_consultas')->insert(['id' => (string) Str::uuid(), 'curp' => $curp, 'email_destino' => $email, 'token_hash' => hash('sha256', $token), 'fecha_expiracion' => now()->addMinutes(15), 'intentos' => 0, 'utilizado' => false, 'created_at' => now(), 'updated_at' => now()]);
+        $tokenId = (string) Str::uuid();
+        $notificacionId = (string) Str::uuid();
+        DB::transaction(function () use ($curp, $email, $token, $tokenId, $notificacionId, $solicitud): void {
+            DB::table('token_consultas')->where('curp', $curp)->where('email_destino', $email)
+                ->where('utilizado', false)->update(['utilizado' => true, 'updated_at' => now()]);
+            DB::table('token_consultas')->insert([
+                'id' => $tokenId, 'curp' => $curp, 'email_destino' => $email,
+                'token_hash' => hash_hmac('sha256', $token, (string) config('app.key')),
+                'fecha_expiracion' => now()->addMinutes(15), 'intentos' => 0, 'utilizado' => false,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            DB::table('notificacion_emails')->insert([
+                'id' => $notificacionId, 'solicitud_id' => $solicitud->id,
+                'notificacion_estado_id' => DB::table('notificacion_estados')->where('clave', 'PENDIENTE')->value('id'),
+                'destinatario' => $email, 'tipo' => 'TOKEN_CONSULTA',
+                'asunto' => 'Código temporal para consultar tus trámites', 'intentos' => 0,
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        });
 
         try {
             Mail::to($email)->send(new TokenConsultaMail($token));
+            DB::table('notificacion_emails')->where('id', $notificacionId)->update([
+                'notificacion_estado_id' => DB::table('notificacion_estados')->where('clave', 'ENVIADO')->value('id'),
+                'intentos' => 1, 'fecha_envio' => now(), 'updated_at' => now(),
+            ]);
         } catch (\Throwable $exception) {
-            Log::error('No se pudo enviar el token de consulta.', ['curp' => $curp, 'exception' => $exception]);
+            DB::table('token_consultas')->where('id', $tokenId)->update(['utilizado' => true, 'updated_at' => now()]);
+            DB::table('notificacion_emails')->where('id', $notificacionId)->update([
+                'notificacion_estado_id' => DB::table('notificacion_estados')->where('clave', 'ERROR')->value('id'),
+                'intentos' => 1, 'error' => Str::limit($exception->getMessage(), 65535, ''), 'updated_at' => now(),
+            ]);
+            Log::error('No se pudo enviar el token de consulta.', ['token_consulta_id' => $tokenId, 'exception' => $exception]);
 
-            return back()->withErrors(['curp' => 'No fue posible enviar el token. Intenta nuevamente.'])->withInput();
+            return redirect(route('portal.publico').'#consulta')->with('consulta_aviso', $aviso);
         }
 
-        return redirect(route('portal.publico').'#consulta')->with('consulta_curp', $curp)->with('token_solicitado', true);
+        return redirect(route('portal.publico').'#consulta')->with('consulta_aviso', $aviso);
     }
 
     public function verificarToken(Request $request)
     {
-        $datos = $request->validate([
-            'curp' => ['required', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'],
-            'token' => ['required', 'digits:6'],
-        ]);
-        $curp = Str::upper($datos['curp']);
-        $valido = DB::transaction(function () use ($curp, $datos) {
-            $registro = DB::table('token_consultas')->where('curp', $curp)->where('utilizado', false)->latest('created_at')->lockForUpdate()->first();
-            if (! $registro || now()->greaterThan($registro->fecha_expiracion) || $registro->intentos >= 5) {
+        $datos = $request->validate(['token' => ['required', 'digits:6']]);
+        $pendiente = $request->session()->get('consulta_pendiente');
+        if (! is_array($pendiente) || ! isset($pendiente['curp'], $pendiente['email'], $pendiente['expira']) || now()->timestamp >= $pendiente['expira']) {
+            if (is_array($pendiente) && isset($pendiente['curp'], $pendiente['email'])) {
+                DB::table('token_consultas')->where('curp', $pendiente['curp'])->where('email_destino', $pendiente['email'])
+                    ->where('utilizado', false)->update(['utilizado' => true, 'updated_at' => now()]);
+            }
+            $request->session()->forget('consulta_pendiente');
+
+            return redirect(route('portal.publico').'#consulta')->with('consulta_aviso', 'El código venció. Inicia una nueva consulta.');
+        }
+        $valido = DB::transaction(function () use ($pendiente, $datos) {
+            $registro = DB::table('token_consultas')->where('curp', $pendiente['curp'])
+                ->where('email_destino', $pendiente['email'])->where('utilizado', false)
+                ->latest('created_at')->lockForUpdate()->first();
+            if (! $registro || now()->greaterThanOrEqualTo($registro->fecha_expiracion) || $registro->intentos >= 5) {
                 return false;
             }
-            if (! hash_equals($registro->token_hash, hash('sha256', $datos['token']))) {
+            if (! hash_equals($registro->token_hash, hash_hmac('sha256', $datos['token'], (string) config('app.key')))) {
                 $intentos = $registro->intentos + 1;
                 DB::table('token_consultas')->where('id', $registro->id)->update(['intentos' => $intentos, 'utilizado' => $intentos >= 5, 'updated_at' => now()]);
 
@@ -214,30 +299,101 @@ class PublicoController extends Controller
             return true;
         });
         if (! $valido) {
-            return back()->withErrors(['token' => 'El token es inválido, expiró o alcanzó el límite de intentos.'])->withInput();
+            return redirect(route('portal.publico').'#consulta')->withErrors(['token' => 'El código es inválido, venció o alcanzó el límite de intentos.']);
         }
 
-        $request->session()->put('consulta_curp_autorizada', $curp);
+        $request->session()->regenerate();
+        $request->session()->forget('consulta_pendiente');
+        $request->session()->put('consulta_ciudadana', [
+            'curp' => $pendiente['curp'], 'email' => $pendiente['email'], 'expira' => now()->addMinutes(30)->timestamp,
+        ]);
 
         return redirect()->route('consulta.solicitudes');
     }
 
     public function solicitudesConsulta(Request $request): View
     {
-        $curp = $request->session()->get('consulta_curp_autorizada');
-        abort_unless($curp, 403);
-        $solicitudes = Solicitud::query()->where('curp_consulta', $curp)->with(['tramite:id,nombre', 'estado:id,clave,nombre', 'documentoEmitido'])->latest('fecha_envio')->get();
+        $acceso = $this->accesoCiudadano($request);
+        $filtros = $request->validate(['q' => ['nullable', 'string', 'max:100'], 'estado' => ['nullable', 'string', 'max:50']]);
+        $filtros['q'] = trim($filtros['q'] ?? '');
+        $consulta = Solicitud::query()->where('curp_consulta', $acceso['curp'])->where('email_contacto', $acceso['email']);
+        $nombre = (clone $consulta)->whereNotNull('nombre_solicitante_snapshot')->latest('fecha_envio')->value('nombre_solicitante_snapshot') ?: 'Persona solicitante';
+        $total = (clone $consulta)->count();
+        $estados = EstadoSolicitud::withTrashed()->whereIn('id', (clone $consulta)->select('solicitud_estado_id'))
+            ->orderBy('orden')->get(['id', 'clave', 'nombre']);
+        validator($filtros, ['estado' => ['nullable', Rule::in($estados->pluck('clave')->all())]])->validate();
+        if ($filtros['q'] !== '') {
+            $consulta->where(function ($query) use ($filtros) {
+                $query->where('folio', 'like', '%'.$filtros['q'].'%')
+                    ->orWhereHas('tramite', fn ($tramite) => $tramite->withTrashed()->where('nombre', 'like', '%'.$filtros['q'].'%'));
+            });
+        }
+        if (filled($filtros['estado'] ?? null)) {
+            $consulta->where('solicitud_estado_id', $estados->firstWhere('clave', $filtros['estado'])->id);
+        }
+        $solicitudes = $consulta->with([
+            'tramite' => fn ($tramite) => $tramite->withTrashed()->select('id', 'nombre'),
+            'estado' => fn ($estado) => $estado->withTrashed()->select('id', 'clave', 'nombre'),
+        ])
+            ->latest('fecha_envio')->paginate(10)->withQueryString();
 
-        return view('publico.consulta-solicitudes', compact('solicitudes'));
+        return view('publico.consulta-solicitudes', compact('solicitudes', 'nombre', 'acceso', 'filtros', 'estados', 'total'));
+    }
+
+    public function detalleSolicitudConsulta(Request $request, Solicitud $solicitud): View
+    {
+        $acceso = $this->accesoCiudadano($request);
+        abort_unless($solicitud->curp_consulta === $acceso['curp'] && Str::lower($solicitud->email_contacto) === $acceso['email'], 404);
+        $solicitud->load([
+            'tramite' => fn ($tramite) => $tramite->withTrashed()->select('id', 'nombre'),
+            'estado' => fn ($estado) => $estado->withTrashed()->select('id', 'clave', 'nombre'),
+            'documentoEmitido',
+        ]);
+        $historial = DB::table('solicitud_historial_estados as historial')
+            ->join('solicitud_estados as estado', 'estado.id', '=', 'historial.estado_nuevo_id')
+            ->where('historial.solicitud_id', $solicitud->id)
+            ->orderBy('historial.fecha')->get(['estado.nombre as estado', 'historial.fecha']);
+        $observaciones = DB::table('solicitud_observaciones')->where('solicitud_id', $solicitud->id)
+            ->where('visible_ciudadano', true)->orderBy('created_at')->get(['texto', 'created_at']);
+
+        return view('publico.solicitudes.detalle', compact('solicitud', 'historial', 'observaciones'));
+    }
+
+    public function cerrarConsulta(Request $request)
+    {
+        $request->session()->forget(['consulta_ciudadana', 'consulta_pendiente']);
+        $request->session()->regenerateToken();
+
+        return redirect(route('portal.publico').'#consulta')->with('consulta_aviso', 'La consulta se cerró correctamente.');
+    }
+
+    public function cancelarConsultaPendiente(Request $request)
+    {
+        $request->session()->forget('consulta_pendiente');
+
+        return redirect(route('portal.publico').'#consulta');
     }
 
     public function descargarDocumentoEmitido(Request $request, SolicitudDocumentoEmitido $documento)
     {
-        abort_unless($request->session()->get('consulta_curp_autorizada') === $documento->solicitud->curp_consulta, 403);
+        $acceso = $this->accesoCiudadano($request);
+        abort_unless($acceso['curp'] === $documento->solicitud->curp_consulta && $acceso['email'] === Str::lower($documento->solicitud->email_contacto), 404);
+        abort_unless($documento->solicitud->estado?->clave === 'APROBADA', 404);
         abort_unless(Storage::disk('local')->exists($documento->storage_key), 404);
         abort_if($documento->fecha_expiracion !== null && now()->greaterThan($documento->fecha_expiracion), 410, 'El documento ya no está disponible por vencimiento de la descarga.');
 
         return Storage::disk('local')->download($documento->storage_key, $documento->nombre_original);
+    }
+
+    private function accesoCiudadano(Request $request): array
+    {
+        $acceso = $request->session()->get('consulta_ciudadana');
+        if (! is_array($acceso) || ! isset($acceso['curp'], $acceso['email'], $acceso['expira']) || now()->timestamp >= $acceso['expira']) {
+            $request->session()->forget('consulta_ciudadana');
+            throw new HttpResponseException(redirect(route('portal.publico').'#consulta')->with('consulta_aviso', 'Tu acceso temporal terminó. Inicia una nueva consulta.'));
+        }
+
+        return $acceso;
     }
 
     private function formularioActivo(Tramite $tramite)

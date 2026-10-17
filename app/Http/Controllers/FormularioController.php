@@ -12,6 +12,7 @@ use App\Models\FormularioGrupoCampo;
 use App\Models\FormularioSeccion;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -58,7 +59,8 @@ class FormularioController extends Controller
     {
         try {
             $departamentos = $accesos->departamentosActivos();
-        } catch (\Throwable) {
+        } catch (\Throwable $exception) {
+            Log::warning('No se pudo cargar el catálogo de departamentos de Accesos.', ['exception' => $exception]);
             $departamentos = [];
         }
 
@@ -81,7 +83,8 @@ class FormularioController extends Controller
     {
         try {
             $departamentos = $accesos->departamentosActivos();
-        } catch (\Throwable) {
+        } catch (\Throwable $exception) {
+            Log::warning('No se pudo cargar el catálogo de departamentos de Accesos.', ['exception' => $exception]);
             $departamentos = [];
         }
 
@@ -406,7 +409,8 @@ class FormularioController extends Controller
 
         try {
             $departamentos = $accesos->departamentosActivos();
-        } catch (\Throwable) {
+        } catch (\Throwable $exception) {
+            Log::warning('No se pudo cargar el catálogo de departamentos de Accesos.', ['exception' => $exception]);
             $departamentos = [];
         }
 

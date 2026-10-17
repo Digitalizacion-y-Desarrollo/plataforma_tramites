@@ -16,16 +16,28 @@ class TokenConsultaMail extends Mailable
 
     public function envelope(): Envelope
     {
-        return new Envelope(subject: 'Token temporal para consultar tus trámites');
+        return new Envelope(subject: 'Tu código para consultar tus trámites');
     }
 
     public function content(): Content
     {
         return new Content(view: 'emails.layouts.notificacion', with: [
-            'title' => 'Consulta segura de trámites', 'kicker' => 'TOKEN TEMPORAL',
-            'intro' => 'Tu token temporal es: '.$this->token.'. Tiene una vigencia de 15 minutos y solo puede utilizarse una vez.',
-            'statusLabel' => 'Token temporal', 'statusTone' => 'info',
-            'notice' => 'No compartas este token con terceros.',
+            'subject' => 'Tu código para consultar tus trámites',
+            'preheader' => 'Recibimos tu solicitud de acceso a la consulta ciudadana. El código vence en 15 minutos.',
+            'kicker' => 'CÓDIGO DE VERIFICACIÓN',
+            'title' => $this->token,
+            'intro' => 'Ingresa este código de seis dígitos en la plataforma para consultar el estado de tus trámites. Es de un solo uso y vence en 15 minutos.',
+            'stepsTitle' => '¿Cómo consultar tus trámites?',
+            'steps' => [
+                ['title' => 'Vuelve a la plataforma', 'description' => 'Abre la página de consulta con el mismo navegador donde solicitaste el código.'],
+                ['title' => 'Ingresa el código', 'description' => 'Escribe los seis dígitos en el campo «Código de verificación» y selecciona «Entrar a mi portal».'],
+            ],
+            'noticeTitle' => 'Tu información está protegida',
+            'notice' => 'No compartas este código. Si no solicitaste el acceso, ignora este correo; nadie podrá entrar a tus trámites sin el código.',
+            'actionUrl' => route('portal.publico').'#consulta',
+            'actionLabel' => 'Ir a la consulta de trámites',
+            'actionHint' => 'Este enlace no inicia sesión automáticamente; deberás ingresar el código.',
+            'helpText' => 'Si el código vence o no funciona, solicita uno nuevo desde la página de consulta.',
         ]);
     }
 }

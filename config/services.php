@@ -41,6 +41,7 @@ return [
             'https://accesos.digitalneza.com/api/departamentos'
         ),
         'timeout' => (int) env('ACCESOS_TIMEOUT', 15),
+        'ca_bundle' => env('ACCESOS_CA_BUNDLE'),
     ],
 
 ];

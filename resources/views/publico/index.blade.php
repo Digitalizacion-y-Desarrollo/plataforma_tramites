@@ -46,6 +46,10 @@
                         </a>
                     @endforeach
                 </div>
+                <a href="#consulta" class="mt-5 inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-neza-wine px-5 py-2.5 text-sm font-bold text-neza-wine transition hover:bg-neza-wine-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">
+                    ¿Ya realizaste un trámite? Consulta su estado
+                    <svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5 21 12m0 0-7.5 7.5M21 12H3" /></svg>
+                </a>
             </div>
         </div>
     </section>
@@ -134,57 +138,57 @@
                 </div>
                 <p class="mt-5 text-[11px] font-bold uppercase tracking-wide text-[#be985c]">Seguimiento ciudadano</p>
                 <h2 class="mt-2 max-w-md text-3xl font-bold leading-tight">Consulta el estado de tu trámite</h2>
-                <p class="mt-3 max-w-lg text-sm leading-relaxed text-white/70">Ingresa tu CURP y solicita un token temporal
-                    en el correo asociado para consultar tus solicitudes de forma segura.</p>
+                <p class="mt-3 max-w-lg text-sm leading-relaxed text-white/70">Ingresa tu CURP y el correo que usaste en tu solicitud. Te enviaremos un código temporal para acceder a tus trámites.</p>
             </div>
-            <form class="rounded-2xl bg-white p-5 text-neza-ink shadow-2xl sm:p-6" action="{{ route('consulta.token.solicitar') }}" method="POST">
-                @csrf
-                <div class="grid gap-4">
-                    <div>
-                        <label for="curp-consulta" class="text-xs font-bold">CURP</label>
-                        <input id="curp-consulta" name="curp" type="text" maxlength="18" autocomplete="off" value="{{ old('curp', session('consulta_curp')) }}"
-                            placeholder="Ingresa tu CURP"
-                            class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm uppercase outline-none transition focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15">
-                        @error('curp')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+            <div class="rounded-2xl bg-white p-5 text-neza-ink shadow-2xl sm:p-7">
+                <p class="text-xs font-bold uppercase tracking-wide text-neza-wine">Paso {{ $consultaPendiente ? '2' : '1' }} de 2</p>
+                @if (session('consulta_aviso'))
+                    <p role="status" class="mt-4 rounded-xl bg-neza-wine-soft p-3 text-sm text-neza-wine">{{ session('consulta_aviso') }}</p>
+                @endif
+                @if ($consultaPendiente)
+                    <h3 class="mt-2 text-xl font-bold">Ingresa el código de verificación</h3>
+                    <p class="mt-2 text-sm leading-relaxed text-neza-muted">Si tus datos coinciden con una solicitud, enviamos un código de seis dígitos a <strong class="text-neza-ink">{{ \Illuminate\Support\Str::mask($consultaPendiente['email'], '*', 2, max(0, strpos($consultaPendiente['email'], '@') - 2)) }}</strong>. Vence en 15 minutos.</p>
+                    <form action="{{ route('consulta.token.verificar') }}" method="POST" class="mt-5">
+                        @csrf
+                        <label for="token-consulta" class="block text-sm font-bold">Código de verificación</label>
+                        <input id="token-consulta" name="token" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required aria-describedby="token-ayuda @error('token') token-error @enderror" class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm outline-none focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15 @error('token') border-rose-600 @enderror">
+                        @error('token')<p id="token-error" class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                        <p id="token-ayuda" class="mt-2 text-xs text-neza-muted">El código es de un solo uso. No lo compartas.</p>
+                        <button type="submit" class="mt-5 min-h-11 w-full rounded-xl bg-neza-wine px-5 py-2.5 text-sm font-bold text-white hover:bg-neza-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine sm:w-auto">Entrar a mi portal</button>
+                    </form>
+                    <div class="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-neza-line pt-4 text-sm">
+                        <form action="{{ route('consulta.token.solicitar') }}" method="POST">
+                            @csrf
+                            <input type="hidden" name="curp" value="{{ $consultaPendiente['curp'] }}">
+                            <input type="hidden" name="email_contacto" value="{{ $consultaPendiente['email'] }}">
+                            <button type="submit" data-reenviar-en="{{ $consultaPendiente['reenviar_en'] }}" class="font-bold text-neza-wine underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Reenviar código</button>
+                        </form>
+                        <form action="{{ route('consulta.cancelar') }}" method="POST">
+                            @csrf
+                            <button type="submit" class="font-bold text-neza-muted underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Cambiar CURP o correo</button>
+                        </form>
                     </div>
-                    <div>
-                        <label for="correo-consulta" class="text-xs font-bold">Correo electrónico</label>
-                        <input id="correo-consulta" name="email_contacto" type="email" autocomplete="email"
-                            placeholder="correo@ejemplo.com"
-                            class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm outline-none transition focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15">
-                    </div>
-                </div>
-                <div
-                    class="mt-4 flex flex-col gap-4 border-t border-neza-line pt-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div class="flex flex-wrap gap-x-5 gap-y-2 text-[11px] text-neza-muted">
-                        <span class="flex items-center gap-1.5"><svg class="size-4 text-[#287a47]" aria-hidden="true"
-                                fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M9 12.75L11.25 15 15 9.75m6-3.75A2.25 2.25 0 0018.75 3.75H5.25A2.25 2.25 0 003 6v12a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18V6z" />
-                            </svg>Token temporal</span>
-                        <span class="flex items-center gap-1.5"><svg class="size-4 text-[#76531f]" aria-hidden="true"
-                                fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round"
-                                    d="M16.5 10.5V6.75a4.5 4.5 0 00-9 0v3.75m-.75 0h10.5A2.25 2.25 0 0119.5 12.75v6A2.25 2.25 0 0117.25 21H6.75a2.25 2.25 0 01-2.25-2.25v-6a2.25 2.25 0 012.25-2.25z" />
-                            </svg>Datos protegidos</span>
-                    </div>
-                    <button type="submit"
-                        class="h-11 shrink-0 rounded-xl bg-neza-wine px-5 text-sm font-bold text-white transition hover:bg-[#4c0f26]">Solicitar
-                        token</button>
-                </div>
-            </form>
-            @if (session('token_solicitado'))
-                <form class="rounded-2xl border border-[#be985c] bg-[#fdfbf8] p-5 text-neza-ink shadow-2xl sm:p-6" action="{{ route('consulta.token.verificar') }}" method="POST">
-                    @csrf
-                    <h3 class="text-lg font-bold">Ingresa tu token temporal</h3>
-                    <p class="mt-1 text-sm text-neza-muted">Enviamos un código de seis dígitos al correo asociado a tu CURP.</p>
-                    <input type="hidden" name="curp" value="{{ session('consulta_curp') }}">
-                    <label for="token-consulta" class="mt-4 block text-xs font-bold">Token</label>
-                    <input id="token-consulta" name="token" type="text" inputmode="numeric" maxlength="6" required class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm outline-none focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15 @error('token') border-rose-600 @enderror">
-                    @error('token')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
-                    <button type="submit" class="mt-4 h-11 rounded-xl bg-neza-wine px-5 text-sm font-bold text-white hover:bg-[#4c0f26]">Consultar solicitudes</button>
-                </form>
-            @endif
+                    <p class="mt-4 text-xs text-neza-muted">¿No llegó? Revisa spam o vuelve a solicitarlo después de un minuto.</p>
+                @else
+                    <h3 class="mt-2 text-xl font-bold">Confirma tus datos</h3>
+                    <p class="mt-2 text-sm text-neza-muted">Usa la CURP y el correo que proporcionaste al enviar tu solicitud.</p>
+                    <form action="{{ route('consulta.token.solicitar') }}" method="POST" class="mt-5 space-y-4">
+                        @csrf
+                        <div>
+                            <label for="curp-consulta" class="text-sm font-bold">CURP</label>
+                            <input id="curp-consulta" name="curp" type="text" maxlength="18" autocomplete="off" required value="{{ old('curp') }}" placeholder="Ingresa tu CURP" class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm uppercase outline-none focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15 @error('curp') border-rose-600 @enderror">
+                            @error('curp')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                        </div>
+                        <div>
+                            <label for="correo-consulta" class="text-sm font-bold">Correo electrónico</label>
+                            <input id="correo-consulta" name="email_contacto" type="email" autocomplete="email" required value="{{ old('email_contacto') }}" placeholder="correo@ejemplo.com" class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm outline-none focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15 @error('email_contacto') border-rose-600 @enderror">
+                            @error('email_contacto')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                        </div>
+                        <button type="submit" class="min-h-11 w-full rounded-xl bg-neza-wine px-5 py-2.5 text-sm font-bold text-white hover:bg-neza-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine sm:w-auto">Enviar código de acceso</button>
+                    </form>
+                    <p class="mt-4 border-t border-neza-line pt-4 text-xs text-neza-muted">Por tu seguridad, el acceso dura 30 minutos y solo muestra las solicitudes vinculadas a ambos datos.</p>
+                @endif
+            </div>
         </div>
     </section>
 
@@ -270,27 +274,19 @@
                     <p class="mt-2 text-sm text-neza-muted">Accesos rápidos a información, pagos y servicios municipales.
                     </p>
                 </div>
-                <a href="#" class="text-xs font-bold text-neza-wine">Explorar todos los servicios</a>
             </div>
             <div class="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                @foreach (['Pago en línea', 'Directorio de dependencias', 'Transparencia', 'Mapas y cartografía', 'Bolsa de trabajo', 'Programas sociales', 'Quejas y sugerencias', 'Protección de datos'] as $servicio)
-                    <a href="#"
-                        class="group flex min-h-24 items-center justify-between gap-3 rounded-xl border border-neza-line bg-[#f8f9fa] p-4 transition hover:border-neza-wine/40 hover:bg-white">
-                        <span><span
-                                class="mb-3 grid size-8 place-items-center rounded-lg bg-neza-wine-soft text-neza-wine"><svg
-                                    class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24"
-                                    stroke-width="1.7" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round"
-                                        d="M3.75 21h16.5M4.5 3h15l-.75 6H5.25L4.5 3zm.75 6v9.75h13.5V9M9 21v-6h6v6" />
-                                </svg></span><span
-                                class="text-xs font-bold text-neza-ink">{{ $servicio }}</span></span>
-                        <svg class="size-4 shrink-0 text-neza-muted transition group-hover:translate-x-0.5 group-hover:text-neza-wine"
-                            aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8"
-                            stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                        </svg>
+                @forelse ($servicios as $servicio)
+                    <a href="{{ $servicio->enlace }}" target="_blank" rel="noopener noreferrer"
+                        class="group flex min-h-36 flex-col gap-3 rounded-xl border border-neza-line bg-neza-canvas p-4 transition hover:border-neza-wine/40 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">
+                        <img src="{{ asset('storage/'.$servicio->logo_storage_key) }}" alt="" class="size-10 rounded-lg object-contain" loading="lazy">
+                        <span class="text-sm font-bold text-neza-ink">{{ $servicio->titulo }}</span>
+                        <span class="line-clamp-3 text-xs leading-relaxed text-neza-muted">{{ $servicio->descripcion }}</span>
+                        <span class="sr-only">Abre en una pestaña nueva</span>
                     </a>
-                @endforeach
+                @empty
+                    <p class="col-span-full rounded-xl border border-dashed border-neza-line p-6 text-sm text-neza-muted">Próximamente encontrarás aquí servicios y enlaces de interés.</p>
+                @endforelse
             </div>
         </div>
     </section>

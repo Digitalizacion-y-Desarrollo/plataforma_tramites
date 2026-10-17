@@ -14,7 +14,7 @@ class Solicitud extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['folio', 'tramite_id', 'formulario_version_id', 'solicitud_estado_id', 'curp_consulta', 'email_contacto', 'fecha_envio', 'fecha_terminacion'];
+    protected $fillable = ['folio', 'tramite_id', 'formulario_version_id', 'solicitud_estado_id', 'curp_consulta', 'email_contacto', 'nombre_solicitante_snapshot', 'fecha_envio', 'fecha_terminacion'];
 
     protected function casts(): array
     {
