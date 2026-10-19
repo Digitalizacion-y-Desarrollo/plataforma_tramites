@@ -192,7 +192,7 @@
         </div>
     </section>
 
-    <section class="bg-white px-4 py-14 sm:px-6 lg:px-[72px] lg:py-16">
+    <section class="hidden bg-white px-4 py-14 sm:px-6 lg:px-[72px] lg:py-16">
         <div class="mx-auto max-w-[1296px] text-center">
             <p class="text-[11px] font-bold uppercase tracking-wide text-[#76531f]">Simple y transparente</p>
             <h2 class="mt-2 text-2xl font-bold sm:text-[30px]">Haz tu trámite en 3 pasos</h2>
@@ -299,27 +299,23 @@
                 <p class="mt-2 text-sm text-neza-muted">Resuelve tus dudas frecuentes o comunícate por los canales
                     oficiales.</p>
                 <div class="mt-7 space-y-2">
-                    @foreach (['¿Cómo sé si un trámite puede realizarse en línea?', '¿Qué hago si olvidé mi folio?', '¿Cómo corrijo un documento antes de enviar?', '¿Dónde consulto requisitos, costos y tiempos?'] as $pregunta)
+                    @forelse ($canalesAyuda?->preguntas_frecuentes ?? [] as $pregunta)
                         <details class="group rounded-xl border border-neza-line bg-white px-4 py-3">
                             <summary
                                 class="flex cursor-pointer list-none items-center justify-between gap-4 text-[13px] font-bold [&::-webkit-details-marker]:hidden">
-                                {{ $pregunta }}<svg
+                                {{ $pregunta['pregunta'] }}<svg
                                     class="size-4 shrink-0 text-neza-wine transition group-open:rotate-45"
                                     aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8"
                                     stroke="currentColor">
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m6-6H6" />
                                 </svg></summary>
                             <p class="mt-3 border-t border-neza-line pt-3 text-[13px] leading-relaxed text-neza-muted">
-                                Consulta la ficha del trámite. Ahí encontrarás su modalidad, requisitos, documentos, costo y
-                                tiempo estimado de respuesta.</p>
+                                {{ $pregunta['respuesta'] }}</p>
                         </details>
-                    @endforeach
+                    @empty
+                        <p class="rounded-xl border border-dashed border-neza-line bg-white p-4 text-sm text-neza-muted">Próximamente publicaremos preguntas frecuentes.</p>
+                    @endforelse
                 </div>
-                <a href="#" class="mt-5 inline-flex items-center gap-1 text-xs font-bold text-neza-wine">Visitar el
-                    centro de ayuda <svg class="size-3.5" aria-hidden="true" fill="none" viewBox="0 0 24 24"
-                        stroke-width="2" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                    </svg></a>
             </div>
             <aside class="rounded-2xl border border-neza-line bg-white p-6 shadow-[0_10px_30px_rgba(31,41,55,0.06)]">
                 <div class="flex items-start gap-3"><span
@@ -334,23 +330,27 @@
                         <p class="mt-1 text-xs text-neza-muted">Comunícate únicamente por medios oficiales.</p>
                     </div>
                 </div>
-                <div class="mt-5 rounded-xl bg-neza-wine-soft p-4">
-                    <p class="text-[10px] font-bold uppercase text-neza-wine">Atención telefónica</p><a
-                        href="tel:5557169070" class="mt-1 block text-xl font-bold text-[#340c1b]">55 5716 9070</a>
-                </div>
+                @if (filled($canalesAyuda?->telefono_contacto))
+                    <div class="mt-5 rounded-xl bg-neza-wine-soft p-4">
+                        <p class="text-[10px] font-bold uppercase text-neza-wine">Atención telefónica</p><a
+                            href="tel:{{ preg_replace('/\D+/', '', $canalesAyuda->telefono_contacto) }}" class="mt-1 block text-xl font-bold text-[#340c1b]">{{ $canalesAyuda->telefono_contacto }}</a>
+                    </div>
+                @endif
                 <div class="mt-4 space-y-3 text-[13px]">
-                    <p class="flex gap-3"><svg class="mt-0.5 size-4 shrink-0 text-neza-wine" aria-hidden="true"
+                    @if (filled($canalesAyuda?->horario_atencion))
+                        <p class="flex gap-3"><svg class="mt-0.5 size-4 shrink-0 text-neza-wine" aria-hidden="true"
                             fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg><span><strong class="block">Horario de atención</strong><span class="text-neza-muted">Lunes
-                                a viernes, 9:00 a 18:00 h.</span></span></p>
+                        </svg><span><strong class="block">Horario de atención</strong><span class="text-neza-muted">{{ $canalesAyuda->horario_atencion }}</span></span></p>
+                    @endif
+                    @if (filled($canalesAyuda?->email_contacto))
+                        <p class="flex gap-3"><svg class="mt-0.5 size-4 shrink-0 text-neza-wine" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5A2.25 2.25 0 0119.5 19.5h-15A2.25 2.25 0 012.25 17.25V6.75M21.75 6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.917l-7.5 4.616a2.25 2.25 0 01-2.36 0L3.32 8.91A2.25 2.25 0 012.25 6.993V6.75" /></svg><span><strong class="block">Correo electrónico</strong><a href="mailto:{{ $canalesAyuda->email_contacto }}" class="text-neza-muted hover:text-neza-wine">{{ $canalesAyuda->email_contacto }}</a></span></p>
+                    @endif
                 </div>
-                <div class="mt-5 grid gap-2 sm:grid-cols-2"><a href="#"
-                        class="flex h-11 items-center justify-center gap-2 rounded-xl border border-neza-wine text-xs font-bold text-neza-wine hover:bg-neza-wine-soft">Enviar
-                        mensaje</a><a href="#"
-                        class="flex h-11 items-center justify-center gap-2 rounded-xl border border-neza-wine text-xs font-bold text-neza-wine hover:bg-neza-wine-soft">Reportar
-                        problema</a></div>
+                @if (filled($canalesAyuda?->redes_sociales))
+                    <div class="mt-5 border-t border-neza-line pt-4"><p class="text-xs font-bold text-neza-ink">Redes sociales oficiales</p><div class="mt-3 flex flex-wrap gap-2">@foreach ($canalesAyuda->redes_sociales as $red)<a href="{{ $red['url'] }}" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 rounded-lg border border-neza-line px-3 py-2 text-xs font-semibold text-neza-wine hover:bg-neza-wine-soft"><img src="{{ asset('images/social/'.strtolower($red['nombre']).'.svg') }}" alt="" class="size-4 object-contain">{{ $red['nombre'] }}</a>@endforeach</div></div>
+                @endif
                 <p class="mt-4 rounded-xl bg-[#fdfbf8] p-3 text-[11px] leading-relaxed text-[#76531f]">No compartas
                     contraseñas ni datos bancarios por mensajes o llamadas.</p>
             </aside>

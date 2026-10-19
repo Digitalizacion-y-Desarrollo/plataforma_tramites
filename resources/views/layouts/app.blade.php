@@ -67,20 +67,34 @@
                     </summary>
                     <div class="mt-1 grid gap-1 border-l border-neza-line pl-3">
                         <a href="{{ route('catalogo-tramites.index') }}" class="!py-2 !text-xs">Trámites</a>
-                        <a href="{{ route('servicios-interes.index') }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('servicios-interes.*')])>Servicios y enlaces de interés</a>
                         <a href="{{ route('catalogo-estados.index') }}" class="!py-2 !text-xs">Estados de solicitudes</a>
                         <a href="{{ route('catalogo-estados-formularios.index') }}" class="!py-2 !text-xs">Estados de formularios</a>
                         <a href="{{ route('catalogo-estados-documentos.index') }}" class="!py-2 !text-xs">Estados de documentos</a>
                         <a href="{{ route('catalogo-estados-notificaciones.index') }}" class="!py-2 !text-xs">Estados de notificaciones</a>
                     </div>
                 </details>
-                <a href="#"><svg class="nav-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24"
+                <details class="group" @if (request()->routeIs('servicios-interes.*') || request()->routeIs('canales-ayuda.*')) open @endif>
+                    <summary
+                        class="flex cursor-pointer list-none items-center gap-[11px] rounded-[10px] px-3 py-[11px] text-[13px] font-medium text-[#667085] outline-none transition hover:bg-neza-wine-soft hover:text-neza-wine focus-visible:ring-2 focus-visible:ring-neza-wine [&::-webkit-details-marker]:hidden">
+                    <svg class="nav-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24"
                         stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.592c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.655.87.11.059.218.122.324.19.33.208.746.269 1.107.128l1.228-.478a1.125 1.125 0 0 1 1.285.454l1.296 2.244a1.125 1.125 0 0 1-.171 1.354l-1.015.859c-.282.239-.419.611-.386.98.007.131.007.263 0 .394.033.369.104.741.386.98l1.015.86c.407.344.514.917.17 1.353l-1.295 2.244a1.125 1.125 0 0 1-1.285.454l-1.228-.478c-.361-.14-.776-.08-1.107.128-.106.068-.213.131-.324.19-.342.184-.592.496-.655.87l-.213 1.281c-.09.542-.56.94-1.11.94h-2.592c-.55 0-1.02-.398-1.11-.94l-.213-1.281c-.063-.374-.313-.686-.655-.87a6.52 6.52 0 0 1-.324-.19c-.33-.208-.746-.269-1.107-.128l-1.228.478a1.125 1.125 0 0 1-1.285-.454l-1.296-2.244a1.125 1.125 0 0 1 .171-1.354l1.015-.859c.282-.239.419-.611.386-.98a6.932 6.932 0 0 1 0-.394c-.033-.369-.104-.741-.386-.98l-1.015-.86a1.125 1.125 0 0 1-.17-1.353l1.295-2.244a1.125 1.125 0 0 1 1.285-.454l1.228.478c.361.14.776.08 1.107-.128.106-.068.213-.131.324-.19.342-.184.592-.496.655-.87l.213-1.281Z" />
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
-                    </svg>Configuración</a>
+                    </svg>
+                    <span>Configuración</span>
+                    <svg class="ml-auto size-4 transition-transform group-open:rotate-180" aria-hidden="true" fill="none"
+                        viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                    </svg>
+                    </summary>
+                    <div class="mt-1 grid gap-1 border-l border-neza-line pl-3">
+                        <a href="{{ route('canales-ayuda.edit') }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('canales-ayuda.*')])>Canales de ayuda</a>
+                        <a href="#" class="!py-2 !text-xs">Foto de portada</a>
+                        <a href="{{ route('servicios-interes.index') }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('servicios-interes.*')])>Servicios y enlaces de interés</a>
+                    </div>
+                </details>
             </nav>
             <div class="side-footer">Municipio de Nezahualcóyotl</div>
         </aside>
@@ -92,28 +106,10 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                     </svg>
                 </button>
-                <div class="context"><span class="shield">♧</span>Administración institucional</div>
                 <div class="tools">
-                    <button type="button" data-accessibility-open aria-haspopup="dialog" aria-controls="accessibility-dialog" aria-label="Abrir opciones de accesibilidad" class="inline-flex size-11 shrink-0 items-center justify-center rounded-xl border border-neza-line bg-white text-neza-wine hover:bg-neza-wine-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine" title="Accesibilidad">
-                        <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5a3.75 3.75 0 117.5 0m-9 15.75 1.5-7.5 3.75 3 3.75-3 1.5 7.5M12 7.5v8.25" /></svg>
-                    </button>
                     <div class="search"><span>⌕</span><span>Buscar solicitudes, trámites, ciudadanos...</span><span
                             class="shortcut">⌘ K</span></div>
-                    <div class="notification" aria-label="3 notificaciones">♧<span class="badge">3</span></div><span
-                        class="divider"></span>
-                    <div class="profile"><img src="{{ asset('images/figma/profile.jpeg') }}" alt="María López">
-                        <div>
-                            <div class="profile-name">María López</div>
-                            <div class="profile-role">Servidor público</div>
-                        </div>
-                        <span class="chevron">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                                stroke-width="1.5" stroke="currentColor" class="size-6">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                            </svg>
-
-                        </span>
-                    </div>
+                    <button type="button" data-accessibility-open aria-haspopup="dialog" aria-controls="accessibility-dialog" aria-label="Abrir opciones de accesibilidad" class="inline-flex h-11 shrink-0 items-center justify-center rounded-xl border border-neza-line bg-white px-4 text-sm font-semibold text-neza-wine hover:bg-neza-wine-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Accesibilidad</button>
                 </div>
             </header>
             <main>@yield('content')</main>

@@ -6,7 +6,6 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
                 </svg>
                 <p class="truncate">Consulta requisitos y costos antes de iniciar. La información de cada trámite indica su modalidad vigente.</p>
-                <a href="#avisos" class="hidden shrink-0 font-bold text-[#be985c] hover:text-white sm:inline">Ver recomendaciones</a>
             </div>
             <button type="button" data-dismiss-public-notice class="grid size-7 shrink-0 place-items-center rounded-lg text-white/80 transition hover:bg-white/10 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" aria-label="Cerrar aviso">
                 <svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
@@ -30,9 +29,6 @@
             <a href="#inicio" class="relative font-bold text-neza-wine after:absolute after:-bottom-2 after:left-1/2 after:h-0.5 after:w-6 after:-translate-x-1/2 after:rounded-full after:bg-[#be985c]">Inicio</a>
             <a href="{{ route('portal.tramites.index') }}" class="transition hover:text-neza-wine">Trámites</a>
             <a href="#servicios" class="transition hover:text-neza-wine">Servicios</a>
-            <a href="#dependencias" class="transition hover:text-neza-wine">Dependencias</a>
-            <a href="#avisos" class="transition hover:text-neza-wine">Transparencia</a>
-            <a href="#ayuda" class="transition hover:text-neza-wine">Ayuda</a>
         </nav>
 
         <div class="flex items-center gap-2.5">

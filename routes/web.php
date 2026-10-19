@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\CanalAyudaController;
 use App\Http\Controllers\CorreccionDocumentoController;
 use App\Http\Controllers\PublicoController;
 use App\Http\Controllers\ServicioInteresController;
@@ -68,6 +69,8 @@ Route::resource('catalogo-tramites', 'App\Http\Controllers\TramiteController');
 Route::resource('servicios-interes', ServicioInteresController::class)
     ->except('show')
     ->parameters(['servicios-interes' => 'servicio_interes']);
+Route::get('configuracion/canales-ayuda', [CanalAyudaController::class, 'edit'])->name('canales-ayuda.edit');
+Route::put('configuracion/canales-ayuda', [CanalAyudaController::class, 'update'])->name('canales-ayuda.update');
 Route::patch('catalogo-tramites/{catalogo_tramite}/estado', 'App\Http\Controllers\TramiteController@cambiarEstado')
     ->name('catalogo-tramites.estado');
 
