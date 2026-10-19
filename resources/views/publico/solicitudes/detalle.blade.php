@@ -11,10 +11,10 @@
                 @php
                     [$tituloEstado, $siguientePaso] = match ($solicitud->estado?->clave) {
                         'BORRADOR' => ['Solicitud en borrador', 'Este expediente aún no se ha enviado. Revisa la información de tu solicitud.'],
-                        'ENVIADA' => ['Solicitud recibida', 'Estamos revisando tu expediente. Te avisaremos por correo cuando haya un cambio.'],
-                        'CORRECCION_SOLICITADA' => ['Se requiere una corrección', 'Revisa las observaciones visibles y el correo recibido para conocer las indicaciones.'],
-                        'APROBADA' => ['Solicitud aprobada', 'Si hay un documento final disponible, puedes descargarlo aquí.'],
-                        'RECHAZADA' => ['Solicitud rechazada', 'Consulta las observaciones visibles y el correo recibido para conocer el motivo.'],
+                        'ENVIADA' => ['Solicitud recibida', 'Siguiente paso: espera la revisión del área responsable. Te avisaremos por correo cuando haya un cambio.'],
+                        'CORRECCION_SOLICITADA' => ['Se requiere una corrección', 'Siguiente paso: usa el enlace del correo recibido para subir los documentos corregidos. Tu solicitud volverá a revisión.'],
+                        'APROBADA' => ['Solicitud aprobada', 'Siguiente paso: descarga tu documento final desde esta pantalla mientras esté disponible.'],
+                        'RECHAZADA' => ['Solicitud rechazada', 'Consulta las observaciones visibles y el correo recibido para conocer el motivo. Si tienes dudas, usa los canales de atención oficial.'],
                         default => ['Estado de tu solicitud', 'Consulta el historial y las observaciones para conocer los avances.'],
                     };
                 @endphp
@@ -22,6 +22,10 @@
                     <p class="text-xs font-bold uppercase tracking-wide text-neza-wine">Estado actual</p>
                     <div class="mt-2 flex flex-wrap items-center gap-3"><h2 id="estado-actual" class="text-xl font-bold text-neza-ink">{{ $tituloEstado }}</h2>@include('partials.publico.solicitud-estado', ['estado' => $solicitud->estado])</div>
                     <p class="mt-2 text-sm leading-relaxed text-neza-ink">{{ $siguientePaso }}</p>
+                </section>
+                <section aria-labelledby="progreso-titulo" class="mt-5">
+                    <h2 id="progreso-titulo" class="text-base font-bold">Progreso de tu solicitud</h2>
+                    <div class="mt-3 rounded-2xl border border-neza-line bg-white p-5">@include('partials.publico.solicitud-progreso', ['estado' => $solicitud->estado])</div>
                 </section>
                 <dl class="mt-6 grid gap-5 border-t border-neza-line pt-5 sm:grid-cols-2"><div><dt class="text-xs text-neza-muted">Fecha de envío</dt><dd class="mt-1 font-bold">{{ $solicitud->fecha_envio?->format('d/m/Y H:i') ?? 'Sin fecha' }}</dd></div><div><dt class="text-xs text-neza-muted">Fecha de terminación</dt><dd class="mt-1 font-bold">{{ $solicitud->fecha_terminacion?->format('d/m/Y H:i') ?? 'Pendiente' }}</dd></div></dl>
                 @if ($solicitud->estado->clave === 'APROBADA' && $solicitud->documentoEmitido)

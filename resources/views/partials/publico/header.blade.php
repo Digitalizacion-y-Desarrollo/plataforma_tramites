@@ -1,3 +1,4 @@
+@php($enlaceServicios = request()->routeIs('portal.publico') ? '#servicios' : route('portal.publico').'#servicios')
 <header class="relative z-30 bg-white/95 shadow-sm backdrop-blur">
     <div data-public-notice class="bg-[#340c1b] text-white">
         <div class="mx-auto flex min-h-10 max-w-[1440px] items-center justify-between gap-4 px-4 py-2 sm:px-6 lg:px-[72px]">
@@ -26,9 +27,9 @@
         </a>
 
         <nav class="hidden items-center gap-6 text-[13px] font-medium text-neza-ink xl:flex" aria-label="Navegación principal">
-            <a href="#inicio" class="relative font-bold text-neza-wine after:absolute after:-bottom-2 after:left-1/2 after:h-0.5 after:w-6 after:-translate-x-1/2 after:rounded-full after:bg-[#be985c]">Inicio</a>
+            <a href="{{ route('portal.publico') }}" class="relative font-bold text-neza-wine after:absolute after:-bottom-2 after:left-1/2 after:h-0.5 after:w-6 after:-translate-x-1/2 after:rounded-full after:bg-[#be985c]">Inicio</a>
             <a href="{{ route('portal.tramites.index') }}" class="transition hover:text-neza-wine">Trámites</a>
-            <a href="#servicios" class="transition hover:text-neza-wine">Servicios</a>
+            <a href="{{ $enlaceServicios }}" class="transition hover:text-neza-wine">Servicios</a>
         </nav>
 
         <div class="flex items-center gap-2.5">
@@ -45,6 +46,25 @@
                 <span class="hidden sm:inline">Consultar trámite</span>
                 <span class="sm:hidden">Consulta</span>
             </a>
+            <button type="button" data-menu-movil-toggle aria-expanded="false" aria-controls="menu-movil" aria-label="Abrir menú de navegación" class="inline-flex size-11 items-center justify-center rounded-xl border border-neza-line bg-white text-neza-wine transition hover:bg-neza-wine-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine xl:hidden">
+                <svg data-menu-movil-abierto class="hidden size-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+                <svg data-menu-movil-cerrado class="size-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
+                </svg>
+            </button>
         </div>
+    </div>
+
+    <div id="menu-movil" data-menu-movil class="hidden border-t border-neza-line bg-white px-4 pb-5 sm:px-6 xl:hidden">
+        <nav aria-label="Navegación principal móvil">
+            <ul class="divide-y divide-neza-line">
+                <li><a href="{{ route('portal.publico') }}" data-menu-movil-enlace class="flex min-h-12 items-center justify-between text-[15px] font-bold {{ request()->routeIs('portal.publico') ? 'text-neza-wine' : 'text-neza-ink' }}">Inicio<svg class="size-4 text-neza-wine" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg></a></li>
+                <li><a href="{{ route('portal.tramites.index') }}" data-menu-movil-enlace class="flex min-h-12 items-center justify-between text-[15px] font-bold {{ request()->routeIs('portal.tramites.index') ? 'text-neza-wine' : 'text-neza-ink' }}">Trámites<svg class="size-4 text-neza-wine" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg></a></li>
+                <li><a href="{{ $enlaceServicios }}" data-menu-movil-enlace class="flex min-h-12 items-center justify-between text-[15px] font-bold text-neza-ink">Servicios<svg class="size-4 text-neza-wine" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" /></svg></a></li>
+                <li><a href="{{ route('portal.publico') }}#consulta" data-menu-movil-enlace class="flex min-h-12 items-center justify-between text-[15px] font-bold text-neza-wine">Consultar estado de un trámite<svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" /></svg></a></li>
+            </ul>
+        </nav>
     </div>
 </header>

@@ -4,10 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Mail\SolicitudEnviadaMail;
 use App\Mail\TokenConsultaMail;
+use App\Models\CanalAyuda;
 use App\Models\EstadoSolicitud;
+use App\Models\ServicioInteres;
 use App\Models\Solicitud;
 use App\Models\SolicitudDocumentoEmitido;
-use App\Models\ServicioInteres;
 use App\Models\Tramite;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
@@ -40,11 +41,43 @@ class PublicoController extends Controller
         return view('publico.index', compact('tramites', 'servicios', 'consultaPendiente'));
     }
 
-    public function tramites(): View
+    public function tramites(Request $request): View
     {
-        $tramites = $this->tramitesPublicados();
+        $filtros = $request->validate([
+            'q' => ['nullable', 'string', 'max:150'],
+            'modalidad' => ['nullable', 'array'],
+            'modalidad.*' => ['string', 'max:20'],
+        ]);
+        $tramites = $this->tramitesPublicados()->map(function ($tramite) {
+            return (object) [
+                'tramite' => $tramite,
+                'modalidad' => $this->modalidadEtiqueta($tramite),
+            ];
+        });
 
-        return view('publico.tramites.index', compact('tramites'));
+        $modalidadesDisponibles = $tramites->pluck('modalidad')->filter()->unique()->sort()->values();
+        $termino = trim($filtros['q'] ?? '');
+        if ($termino !== '') {
+            $termino = mb_strtolower($termino, 'UTF-8');
+            $tramites = $tramites->filter(function ($carta) use ($termino) {
+                $tramite = $carta->tramite;
+
+                return str_contains(mb_strtolower($tramite->nombre, 'UTF-8'), $termino)
+                    || str_contains(mb_strtolower((string) $tramite->descripcion, 'UTF-8'), $termino);
+            });
+        }
+        $seleccion = array_values(array_intersect($modalidadesDisponibles->all(), $filtros['modalidad'] ?? []));
+        if ($seleccion !== []) {
+            $tramites = $tramites->filter(fn ($carta) => in_array($carta->modalidad, $seleccion, true))->values();
+        }
+
+        return view('publico.tramites.index', [
+            'tramites' => $tramites->pluck('tramite'),
+            'modalidades' => $modalidadesDisponibles,
+            'filtros' => ['q' => $termino, 'modalidad' => $seleccion],
+            'total' => $tramites->count(),
+            'canalesAyuda' => Schema::hasTable('canales_ayuda') ? CanalAyuda::query()->first() : null,
+        ]);
     }
 
     public function detalle(Tramite $tramite): View
@@ -394,6 +427,15 @@ class PublicoController extends Controller
         }
 
         return $acceso;
+    }
+
+    private function modalidadEtiqueta(Tramite $tramite): string
+    {
+        return match (collect($tramite->modalidades ?? [])->unique()->values()->count()) {
+            0 => '',
+            1 => collect($tramite->modalidades ?? [])->first() === 'EN_LINEA' ? 'En línea' : 'Presencial',
+            default => 'Mixto',
+        };
     }
 
     private function formularioActivo(Tramite $tramite)

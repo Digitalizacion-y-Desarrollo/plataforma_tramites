@@ -31,44 +31,30 @@
             </div>
         </div>
 
-        @php
-            $footerLinks = [
-                'Portal' => ['Inicio' => route('portal.publico').'#inicio', 'Trámites' => route('portal.tramites.index'), 'Servicios' => route('portal.publico').'#servicios'],
-                'Legal' => ['Aviso de privacidad' => '#', 'Términos de uso' => '#', 'Protección de datos' => '#'],
-            ];
-        @endphp
-        <nav class="grid grid-cols-2 gap-x-10 gap-y-8 sm:gap-x-16 lg:justify-self-end" aria-label="Enlaces del pie de página">
-            @foreach ($footerLinks as $titulo => $enlaces)
-                <div>
-                    <h2 class="text-[13px] font-bold text-[#be985c]">{{ $titulo }}</h2>
-                    <ul class="mt-4 space-y-2.5 text-[13px] text-white/70">
-                        @foreach ($enlaces as $texto => $href)
-                            <li>
-                                @if ($texto === 'Accesibilidad')
-                                    <button type="button" data-accessibility-open aria-haspopup="dialog" aria-controls="accessibility-dialog" class="text-left transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">{{ $texto }}</button>
-                                @else
-                                    <a href="{{ $href }}" class="transition hover:text-white">{{ $texto }}</a>
-                                @endif
-                            </li>
-                        @endforeach
-                    </ul>
-                </div>
-            @endforeach
+        <nav class="grid gap-x-10 gap-y-8 sm:gap-x-16 lg:justify-self-end" aria-label="Enlaces del pie de página">
+            <div>
+                <h2 class="text-[13px] font-bold text-[#be985c]">Portal</h2>
+                <ul class="mt-4 space-y-2.5 text-[13px] text-white/70">
+                    <li><a href="{{ route('portal.publico') }}" class="transition hover:text-white">Inicio</a></li>
+                    <li><a href="{{ route('portal.tramites.index') }}" class="transition hover:text-white">Trámites</a></li>
+                    <li><a href="{{ request()->routeIs('portal.publico') ? '#servicios' : route('portal.publico').'#servicios' }}" class="transition hover:text-white">Servicios</a></li>
+                    <li><a href="{{ route('portal.publico') }}#consulta" class="transition hover:text-white">Consulta de solicitudes</a></li>
+                    <li>
+                        <button type="button" data-accessibility-open aria-haspopup="dialog" aria-controls="accessibility-dialog" class="text-left text-white/70 transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Accesibilidad</button>
+                    </li>
+                </ul>
+            </div>
         </nav>
     </div>
     <div class="border-t border-white/10">
         <div class="mx-auto flex max-w-[1440px] flex-col gap-4 px-4 py-6 text-xs text-white/70 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-[72px]">
             <p>© {{ date('Y') }} Gobierno Municipal de Nezahualcóyotl · Portal de trámites</p>
-            <div class="flex flex-wrap gap-x-5 gap-y-2">
-                <a href="#" class="hover:text-white">Privacidad</a>
-                <button type="button" data-accessibility-open aria-haspopup="dialog" aria-controls="accessibility-dialog" class="hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Accesibilidad</button>
-                <a href="#" class="hover:text-white">Mapa del sitio</a>
-            </div>
+            <button type="button" data-accessibility-open aria-haspopup="dialog" aria-controls="accessibility-dialog" class="self-start hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Accesibilidad</button>
             @if (filled($canalesAyuda?->redes_sociales))
                 <div class="flex items-center gap-2" aria-label="Redes sociales">
                     <span>Síguenos</span>
                     @foreach ($canalesAyuda->redes_sociales as $red)
-                        <a href="{{ $red['url'] }}" target="_blank" rel="noopener noreferrer" class="grid size-8 place-items-center rounded-full border border-white/15 bg-white/5 transition hover:bg-white/15" aria-label="{{ $red['nombre'] }}"><img src="{{ asset('images/social/'.strtolower($red['nombre']).'.svg') }}" alt="" class="size-4 object-contain"></a>
+                        <a href="{{ $red['url'] }}" target="_blank" rel="noopener noreferrer" class="grid size-8 place-items-center rounded-full border border-white/20 bg-white transition hover:bg-[#fdfbf8] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white" aria-label="{{ $red['nombre'] }}"><img src="{{ asset('images/social/'.strtolower($red['nombre']).'.svg') }}" alt="" class="size-4 object-contain"></a>
                     @endforeach
                 </div>
             @endif

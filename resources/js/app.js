@@ -11,6 +11,38 @@ document.querySelectorAll('[data-dismiss-public-notice]').forEach((button) => {
 
 const cuerpo = document.body;
 
+const botonMenu = document.querySelector('[data-menu-movil-toggle]');
+const menuMovil = document.querySelector('[data-menu-movil]');
+const iconoMenuAbierto = document.querySelector('[data-menu-movil-abierto]');
+const iconoMenuCerrado = document.querySelector('[data-menu-movil-cerrado]');
+
+if (botonMenu && menuMovil && iconoMenuAbierto && iconoMenuCerrado) {
+    const alternarMenu = () => {
+        const abierto = menuMovil.classList.toggle('hidden') === false;
+        botonMenu.setAttribute('aria-expanded', String(abierto));
+        botonMenu.setAttribute('aria-label', abierto ? 'Cerrar menú de navegación' : 'Abrir menú de navegación');
+        iconoMenuAbierto.classList.toggle('hidden', !abierto);
+        iconoMenuCerrado.classList.toggle('hidden', abierto);
+    };
+
+    botonMenu.addEventListener('click', alternarMenu);
+    menuMovil.querySelectorAll('[data-menu-movil-enlace]').forEach((enlace) => {
+        enlace.addEventListener('click', () => {
+            if (!menuMovil.classList.contains('hidden')) alternarMenu();
+        });
+    });
+    document.addEventListener('keydown', (evento) => {
+        if (evento.key === 'Escape' && !menuMovil.classList.contains('hidden')) {
+            alternarMenu();
+            botonMenu.focus();
+        }
+    });
+}
+
+document.querySelectorAll('form[data-envio-automatico]').forEach((formulario) => {
+    formulario.addEventListener('change', () => formulario.requestSubmit());
+});
+
 const botonMenuAdministracion = document.querySelector('[data-admin-menu-toggle]');
 const menuAdministracion = document.querySelector('#admin-sidebar');
 const fondoMenuAdministracion = document.querySelector('[data-admin-menu-overlay]');
@@ -69,6 +101,113 @@ if (cuerpo.dataset.solicitudActiva && cuerpo.dataset.solicitudActiva !== 'null')
         }
     });
 }
+
+const formatoTamano = (bytes) => {
+    if (Number(bytes) >= 1048576) return `${(bytes / 1048576).toFixed(1)} MB`;
+    if (Number(bytes) >= 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
+
+    return `${bytes} B`;
+};
+
+document.querySelectorAll('input[type="file"][data-file-input]').forEach((input) => {
+    const contenedor = document.createElement('div');
+    contenedor.className = 'mt-2 rounded-xl border border-neza-line bg-neza-canvas p-3';
+    contenedor.setAttribute('data-file-preview', '');
+
+    const renderizar = () => {
+        contenedor.replaceChildren();
+        const archivo = input.files?.[0];
+
+        if (!archivo) {
+            contenedor.classList.add('hidden');
+            contenedor.removeAttribute('data-file-seleccionado');
+            input.removeAttribute('aria-describedby-file');
+            return;
+        }
+
+        contenedor.classList.remove('hidden');
+        contenedor.setAttribute('data-file-seleccionado', '');
+
+        const fila = document.createElement('div');
+        fila.className = 'flex flex-wrap items-center justify-between gap-3';
+
+        const descripcion = document.createElement('span');
+        descripcion.className = 'flex min-w-0 items-center gap-2 text-sm text-neza-ink';
+        const icono = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        icono.setAttribute('class', 'size-5 shrink-0 text-neza-wine');
+        icono.setAttribute('aria-hidden', 'true');
+        icono.setAttribute('fill', 'none');
+        icono.setAttribute('viewBox', '0 0 24 24');
+        icono.setAttribute('stroke-width', '1.6');
+        icono.setAttribute('stroke', 'currentColor');
+        const ruta = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        ruta.setAttribute('stroke-linecap', 'round');
+        ruta.setAttribute('stroke-linejoin', 'round');
+        ruta.setAttribute('d', 'M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5V6.75a3.375 3.375 0 00-3.375-3.375H6.75A2.25 2.25 0 004.5 5.625v12.75a2.25 2.25 0 002.25 2.25h10.5a2.25 2.25 0 002.25-2.25v-4.125zM14.625 3.75V8.25h4.5');
+        icono.append(ruta);
+        const texto = document.createElement('span');
+        texto.className = 'min-w-0 break-all';
+        texto.textContent = `${archivo.name} (${formatoTamano(archivo.size)})`;
+        descripcion.append(icono, texto);
+
+        const acciones = document.createElement('div');
+        acciones.className = 'flex shrink-0 gap-2';
+        const quitar = document.createElement('button');
+        quitar.type = 'button';
+        quitar.className = 'rounded-lg border border-neza-line bg-white px-3 py-1.5 text-xs font-bold text-neza-wine hover:bg-neza-wine-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine';
+        quitar.textContent = 'Quitar archivo';
+        quitar.setAttribute('aria-label', `Quitar el archivo ${archivo.name}`);
+        quitar.addEventListener('click', () => {
+            input.value = '';
+            renderizar();
+            input.focus();
+        });
+        acciones.append(quitar);
+
+        fila.append(descripcion, acciones);
+        contenedor.append(fila);
+    };
+
+    input.addEventListener('change', renderizar);
+    input.insertAdjacentElement('afterend', contenedor);
+    contenedor.classList.add('hidden');
+});
+
+document.querySelectorAll('form[data-confirm-datos]').forEach((formulario) => {
+    formulario.addEventListener('submit', async (evento) => {
+        if (formulario.dataset.confirmed === 'true') {
+            return;
+        }
+
+        evento.preventDefault();
+
+        const nombre = formulario.querySelector('#nombre_solicitante')?.value.trim() || '';
+        const curp = formulario.querySelector('#curp_consulta')?.value.trim() || '';
+        const correo = formulario.querySelector('#email_contacto')?.value.trim() || '';
+        const curpEnmascarada = curp.length > 5 ? `${curp.slice(0, 4)}${'*'.repeat(curp.length - 5)}${curp.slice(-1)}` : curp;
+
+        const resultado = await Swal.fire({
+            icon: 'info',
+            title: 'Confirma tu envío',
+            html: `<div class="text-left text-sm"><p class="mb-2 font-semibold">Verifica tus datos de seguimiento:</p><p class="mb-1"><strong>Nombre:</strong> ${nombre}</p><p class="mb-1"><strong>CURP:</strong> ${curpEnmascarada}</p><p><strong>Correo:</strong> ${correo}</p></div>`,
+            showCancelButton: true,
+            confirmButtonText: 'Enviar solicitud',
+            cancelButtonText: 'Revisar datos',
+            confirmButtonColor: '#601633',
+            cancelButtonColor: '#6b7280',
+            reverseButtons: true,
+            focusCancel: true,
+        });
+
+        if (!resultado.isConfirmed) {
+            formulario.querySelector('#nombre_solicitante')?.focus();
+            return;
+        }
+
+        formulario.dataset.confirmed = 'true';
+        formulario.requestSubmit();
+    });
+});
 
 const bloquearFormulario = (formulario) => {
     formulario.dataset.submitting = 'true';

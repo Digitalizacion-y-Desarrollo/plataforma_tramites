@@ -15,7 +15,7 @@
             </div>
             <section aria-label="Datos de consulta" class="mt-7 grid gap-4 rounded-2xl border border-neza-line bg-white p-5 shadow-sm sm:grid-cols-3 sm:p-6">
                 <div><p class="text-xs font-semibold text-neza-muted">Nombre</p><p class="mt-1 font-bold text-neza-ink">{{ $nombre }}</p></div>
-                <div><p class="text-xs font-semibold text-neza-muted">CURP</p><p class="mt-1 break-all font-bold text-neza-ink">{{ $acceso['curp'] }}</p></div>
+                <div><p class="text-xs font-semibold text-neza-muted">CURP</p><p class="mt-1 break-all font-bold text-neza-ink">@php($curp = $acceso['curp']){{ \Illuminate\Support\Str::of($curp)->substr(0, 4)->append(str_repeat('·', max(0, strlen($curp) - 5)))->append(\Illuminate\Support\Str::of($curp)->substr(-1)) }}</p></div>
                 <div><p class="text-xs font-semibold text-neza-muted">Correo de consulta</p><p class="mt-1 break-all font-bold text-neza-ink">{{ \Illuminate\Support\Str::mask($acceso['email'], '*', 2, max(0, strpos($acceso['email'], '@') - 2)) }}</p></div>
             </section>
             <section aria-labelledby="historial-titulo" class="mt-9">
@@ -30,7 +30,19 @@
                 </form>
                 <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-neza-muted"><p role="status">{{ $solicitudes->total() }} {{ $solicitudes->total() === 1 ? 'resultado' : 'resultados' }}</p>@if ($filtros['q'] !== '' || filled($filtros['estado'] ?? null))<a href="{{ route('consulta.solicitudes') }}" class="font-bold text-neza-wine underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Limpiar filtros</a>@endif</div>
                 @if ($solicitudes->isEmpty())
-                    <div class="mt-4 rounded-2xl border border-dashed border-neza-line bg-white px-6 py-12 text-center"><h3 class="font-bold text-neza-ink">{{ $total === 0 ? 'Aún no hay solicitudes para mostrar' : 'No encontramos solicitudes con esos filtros' }}</h3><p class="mx-auto mt-2 max-w-md text-sm text-neza-muted">{{ $total === 0 ? 'Verifica que hayas usado el mismo correo con el que enviaste tu solicitud.' : 'Prueba con otro folio, nombre de trámite o estado.' }}</p></div>
+                    <div class="mt-4 rounded-2xl border border-dashed border-neza-line bg-white px-6 py-12 text-center">
+                        <span class="mx-auto grid size-12 place-items-center rounded-xl bg-neza-wine-soft text-neza-wine"><svg class="size-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" /></svg></span>
+                        <h3 class="mt-4 font-bold text-neza-ink">{{ $total === 0 ? 'Aún no hay solicitudes para mostrar' : 'No encontramos solicitudes con esos filtros' }}</h3>
+                        <p class="mx-auto mt-2 max-w-md text-sm text-neza-muted">{{ $total === 0 ? 'Verifica que hayas usado el mismo correo con el que enviaste tu solicitud.' : 'Prueba con otro folio, nombre de trámite o estado, o revisa el catálogo completo de trámites.' }}</p>
+                        <div class="mt-6 flex flex-col items-center justify-center gap-3 sm:flex-row">
+                            @if ($total === 0)
+                                <form action="{{ route('consulta.cerrar') }}" method="POST">@ csrf<button type="submit" class="inline-flex min-h-11 items-center rounded-xl bg-neza-wine px-5 text-sm font-bold text-white hover:bg-neza-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Iniciar otra consulta</button></form>
+                                <a href="{{ route('portal.tramites.index') }}" class="inline-flex min-h-11 items-center rounded-xl border border-neza-wine px-5 text-sm font-bold text-neza-wine hover:bg-neza-wine-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Explorar trámites</a>
+                            @else
+                                <a href="{{ route('consulta.solicitudes') }}" class="inline-flex min-h-11 items-center rounded-xl bg-neza-wine px-5 text-sm font-bold text-white hover:bg-neza-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Limpiar filtros</a>
+                            @endif
+                        </div>
+                    </div>
                 @else
                     <div class="mt-4 space-y-3 md:hidden">
                         @foreach ($solicitudes as $solicitud)
