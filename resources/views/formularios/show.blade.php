@@ -42,10 +42,10 @@
                                 @if ($campo->tipo === 'TEXTAREA')
                                     <textarea data-campo-control="{{ $campo->id }}" rows="4" placeholder="Respuesta del ciudadano" class="mt-2 block w-full resize-none rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm placeholder:text-neza-muted focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft"></textarea>
                                 @elseif ($campo->tipo === 'DOMICILIO')
-                                    <div class="mt-2" data-domicilio data-indice-url="{{ asset('data/domicilios-index.json') }}">
+                                    <div class="mt-2" data-domicilio data-indice-url="{{ asset('data/capa.json') }}">
                                         <div class="grid gap-3 sm:grid-cols-2">
                                             @foreach (config('formulario.campos_domicilio') as $clave => $subcampo)
-                                                <div class="{{ $clave === 'calle' ? 'sm:col-span-2' : '' }}"><label class="block text-xs font-semibold text-neza-muted" for="domicilio-{{ $campo->id }}-{{ $clave }}">{{ $subcampo['etiqueta'] }}</label><input id="domicilio-{{ $campo->id }}-{{ $clave }}" name="campo[{{ $campo->id }}][{{ $clave }}]" type="{{ $subcampo['tipo'] }}" autocomplete="{{ $subcampo['autocomplete'] }}" value="{{ $subcampo['valor'] ?? '' }}" @if (in_array($clave, ['colonia', 'calle', 'numero'])) list="domicilio-{{ $campo->id }}-{{ $clave }}-opciones" @endif data-domicilio-campo="{{ $clave }}" @disabled($subcampo['disabled'] ?? false) @required($campo->requerido && ! ($subcampo['disabled'] ?? false)) class="mt-1 block w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm text-neza-ink placeholder:text-neza-muted focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft disabled:cursor-not-allowed disabled:bg-neza-canvas disabled:text-neza-muted"></div>
+                                                <div class="{{ $clave === 'calle' ? 'sm:col-span-2' : '' }}"><label class="block text-xs font-semibold text-neza-muted" for="domicilio-{{ $campo->id }}-{{ $clave }}">{{ $subcampo['etiqueta'] }}</label><input id="domicilio-{{ $campo->id }}-{{ $clave }}" name="campo[{{ $campo->id }}][{{ $clave }}]" type="{{ $subcampo['tipo'] }}" autocomplete="{{ $subcampo['autocomplete'] }}" value="{{ $subcampo['valor'] ?? '' }}" @if (in_array($clave, ['colonia', 'calle', 'numero'])) list="domicilio-{{ $campo->id }}-{{ $clave }}-opciones" @endif data-domicilio-campo="{{ $clave }}" @readonly(($subcampo['disabled'] ?? false) || $clave === 'codigo_postal') @required($campo->requerido && ! ($subcampo['disabled'] ?? false)) class="mt-1 block w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm text-neza-ink placeholder:text-neza-muted focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft disabled:cursor-not-allowed disabled:bg-neza-canvas disabled:text-neza-muted"></div>
                                             @endforeach
                                         </div>
                                         <datalist id="domicilio-{{ $campo->id }}-colonia-opciones" data-domicilio-colonias></datalist>
@@ -53,8 +53,38 @@
                                         <datalist id="domicilio-{{ $campo->id }}-numero-opciones" data-domicilio-numeros></datalist>
                                         <input type="hidden" name="campo[{{ $campo->id }}][latitud]" data-domicilio-latitud>
                                         <input type="hidden" name="campo[{{ $campo->id }}][longitud]" data-domicilio-longitud>
-                                        <p class="mt-2 text-xs text-neza-muted" data-domicilio-estado aria-live="polite">Ingresa un código postal de cinco dígitos para consultar colonias.</p>
+                                        <p class="mt-2 text-xs text-neza-muted">Primero selecciona una colonia; el código postal y las calles disponibles se actualizarán automáticamente.</p><p class="mt-1 text-xs font-medium text-neza-muted" data-domicilio-estado aria-live="polite" role="status">Esperando la selección de colonia.</p>
                                     </div>
+                                @elseif ($campo->tipo === 'DOMICILIO_FUERA_NEZA')
+                                    <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                                        @foreach (config('formulario.campos_domicilio_fuera_neza') as $clave => $subcampo)
+                                            <div @class(['sm:col-span-2' => in_array($clave, ['municipio', 'calle'], true)])>
+                                                <label class="block text-xs font-semibold text-neza-muted" for="domicilio-fuera-{{ $campo->id }}-{{ $clave }}">{{ $subcampo['etiqueta'] }}</label>
+                                                <input id="domicilio-fuera-{{ $campo->id }}-{{ $clave }}" name="campo[{{ $campo->id }}][{{ $clave }}]" type="{{ $subcampo['tipo'] }}" maxlength="{{ $subcampo['maxlength'] }}" autocomplete="{{ $subcampo['autocomplete'] }}" @if ($clave === 'codigo_postal') inputmode="{{ $subcampo['inputmode'] }}" pattern="{{ $subcampo['pattern'] }}" @endif @required($campo->requerido) class="mt-1 block w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm text-neza-ink placeholder:text-neza-muted focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft">
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                    <p class="mt-2 text-xs text-neza-muted">Captura el domicilio completo fuera de Ciudad Nezahualcóyotl. Todos los datos, incluidos el código postal y el municipio, son editables.</p>
+                                @elseif ($campo->tipo === 'DOMICILIO_USA')
+                                    <div class="mt-2 grid gap-3 sm:grid-cols-2">
+                                        @foreach (config('formulario.campos_domicilio_usa') as $clave => $subcampo)
+                                            @php($requeridoSubcampo = $campo->requerido && ($subcampo['requerido'] ?? true))
+                                            <div @class(['sm:col-span-2' => $clave === 'calle'])>
+                                                <label class="block text-xs font-semibold text-neza-muted" for="domicilio-usa-{{ $campo->id }}-{{ $clave }}">{{ $subcampo['etiqueta'] }}</label>
+                                                @if ($clave === 'estado')
+                                                    <select id="domicilio-usa-{{ $campo->id }}-{{ $clave }}" name="campo[{{ $campo->id }}][{{ $clave }}]" @required($requeridoSubcampo) class="mt-1 block w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm text-neza-ink focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft">
+                                                        <option value="">Selecciona un estado</option>
+                                                        @foreach (config('formulario.estados_usa') as $codigo => $nombre)
+                                                            <option value="{{ $codigo }}">{{ $nombre }}</option>
+                                                        @endforeach
+                                                    </select>
+                                                @else
+                                                    <input id="domicilio-usa-{{ $campo->id }}-{{ $clave }}" name="campo[{{ $campo->id }}][{{ $clave }}]" type="{{ $subcampo['tipo'] }}" maxlength="{{ $subcampo['maxlength'] }}" autocomplete="{{ $subcampo['autocomplete'] }}" @if ($clave === 'codigo_postal') pattern="{{ $subcampo['pattern'] }}" @endif @required($requeridoSubcampo) class="mt-1 block w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm text-neza-ink placeholder:text-neza-muted focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft">
+                                                @endif
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                    <p class="mt-2 text-xs text-neza-muted">País: Estados Unidos. Captura la dirección, ciudad, estado y código postal (ZIP).</p>
                                 @elseif (in_array($campo->tipo, ['SELECT', 'MULTISELECT', 'ESTADO']))
                                     <select data-campo-control="{{ $campo->id }}" @if ($campo->tipo === 'MULTISELECT') multiple @endif class="mt-2 block w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm text-neza-ink focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft"><option value="">Selecciona una opción</option>@if ($campo->tipo === 'ESTADO')@foreach (config('formulario.entidades_federativas') as $clave => $entidad)<option value="{{ $clave }}" data-valor-condicional="{{ $entidad }}">{{ $entidad }}</option>@endforeach @else @foreach ($campo->opciones->where('activo', true)->sortBy('orden') as $opcion)<option value="{{ $opcion->valor }}" data-valor-condicional="{{ $opcion->etiqueta }}">{{ $opcion->etiqueta }}</option>@endforeach @endif</select>
                                 @elseif ($campo->tipo === 'RADIO')

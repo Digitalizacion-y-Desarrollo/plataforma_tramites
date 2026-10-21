@@ -1,18 +1,62 @@
 @php
     $clave = $estado?->clave;
-    $enCorreccion = $clave === 'CORRECCION_SOLICITADA';
-    $pasos = collect([
-        ['clave' => $clave !== 'BORRADOR' && $clave !== null, 'titulo' => 'Enviada', 'descripcion' => 'Tu solicitud fue recibida por el municipio.'],
-        $enCorreccion ? ['clave' => true, 'titulo' => 'En corrección', 'descripcion' => 'El área solicitó corregir documentos o información.'] : null,
-        ['clave' => $clave === 'APROBADA' || $clave === 'RECHAZADA', 'titulo' => $clave === 'RECHAZADA' ? 'Rechazada' : 'Aprobada', 'descripcion' => $clave === 'RECHAZADA' ? 'La revisión concluyó sin autorización.' : 'Tu tramitación concluyó favorablemente.'],
-    ])->filter()->values();
-    $indiceActual = $pasos->filter(fn ($paso) => $paso['clave'] === true)->keys()->last();
+    $flujoPago = $flujoPago ?? 'SIN_PAGO';
+    $esConPago = $flujoPago !== 'SIN_PAGO';
+
+    $pasos = [
+        [
+            'estados' => ['ENVIADA'],
+            'titulo' => 'Solicitud enviada',
+            'descripcion' => 'Tu solicitud fue recibida por el municipio.',
+        ],
+    ];
+
+    if ($clave === 'CORRECCION_SOLICITADA') {
+        $pasos[] = [
+            'estados' => ['CORRECCION_SOLICITADA'],
+            'titulo' => 'Corrección solicitada',
+            'descripcion' => 'Revisa el correo recibido y corrige los documentos solicitados.',
+        ];
+    }
+
+    if ($flujoPago === 'PAGO_POST_VALIDACION') {
+        $pasos[] = [
+            'estados' => ['VALIDADA_PARA_PAGO'],
+            'titulo' => 'Información validada',
+            'descripcion' => 'El área responsable validó la información y generará la referencia de pago.',
+        ];
+    }
+
+    if ($esConPago) {
+        $pasos[] = [
+            'estados' => ['EN_ESPERA_DE_PAGO'],
+            'titulo' => 'En espera de pago',
+            'descripcion' => 'Realiza el pago con la referencia enviada a tu correo.',
+        ];
+        $pasos[] = [
+            'estados' => ['EN_REVISION_FINAL'],
+            'titulo' => 'Pago validado',
+            'descripcion' => 'El pago fue validado y tu solicitud está en revisión final.',
+        ];
+    }
+
+    $pasos[] = [
+        'estados' => ['APROBADA', 'RECHAZADA'],
+        'titulo' => $clave === 'RECHAZADA' ? 'Solicitud rechazada' : 'Resolución final',
+        'descripcion' => $clave === 'RECHAZADA'
+            ? 'La revisión concluyó sin autorización. Consulta las observaciones disponibles.'
+            : 'El área responsable emitirá la resolución de tu solicitud.',
+    ];
+
+    $indiceActual = collect($pasos)->search(fn (array $paso): bool => in_array($clave, $paso['estados'], true));
+    $indiceActual = $indiceActual === false ? null : $indiceActual;
 @endphp
+
 <ol class="space-y-5" aria-label="Progreso de la solicitud">
     @foreach ($pasos as $paso)
         @php($actual = $loop->index === $indiceActual)
-        @php($completado = $loop->index < $indiceActual)
-        @php($pendiente = $loop->index > $indiceActual)
+        @php($completado = $indiceActual !== null && $loop->index < $indiceActual)
+        @php($pendiente = ! $actual && ! $completado)
         <li class="relative flex gap-4" @if ($actual) aria-current="step" @endif>
             @if (! $loop->last)
                 <span class="absolute left-[11px] top-6 h-[calc(100%-1.5rem)] w-0.5 {{ $pendiente ? 'bg-neza-line' : 'bg-neza-wine' }}" aria-hidden="true"></span>

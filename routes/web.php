@@ -9,10 +9,18 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PublicoController::class, 'index'])->name('portal.publico');
 Route::get('/solicitudes', [SolicitudController::class, 'index'])->name('solicitudes.index');
+Route::prefix('dependencias/{dependencia}')->name('dependencias.')->whereIn('dependencia', ['desarrollo-urbano', 'secretaria-del-ayuntamiento'])->group(function () {
+    Route::get('/resumen', [SolicitudController::class, 'resumenDependencia'])->name('resumen');
+    Route::get('/solicitudes', [SolicitudController::class, 'indexDependencia'])->name('solicitudes.index');
+});
 Route::get('/solicitudes/{solicitud}', [SolicitudController::class, 'show'])->name('solicitudes.show');
 Route::post('/solicitudes/{solicitud}/aprobar', [SolicitudController::class, 'aprobar'])->name('solicitudes.aprobar');
 Route::post('/solicitudes/{solicitud}/rechazar', [SolicitudController::class, 'rechazar'])->name('solicitudes.rechazar');
 Route::post('/solicitudes/{solicitud}/correcciones', [SolicitudController::class, 'solicitarCorreccion'])->name('solicitudes.correcciones.solicitar');
+Route::post('/solicitudes/{solicitud}/validar', [SolicitudController::class, 'validarParaPago'])->name('solicitudes.validar');
+Route::post('/solicitudes/{solicitud}/referencia-pago', [SolicitudController::class, 'generarReferenciaPago'])->name('solicitudes.pagos.generar');
+Route::post('/solicitudes/{solicitud}/validar-pago', [SolicitudController::class, 'validarPago'])->name('solicitudes.pagos.validar');
+Route::post('/solicitudes/{solicitud}/comentarios', [SolicitudController::class, 'comentar'])->name('solicitudes.comentarios.store');
 Route::get('/solicitudes/{solicitud}/documentos/{documento}', [SolicitudController::class, 'descargarDocumento'])->name('solicitudes.documentos.descargar');
 Route::get('/solicitudes/{solicitud}/archivos/{campo}', [SolicitudController::class, 'descargarArchivoRespuesta'])->name('solicitudes.archivos.descargar');
 Route::get('/solicitudes/{solicitud}/documentos/{documento}/previsualizar', [SolicitudController::class, 'previsualizarDocumento'])->name('solicitudes.documentos.previsualizar');
@@ -31,6 +39,7 @@ Route::prefix('consulta')->name('consulta.')->controller(PublicoController::clas
     Route::get('/solicitudes/{solicitud}', 'detalleSolicitudConsulta')->name('solicitudes.detalle');
     Route::post('/cerrar', 'cerrarConsulta')->name('cerrar');
     Route::get('/documentos/{documento}', 'descargarDocumentoEmitido')->name('documentos.descargar');
+    Route::get('/pagos/{pago}/referencia', 'descargarReferenciaPago')->name('pagos.referencia.descargar');
 });
 
 Route::prefix('correcciones')->name('correcciones.')->controller(CorreccionDocumentoController::class)->group(function () {

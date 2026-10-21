@@ -111,6 +111,34 @@ class ConsultaCiudadanaTest extends TestCase
         $this->get(route('consulta.documentos.descargar', $documentoPropio))->assertStatus(410);
     }
 
+    public function test_payment_reference_download_requires_ownership_and_pending_payment_status(): void
+    {
+        Storage::fake('local');
+        $propia = $this->crearSolicitud('ana@example.test', 'SOL-ANA');
+        $ajena = $this->crearSolicitud('otra@example.test', 'SOL-OTRA');
+        DB::table('solicitud_estados')->insert(['id' => 2, 'clave' => 'EN_ESPERA_DE_PAGO', 'nombre' => 'En espera de pago']);
+        DB::table('solicitudes')->whereIn('id', [$propia, $ajena])->update(['solicitud_estado_id' => 2]);
+
+        $pagoPropio = (string) Str::uuid();
+        $pagoAjeno = (string) Str::uuid();
+        foreach ([[$pagoPropio, $propia], [$pagoAjeno, $ajena]] as [$id, $solicitudId]) {
+            DB::table('solicitud_pagos')->insert([
+                'id' => $id, 'solicitud_id' => $solicitudId, 'referencia' => 'NEZA-'.$id,
+                'importe' => 100, 'fecha_emision' => now(), 'fecha_vencimiento' => now()->addDays(5),
+                'pdf_nombre_original' => 'referencia-pago.pdf', 'pdf_storage_key' => 'pagos/'.$id.'.pdf', 'pdf_hash_archivo' => hash('sha256', $id),
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+            Storage::disk('local')->put('pagos/'.$id.'.pdf', '%PDF-1.4');
+        }
+        $this->withSession(['consulta_ciudadana' => ['curp' => self::CURP, 'email' => 'ana@example.test', 'expira' => now()->addMinutes(30)->timestamp]]);
+
+        $this->get(route('consulta.pagos.referencia.descargar', $pagoAjeno))->assertNotFound();
+        $this->get(route('consulta.pagos.referencia.descargar', $pagoPropio))->assertOk();
+        DB::table('solicitud_estados')->insert(['id' => 3, 'clave' => 'EN_REVISION_FINAL', 'nombre' => 'En revisión final']);
+        DB::table('solicitudes')->where('id', $propia)->update(['solicitud_estado_id' => 3]);
+        $this->get(route('consulta.pagos.referencia.descargar', $pagoPropio))->assertNotFound();
+    }
+
     public function test_five_wrong_codes_invalidate_the_token(): void
     {
         $this->crearSolicitud('ana@example.test', 'SOL-ANA');
@@ -241,6 +269,18 @@ class ConsultaCiudadanaTest extends TestCase
             $table->string('storage_key');
             $table->string('nombre_original');
             $table->timestamp('fecha_expiracion')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('solicitud_pagos', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->uuid('solicitud_id');
+            $table->string('referencia');
+            $table->decimal('importe', 12, 2);
+            $table->timestamp('fecha_emision');
+            $table->timestamp('fecha_vencimiento');
+            $table->string('pdf_nombre_original');
+            $table->string('pdf_storage_key');
+            $table->string('pdf_hash_archivo');
             $table->timestamps();
         });
         Schema::create('solicitud_historial_estados', function (Blueprint $table): void {

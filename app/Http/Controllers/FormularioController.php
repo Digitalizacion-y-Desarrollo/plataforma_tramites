@@ -105,11 +105,6 @@ class FormularioController extends Controller
     public function storeDuplicado(Request $request, Formulario $formulario, AccesosClient $accesos)
     {
         $datos = $request->validate([
-            'tramite_id' => [
-                'required',
-                Rule::exists('tramites', 'id')->where('activo', true)->whereNull('deleted_at'),
-                Rule::unique('tramite_formulario', 'tramite_id'),
-            ],
             'departamento_accesos_id' => ['required', 'string', 'max:100'],
             'subdepartamento_accesos_id' => ['nullable', 'string', 'max:100'],
         ], [
@@ -161,10 +156,6 @@ class FormularioController extends Controller
             ->firstOrFail();
 
         $duplicado = DB::transaction(function () use ($datos, $formulario, $versionOrigen, $requisitosOrigen, $estadoBorrador, $departamento, $subdepartamento): Formulario {
-            DB::table('tramites')->where('id', $datos['tramite_id'])->lockForUpdate()->firstOrFail();
-
-            abort_if(DB::table('tramite_formulario')->where('tramite_id', $datos['tramite_id'])->exists(), 422, 'El trámite seleccionado ya tiene un formulario asignado.');
-
             $duplicado = Formulario::create([
                 'id' => (string) Str::uuid(),
                 'nombre' => $formulario->nombre.' (copia)',
@@ -282,16 +273,6 @@ class FormularioController extends Controller
                 ]);
             }
 
-            DB::table('tramite_formulario')->insert([
-                'id' => (string) Str::uuid(),
-                'tramite_id' => $datos['tramite_id'],
-                'formulario_version_id' => $versionDuplicada->id,
-                'fecha_inicio_vigencia' => now(),
-                'activo' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-
             return $duplicado;
         });
 
@@ -307,11 +288,6 @@ class FormularioController extends Controller
         $datos = $request->validate([
             'nombre' => ['required', 'string', 'max:200'],
             'descripcion' => ['nullable', 'string'],
-            'tramite_id' => [
-                'required',
-                Rule::exists('tramites', 'id')->where('activo', true)->whereNull('deleted_at'),
-                Rule::unique('tramite_formulario', 'tramite_id'),
-            ],
             'departamento_accesos_id' => ['required', 'string', 'max:100'],
             'subdepartamento_accesos_id' => ['nullable', 'string', 'max:100'],
         ]);
@@ -365,16 +341,6 @@ class FormularioController extends Controller
                 'formulario_estado_id' => $estadoInicial->id,
                 'numero_version' => 1,
                 'creado_por_accesos_id' => null,
-            ]);
-
-            DB::table('tramite_formulario')->insert([
-                'id' => (string) Str::uuid(),
-                'tramite_id' => $datos['tramite_id'],
-                'formulario_version_id' => $version->id,
-                'fecha_inicio_vigencia' => now(),
-                'activo' => true,
-                'created_at' => now(),
-                'updated_at' => now(),
             ]);
 
             return $formulario;
@@ -860,13 +826,6 @@ class FormularioController extends Controller
         $datos = $request->validate([
             'nombre' => ['required', 'string', 'max:200'],
             'descripcion' => ['nullable', 'string'],
-            'tramite_id' => [
-                'required',
-                Rule::exists('tramites', 'id')
-                    ->where('activo', true)
-                    ->whereNull('deleted_at'),
-                Rule::unique('tramite_formulario', 'tramite_id')->ignore($version->id, 'formulario_version_id'),
-            ],
             'departamento_accesos_id' => ['required', 'string', 'max:100'],
             'subdepartamento_accesos_id' => ['nullable', 'string', 'max:100'],
         ]);
@@ -900,10 +859,6 @@ class FormularioController extends Controller
                 'subdepartamento_nombre_snapshot' => $subdepartamento['nombre'] ?? null,
             ]);
 
-            DB::table('tramite_formulario')->where('formulario_version_id', $version->id)->update([
-                'tramite_id' => $datos['tramite_id'],
-                'updated_at' => now(),
-            ]);
         });
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'La información general se actualizó.');

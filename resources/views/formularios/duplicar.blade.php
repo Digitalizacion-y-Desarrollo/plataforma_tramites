@@ -15,19 +15,6 @@
 
         <form action="{{ route('formulario.duplicar.store', $formulario) }}" method="POST" class="mt-6 space-y-5">
             @csrf
-            <section class="rounded-xl border border-neza-line bg-white p-6 shadow-sm">
-                <label for="tramite_id" class="block text-sm font-semibold text-neza-ink">Trámite destino <span class="text-rose-700">*</span></label>
-                <select id="tramite_id" name="tramite_id" required class="mt-2 block w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm text-neza-ink focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('tramite_id') border-rose-600 @enderror">
-                    <option value="">Selecciona un trámite</option>
-                    @foreach ($tramites as $tramite)
-                        <option value="{{ $tramite->id }}" @selected((string) old('tramite_id') === (string) $tramite->id)>{{ $tramite->nombre }}</option>
-                    @endforeach
-                </select>
-                @error('tramite_id')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
-                @if ($tramites->isEmpty())
-                    <p class="mt-2 text-sm text-neza-muted">No hay trámites disponibles: todos los trámites activos ya tienen un formulario asignado.</p>
-                @endif
-            </section>
 
             <section class="rounded-xl border border-neza-line bg-white p-6 shadow-sm">
                 <h2 class="text-lg font-bold text-neza-ink">Departamento responsable</h2>

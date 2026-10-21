@@ -15,8 +15,13 @@ class Tramite extends Model
         'clave',
         'nombre',
         'descripcion',
+        'departamento_accesos_id',
+        'departamento_nombre_snapshot',
         'duracion',
         'costo',
+        'costo_pago',
+        'flujo_pago',
+        'pago_vigencia_dias',
         'tiempo_estimado',
         'modalidades',
         'requisitos',
@@ -36,6 +41,8 @@ class Tramite extends Model
             'proceso' => 'array',
             'preguntas_frecuentes' => 'array',
             'descarga_expira_dias' => 'integer',
+            'costo_pago' => 'decimal:2',
+            'pago_vigencia_dias' => 'integer',
         ];
     }
 
@@ -48,5 +55,10 @@ class Tramite extends Model
     {
         return $this->belongsToMany(FormularioVersion::class, 'tramite_formulario', 'tramite_id', 'formulario_version_id')
             ->withPivot(['activo', 'fecha_inicio_vigencia', 'fecha_fin_vigencia']);
+    }
+
+    public function formularioActivo(): BelongsToMany
+    {
+        return $this->formulariosVersiones()->wherePivot('activo', true);
     }
 }

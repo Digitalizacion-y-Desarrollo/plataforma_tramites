@@ -9,6 +9,7 @@ use App\Models\EstadoSolicitud;
 use App\Models\ServicioInteres;
 use App\Models\Solicitud;
 use App\Models\SolicitudDocumentoEmitido;
+use App\Models\SolicitudPago;
 use App\Models\Tramite;
 use Illuminate\Http\Exceptions\HttpResponseException;
 use Illuminate\Http\Request;
@@ -105,9 +106,12 @@ class PublicoController extends Controller
         $formularioVersion = $this->formularioActivo($tramite);
         abort_unless($formularioVersion, 404);
         $base = $request->validate([
-            'nombre_solicitante' => ['required', 'string', 'min:2', 'max:200'],
+            'nombres_solicitante' => ['required', 'string', 'min:2', 'max:100'],
+            'apellido_paterno_solicitante' => ['required', 'string', 'min:2', 'max:100'],
+            'apellido_materno_solicitante' => ['required', 'string', 'min:2', 'max:100'],
             'curp_consulta' => ['required', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'],
             'email_contacto' => ['required', 'email', 'max:200'],
+            'telefono_contacto' => ['required', 'string', 'regex:/^[0-9+()\-\s]{7,30}$/'],
         ]);
 
         $solicitudActiva = Solicitud::query()
@@ -142,7 +146,7 @@ class PublicoController extends Controller
             if ($campo->tipo === 'ESTADO') {
                 $reglas[] = 'in:'.implode(',', array_keys(config('formulario.entidades_federativas')));
             }
-            if ($campo->tipo === 'DOMICILIO') {
+            if (in_array($campo->tipo, ['DOMICILIO', 'DOMICILIO_FUERA_NEZA', 'DOMICILIO_USA'], true)) {
                 $reglas[] = 'array';
             }
             if ($campo->tipo === 'EMAIL') {
@@ -168,6 +172,23 @@ class PublicoController extends Controller
             if ($validacion->fails()) {
                 $errores['respuestas.'.$campo->id] = $validacion->errors()->first('valor');
             }
+            if ($campo->tipo === 'DOMICILIO' && is_array($valor) && ! $this->domicilioValido($valor)) {
+                $errores['respuestas.'.$campo->id] = 'Selecciona una colonia y una calle válidas de la lista disponible.';
+            }
+            if ($campo->tipo === 'DOMICILIO_FUERA_NEZA' && is_array($valor)) {
+                $mensajeDomicilio = $this->validarDomicilioFueraNeza($valor, $requerido);
+                if ($mensajeDomicilio) {
+                    $errores['respuestas.'.$campo->id] = $mensajeDomicilio;
+                }
+            }
+            if ($campo->tipo === 'DOMICILIO_USA' && is_array($valor)) {
+                $valor['pais'] = 'US';
+                $respuestas[$campo->id] = $valor;
+                $mensajeDomicilio = $this->validarDomicilioUsa($valor, $requerido);
+                if ($mensajeDomicilio) {
+                    $errores['respuestas.'.$campo->id] = $mensajeDomicilio;
+                }
+            }
         }
         if ($errores) {
             return back()->withErrors($errores)->withInput();
@@ -182,7 +203,10 @@ class PublicoController extends Controller
             do {
                 $folio = 'SOL-'.now()->format('Ymd').'-'.Str::upper(Str::random(6));
             } while (DB::table('solicitudes')->where('folio', $folio)->exists());
-            DB::table('solicitudes')->insert(['id' => $id, 'folio' => $folio, 'tramite_id' => $tramite->id, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => Str::upper($base['curp_consulta']), 'email_contacto' => Str::lower(trim($base['email_contacto'])), 'nombre_solicitante_snapshot' => trim($base['nombre_solicitante']), 'fecha_envio' => now(), 'created_at' => now(), 'updated_at' => now()]);
+            $nombres = trim($base['nombres_solicitante']);
+            $paterno = trim($base['apellido_paterno_solicitante']);
+            $materno = trim($base['apellido_materno_solicitante']);
+            DB::table('solicitudes')->insert(['id' => $id, 'folio' => $folio, 'tramite_id' => $tramite->id, 'departamento_accesos_id_snapshot' => $tramite->departamento_accesos_id, 'departamento_nombre_snapshot' => $tramite->departamento_nombre_snapshot, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => Str::upper($base['curp_consulta']), 'email_contacto' => Str::lower(trim($base['email_contacto'])), 'telefono_contacto' => trim($base['telefono_contacto']), 'nombre_solicitante_snapshot' => implode(' ', [$nombres, $paterno, $materno]), 'nombres_solicitante' => $nombres, 'apellido_paterno_solicitante' => $paterno, 'apellido_materno_solicitante' => $materno, 'flujo_pago' => $tramite->flujo_pago ?? 'SIN_PAGO', 'importe_pago' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->costo_pago, 'pago_vigencia_dias' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->pago_vigencia_dias, 'fecha_envio' => now(), 'created_at' => now(), 'updated_at' => now()]);
             foreach ($campos as $campo) {
                 $valor = $respuestas[$campo->id] ?? null;
                 if ($campo->tipo === 'FILE' && request()->hasFile('respuestas.'.$campo->id)) {
@@ -382,6 +406,11 @@ class PublicoController extends Controller
             'estado' => fn ($estado) => $estado->withTrashed()->select('id', 'clave', 'nombre'),
             'documentoEmitido',
         ]);
+        $pago = null;
+        if (Schema::hasTable('solicitud_pagos')) {
+            $solicitud->load('pago');
+            $pago = $solicitud->pago;
+        }
         $historial = DB::table('solicitud_historial_estados as historial')
             ->join('solicitud_estados as estado', 'estado.id', '=', 'historial.estado_nuevo_id')
             ->where('historial.solicitud_id', $solicitud->id)
@@ -389,7 +418,7 @@ class PublicoController extends Controller
         $observaciones = DB::table('solicitud_observaciones')->where('solicitud_id', $solicitud->id)
             ->where('visible_ciudadano', true)->orderBy('created_at')->get(['texto', 'created_at']);
 
-        return view('publico.solicitudes.detalle', compact('solicitud', 'historial', 'observaciones'));
+        return view('publico.solicitudes.detalle', compact('solicitud', 'historial', 'observaciones', 'pago'));
     }
 
     public function cerrarConsulta(Request $request)
@@ -418,6 +447,18 @@ class PublicoController extends Controller
         return Storage::disk('local')->download($documento->storage_key, $documento->nombre_original);
     }
 
+    public function descargarReferenciaPago(Request $request, SolicitudPago $pago)
+    {
+        $acceso = $this->accesoCiudadano($request);
+        $pago->load(['solicitud.estado']);
+
+        abort_unless($acceso['curp'] === $pago->solicitud->curp_consulta && $acceso['email'] === Str::lower($pago->solicitud->email_contacto), 404);
+        abort_unless($pago->solicitud->estado?->clave === 'EN_ESPERA_DE_PAGO', 404);
+        abort_unless(Storage::disk('local')->exists($pago->pdf_storage_key), 404);
+
+        return Storage::disk('local')->download($pago->pdf_storage_key, $pago->pdf_nombre_original);
+    }
+
     private function accesoCiudadano(Request $request): array
     {
         $acceso = $request->session()->get('consulta_ciudadana');
@@ -436,6 +477,89 @@ class PublicoController extends Controller
             1 => collect($tramite->modalidades ?? [])->first() === 'EN_LINEA' ? 'En línea' : 'Presencial',
             default => 'Mixto',
         };
+    }
+
+    private function validarDomicilioFueraNeza(array $domicilio, bool $requerido): ?string
+    {
+        $reglas = ['valor' => [$requerido ? 'required' : 'nullable', 'array']];
+        $mensajes = [
+            'valor.required' => 'Captura el domicilio completo.',
+            'valor.array' => 'El domicilio debe enviarse como un arreglo de datos.',
+        ];
+
+        foreach (config('formulario.campos_domicilio_fuera_neza') as $clave => $subcampo) {
+            $reglas['valor.'.$clave] = [$requerido ? 'required' : 'nullable', 'string', 'max:'.$subcampo['maxlength']];
+            $mensajes['valor.'.$clave.'.required'] = 'Ingresa '.mb_strtolower($subcampo['etiqueta'], 'UTF-8').'.';
+            $mensajes['valor.'.$clave.'.max'] = 'El campo '.$subcampo['etiqueta'].' no debe exceder '.$subcampo['maxlength'].' caracteres.';
+        }
+        $reglas['valor.codigo_postal'] = [$requerido ? 'required' : 'nullable', 'string', 'regex:/^[0-9]{5}$/'];
+        $mensajes['valor.codigo_postal.regex'] = 'El código postal debe tener exactamente cinco dígitos.';
+
+        $validacion = validator(['valor' => $domicilio], $reglas, $mensajes);
+
+        return $validacion->fails() ? $validacion->errors()->first() : null;
+    }
+
+    private function validarDomicilioUsa(array $domicilio, bool $requerido): ?string
+    {
+        $reglas = ['valor' => [$requerido ? 'required' : 'nullable', 'array']];
+        $mensajes = [
+            'valor.required' => 'Captura el domicilio completo.',
+            'valor.array' => 'El domicilio debe enviarse como un arreglo de datos.',
+        ];
+
+        foreach (config('formulario.campos_domicilio_usa') as $clave => $subcampo) {
+            $requeridoSubcampo = $requerido && ($subcampo['requerido'] ?? true);
+            $regla = [$requeridoSubcampo ? 'required' : 'nullable', 'string'];
+            $mensajes['valor.'.$clave.'.required'] = 'Ingresa '.mb_strtolower($subcampo['etiqueta'], 'UTF-8').'.';
+
+            if ($clave === 'estado') {
+                $regla[] = Rule::in(array_keys(config('formulario.estados_usa')));
+                $mensajes['valor.estado.in'] = 'Selecciona un estado válido de Estados Unidos.';
+            } elseif ($clave === 'codigo_postal') {
+                $regla[] = 'regex:/^[0-9]{5}(-[0-9]{4})?$/';
+                $mensajes['valor.codigo_postal.regex'] = 'El código postal debe tener cinco dígitos o el formato ZIP+4.';
+            } else {
+                $regla[] = 'max:'.$subcampo['maxlength'];
+                $mensajes['valor.'.$clave.'.max'] = 'El campo '.$subcampo['etiqueta'].' no debe exceder '.$subcampo['maxlength'].' caracteres.';
+            }
+
+            $reglas['valor.'.$clave] = $regla;
+        }
+        $reglas['valor.pais'] = ['required', 'in:US'];
+        $mensajes['valor.pais.required'] = 'El país es obligatorio.';
+        $mensajes['valor.pais.in'] = 'El país debe ser Estados Unidos.';
+
+        $validacion = validator(['valor' => $domicilio], $reglas, $mensajes);
+
+        return $validacion->fails() ? $validacion->errors()->first() : null;
+    }
+
+    private function domicilioValido(array $domicilio): bool
+    {
+        $coloniaIngresada = mb_strtoupper(trim((string) ($domicilio['colonia'] ?? '')), 'UTF-8');
+        $calleIngresada = mb_strtoupper(trim((string) ($domicilio['calle'] ?? '')), 'UTF-8');
+        $codigoPostal = trim((string) ($domicilio['codigo_postal'] ?? ''));
+        if ($coloniaIngresada === '' || $calleIngresada === '' || ! preg_match('/^\d{5}$/', $codigoPostal)) {
+            return false;
+        }
+
+        $rutaCapa = public_path('data/capa.json');
+        $capa = cache()->rememberForever('domicilios.capa.'.(is_file($rutaCapa) ? md5_file($rutaCapa) : 'ausente'), function () use ($rutaCapa): array {
+            $contenido = @file_get_contents($rutaCapa);
+            $datos = $contenido ? json_decode($contenido, true) : null;
+
+            return is_array($datos['porColonia'] ?? null) ? $datos['porColonia'] : [];
+        });
+        $nombreColonia = collect(array_keys($capa))->first(fn (string $nombre) => mb_strtoupper(trim($nombre), 'UTF-8') === $coloniaIngresada);
+        if (! $nombreColonia) {
+            return false;
+        }
+
+        $datosColonia = $capa[$nombreColonia];
+        $calleValida = collect($datosColonia['calles'] ?? [])->contains(fn (string $calle) => mb_strtoupper(trim($calle), 'UTF-8') === $calleIngresada);
+
+        return $calleValida && in_array($codigoPostal, $datosColonia['codigosPostales'] ?? [], true);
     }
 
     private function formularioActivo(Tramite $tramite)
