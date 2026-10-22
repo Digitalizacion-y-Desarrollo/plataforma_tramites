@@ -45,20 +45,13 @@
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M15.75 3.75H18a2.25 2.25 0 0 1 2.25 2.25v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75h2.25m0 0A2.25 2.25 0 0 0 10.5 6h3a2.25 2.25 0 0 0 2.25-2.25m-7.5 0A2.25 2.25 0 0 1 10.5 1.5h3a2.25 2.25 0 0 1 2.25 2.25m-7.5 9h7.5m-7.5 3h7.5m-7.5-6h7.5" />
                     </svg>Solicitudes</a>
-                <a href="#"><svg class="nav-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24"
-                        stroke-width="1.5" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5V6.75a3.375 3.375 0 0 0-3.375-3.375h-3.75A3.375 3.375 0 0 0 4.125 6.75v10.5a3.375 3.375 0 0 0 3.375 3.375h4.125" />
-                        <path stroke-linecap="round" stroke-linejoin="round"
-                            d="M16.5 14.25h3.75m0 0v3.75m0-3.75-4.5 4.5" />
-                    </svg>Trámites</a>
-                <a href="{{ route('formulario.index') }}"><svg class="nav-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24"
+                <span class="side-label" style="margin-top:16px">Administración</span>
+                <a href="{{ route('formulario.index') }}" @class(['active' => request()->routeIs('formulario.*')])><svg class="nav-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24"
                         stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5V6.75a3.375 3.375 0 0 0-3.375-3.375h-3.75A3.375 3.375 0 0 0 4.125 6.75v10.5a3.375 3.375 0 0 0 3.375 3.375h8.25" />
                         <path stroke-linecap="round" stroke-linejoin="round" d="M14.25 18.75h6m-3-3v6" />
                     </svg>Formularios</a>
-                <span class="side-label" style="margin-top:16px">Administración</span>
                 <details class="group">
                     <summary
                         class="flex cursor-pointer list-none items-center gap-[11px] rounded-[10px] px-3 py-[11px] text-[13px] font-medium text-[#667085] outline-none transition hover:bg-neza-wine-soft hover:text-neza-wine focus-visible:ring-2 focus-visible:ring-neza-wine [&::-webkit-details-marker]:hidden">

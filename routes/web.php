@@ -18,6 +18,7 @@ Route::post('/solicitudes/{solicitud}/aprobar', [SolicitudController::class, 'ap
 Route::post('/solicitudes/{solicitud}/rechazar', [SolicitudController::class, 'rechazar'])->name('solicitudes.rechazar');
 Route::post('/solicitudes/{solicitud}/correcciones', [SolicitudController::class, 'solicitarCorreccion'])->name('solicitudes.correcciones.solicitar');
 Route::post('/solicitudes/{solicitud}/validar', [SolicitudController::class, 'validarParaPago'])->name('solicitudes.validar');
+Route::get('/solicitudes/{solicitud}/referencia-pago/previsualizar', [SolicitudController::class, 'previsualizarReferenciaPago'])->name('solicitudes.pagos.previsualizar');
 Route::post('/solicitudes/{solicitud}/referencia-pago', [SolicitudController::class, 'generarReferenciaPago'])->name('solicitudes.pagos.generar');
 Route::post('/solicitudes/{solicitud}/validar-pago', [SolicitudController::class, 'validarPago'])->name('solicitudes.pagos.validar');
 Route::post('/solicitudes/{solicitud}/comentarios', [SolicitudController::class, 'comentar'])->name('solicitudes.comentarios.store');
@@ -58,6 +59,7 @@ Route::prefix('formulario/{formulario}')
         Route::get('duplicar', 'createDuplicado')->name('formulario.duplicar');
         Route::post('duplicar', 'storeDuplicado')->name('formulario.duplicar.store');
         Route::post('secciones', 'storeSeccion')->name('formulario.secciones.store');
+        Route::patch('secciones/{seccion}', 'updateSeccion')->name('formulario.secciones.update');
         Route::delete('secciones/{seccion}', 'destroySeccion')->name('formulario.secciones.destroy');
         Route::post('campos/orden', 'ordenarCampos')->name('formulario.campos.ordenar');
         Route::post('secciones/{seccion}/campos', 'storeCampo')->name('formulario.secciones.campos.store');

@@ -66,7 +66,7 @@
                                             @endforeach
                                         </div>
                                         <datalist id="campo-{{ $campo->id }}-colonia-opciones" data-domicilio-colonias></datalist><datalist id="campo-{{ $campo->id }}-calle-opciones" data-domicilio-calles></datalist><datalist id="campo-{{ $campo->id }}-numero-opciones" data-domicilio-numeros></datalist>
-                                        <input type="hidden" name="respuestas[{{ $campo->id }}][latitud]" data-domicilio-latitud><input type="hidden" name="respuestas[{{ $campo->id }}][longitud]" data-domicilio-longitud><p class="mt-2 text-xs text-neza-muted">Primero selecciona una colonia; el código postal y las calles disponibles se actualizarán automáticamente.</p><p class="mt-1 text-xs font-medium text-neza-muted" data-domicilio-estado aria-live="polite" role="status">Esperando la selección de colonia.</p>
+                                        <input type="hidden" name="respuestas[{{ $campo->id }}][latitud]" data-domicilio-latitud><input type="hidden" name="respuestas[{{ $campo->id }}][longitud]" data-domicilio-longitud><p class="mt-2 text-xs text-neza-muted">Primero selecciona una colonia; el código postal y las calles disponibles se actualizarán automáticamente.</p>
                                         </div>
                                     @elseif ($campo->tipo === 'DOMICILIO_FUERA_NEZA')
                                         <div class="mt-2 grid gap-3 sm:grid-cols-2" @error('respuestas.'.$campo->id) aria-invalid="true" @enderror>

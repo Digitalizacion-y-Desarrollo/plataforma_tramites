@@ -176,6 +176,8 @@ class PublicoController extends Controller
                 $errores['respuestas.'.$campo->id] = 'Selecciona una colonia y una calle válidas de la lista disponible.';
             }
             if ($campo->tipo === 'DOMICILIO_FUERA_NEZA' && is_array($valor)) {
+                $valor = array_intersect_key($valor, config('formulario.campos_domicilio_fuera_neza'));
+                $respuestas[$campo->id] = $valor;
                 $mensajeDomicilio = $this->validarDomicilioFueraNeza($valor, $requerido);
                 if ($mensajeDomicilio) {
                     $errores['respuestas.'.$campo->id] = $mensajeDomicilio;

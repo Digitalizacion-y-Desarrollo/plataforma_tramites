@@ -11,6 +11,24 @@ document.querySelectorAll('[data-dismiss-public-notice]').forEach((button) => {
 
 const cuerpo = document.body;
 
+document.querySelectorAll('[data-referencia-pago-preview]').forEach((dialogo) => {
+    const vistaPrevia = dialogo.querySelector('[data-referencia-pago-preview-frame]');
+    const confirmar = dialogo.querySelector('[data-referencia-pago-confirmar]');
+
+    if (!vistaPrevia || !confirmar) return;
+
+    vistaPrevia.addEventListener('load', () => {
+        confirmar.disabled = false;
+    });
+
+    document.querySelectorAll('[data-modal-open="previsualizar-referencia-pago"]').forEach((boton) => {
+        boton.addEventListener('click', () => {
+            confirmar.disabled = true;
+            vistaPrevia.src = vistaPrevia.src;
+        });
+    });
+});
+
 const actualizarFormulariosDeTramite = (contenedor) => {
     const departamento = contenedor.querySelector('[data-tramite-departamento]');
     const formulario = contenedor.querySelector('[data-tramite-formulario]');
@@ -197,11 +215,15 @@ const bloquearFormulario = (formulario) => {
         boton.setAttribute('aria-busy', 'true');
 
         if (boton.tagName === 'BUTTON' && !boton.querySelector('[data-submit-spinner]')) {
+            const etiqueta = boton.getAttribute('aria-label') || boton.getAttribute('title') || boton.textContent.trim() || 'Enviar formulario';
+            boton.classList.add('inline-flex', 'items-center', 'justify-center');
+            boton.setAttribute('aria-label', `${etiqueta}. Enviando`);
+
             const indicador = document.createElement('span');
             indicador.dataset.submitSpinner = '';
             indicador.className = 'inline-block size-4 animate-spin rounded-full border-2 border-current border-t-transparent';
             indicador.setAttribute('aria-hidden', 'true');
-            boton.append(indicador);
+            boton.replaceChildren(indicador);
         }
     });
 };
@@ -700,12 +722,11 @@ document.querySelectorAll('[data-domicilio]').forEach((domicilio) => {
     const calles = domicilio.querySelector('[data-domicilio-calles]');
     const latitud = domicilio.querySelector('[data-domicilio-latitud]');
     const longitud = domicilio.querySelector('[data-domicilio-longitud]');
-    const estado = domicilio.querySelector('[data-domicilio-estado]');
     const url = domicilio.dataset.indiceUrl;
     let indice;
     let cargaIndice;
 
-    if (!codigoPostal || !colonia || !calle || !colonias || !calles || !latitud || !longitud || !estado || !url) return;
+    if (!codigoPostal || !colonia || !calle || !colonias || !calles || !latitud || !longitud || !url) return;
 
     const normalizar = (valor) => String(valor).trim().toLocaleUpperCase();
     const opciones = (lista, valores) => lista.replaceChildren(...valores.map((valor) => Object.assign(document.createElement('option'), { value: String(valor) })));
@@ -713,7 +734,6 @@ document.querySelectorAll('[data-domicilio]').forEach((domicilio) => {
     const cargarIndice = async () => {
         if (indice) return indice;
         if (!cargaIndice) {
-            estado.textContent = 'Cargando colonias disponibles...';
             cargaIndice = fetch(url, { headers: { Accept: 'application/json' } })
                 .then((respuesta) => { if (!respuesta.ok) throw new Error(); return respuesta.json(); })
                 .then((datos) => { indice = datos.porColonia ?? {}; return indice; });
@@ -725,17 +745,16 @@ document.querySelectorAll('[data-domicilio]').forEach((domicilio) => {
             const coloniasDisponibles = await cargarIndice();
             const nombre = Object.keys(coloniasDisponibles).find((clave) => normalizar(clave) === normalizar(colonia.value));
             limpiarDerivados();
-            if (!nombre) { codigoPostal.value = ''; estado.textContent = 'Selecciona una colonia de la lista para consultar sus calles.'; return; }
+            if (!nombre) { codigoPostal.value = ''; return; }
             const datos = coloniasDisponibles[nombre];
             codigoPostal.value = (datos.codigosPostales ?? [])[0] ?? '';
             opciones(calles, datos.calles ?? []);
-            estado.textContent = `${(datos.calles ?? []).length} calles disponibles para ${nombre}.${(datos.codigosPostales ?? []).length > 1 ? ` Se asignó el primer código postal disponible (${codigoPostal.value}).` : ''}`;
         } catch {
-            codigoPostal.value = ''; limpiarDerivados(); estado.textContent = 'No fue posible cargar el catálogo de colonias. Intenta nuevamente.';
+            codigoPostal.value = ''; limpiarDerivados();
         }
     };
 
-    cargarIndice().then((coloniasDisponibles) => opciones(colonias, Object.keys(coloniasDisponibles))).catch(() => { estado.textContent = 'No fue posible cargar el catálogo de colonias. Intenta nuevamente.'; });
+    cargarIndice().then((coloniasDisponibles) => opciones(colonias, Object.keys(coloniasDisponibles))).catch(() => {});
     colonia.addEventListener('input', actualizarColonia);
     if (colonia.value) actualizarColonia();
 });

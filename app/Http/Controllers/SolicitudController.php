@@ -14,6 +14,7 @@ use App\Models\SolicitudPago;
 use App\Models\Tramite;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
@@ -64,7 +65,10 @@ class SolicitudController extends Controller
 
         $solicitudes = $consulta->orderByDesc('fecha_envio')->orderByDesc('created_at')->paginate(15)->withQueryString();
         $estados = EstadoSolicitud::query()->where('activo', true)->orderBy('orden')->get(['id', 'clave', 'nombre']);
-        $tramites = Tramite::query()->orderBy('nombre')->get(['id', 'nombre']);
+        $tramites = Tramite::query()
+            ->when($nombreDependencia, fn ($consulta, string $nombre) => $consulta->where('departamento_nombre_snapshot', $nombre))
+            ->orderBy('nombre')
+            ->get(['id', 'nombre']);
 
         $rutaEstadisticas = $dependencia ? route('dependencias.solicitudes.index', $dependencia['slug']) : route('solicitudes.index');
 
@@ -125,7 +129,7 @@ class SolicitudController extends Controller
     {
         $dependencias = [
             'desarrollo-urbano' => ['slug' => 'desarrollo-urbano', 'nombre' => 'DIRECCIÓN DE DESARROLLO URBANO', 'etiqueta' => 'Desarrollo Urbano'],
-            'secretaria-del-ayuntamiento' => ['slug' => 'secretaria-del-ayuntamiento', 'nombre' => 'SECRETARÍA DEL AYUNTAMIENTO', 'etiqueta' => 'Secretaría del Ayuntamiento'],
+            'secretaria-del-ayuntamiento' => ['slug' => 'secretaria-del-ayuntamiento', 'nombre' => 'SECRETARÍA DEL H. AYUNTAMIENTO', 'etiqueta' => 'Secretaría del H. Ayuntamiento'],
         ];
 
         abort_unless(isset($dependencias[$slug]), 404);
@@ -144,12 +148,19 @@ class SolicitudController extends Controller
             ->where('campo.tipo', '!=', 'FILE')
             ->orderBy('seccion.orden')
             ->orderBy('campo.orden')
-            ->get(['seccion.titulo as seccion_titulo', 'campo.etiqueta as campo_etiqueta', 'respuesta.valor'])
+            ->get(['seccion.titulo as seccion_titulo', 'campo.etiqueta as campo_etiqueta', 'campo.tipo as campo_tipo', 'respuesta.valor'])
             ->map(function ($respuesta) {
-                $respuesta->valor = $this->formatearValor(json_decode($respuesta->valor, true));
+                $valor = json_decode($respuesta->valor, true);
+
+                if (! filled($valor)) {
+                    return null;
+                }
+
+                $respuesta->valor = $this->formatearValor($valor, $respuesta->campo_tipo);
 
                 return $respuesta;
             })
+            ->filter()
             ->groupBy('seccion_titulo');
 
         $documentos = DB::table('solicitud_documentos as documento')
@@ -205,20 +216,21 @@ class SolicitudController extends Controller
     public function generarReferenciaPago(Request $request, Solicitud $solicitud)
     {
         $solicitud->load(['estado', 'tramite']);
-        $permitido = ($solicitud->flujo_pago === 'PAGO_DIRECTO' && $solicitud->estado?->clave === 'ENVIADA') || ($solicitud->flujo_pago === 'PAGO_POST_VALIDACION' && $solicitud->estado?->clave === 'VALIDADA_PARA_PAGO');
+        $this->autorizarReferenciaPago($solicitud);
+        $vistaPrevia = $this->vistaPreviaReferenciaPago($request, $solicitud);
+        abort_unless($vistaPrevia, 422, 'Primero revisa la vista previa de la referencia de pago.');
+        $permitido = $vistaPrevia !== null;
         abort_unless($permitido && $solicitud->importe_pago !== null && $solicitud->pago_vigencia_dias, 422, 'La referencia de pago no está disponible para esta solicitud.');
         $actor = $this->actor($request);
         $archivoGuardado = null;
         try {
-            [$pago, $notificacionId] = DB::transaction(function () use ($request, $solicitud, $actor, &$archivoGuardado) {
+            [$pago, $notificacionId] = DB::transaction(function () use ($request, $solicitud, $actor, $vistaPrevia, &$archivoGuardado) {
                 $bloqueada = Solicitud::query()->with('estado')->lockForUpdate()->findOrFail($solicitud->id);
                 abort_if(SolicitudPago::query()->where('solicitud_id', $bloqueada->id)->exists(), 422, 'La solicitud ya tiene una referencia de pago.');
                 $origenValido = ($bloqueada->flujo_pago === 'PAGO_DIRECTO' && $bloqueada->estado?->clave === 'ENVIADA') || ($bloqueada->flujo_pago === 'PAGO_POST_VALIDACION' && $bloqueada->estado?->clave === 'VALIDADA_PARA_PAGO');
                 abort_unless($origenValido, 422, 'La solicitud cambió de estado.');
-                do {
-                    $referencia = 'NEZA-'.now()->format('Ymd').'-'.Str::upper(Str::random(8));
-                } while (SolicitudPago::query()->where('referencia', $referencia)->exists());
-                $pago = new SolicitudPago(['id' => (string) Str::uuid(), 'solicitud_id' => $bloqueada->id, 'referencia' => $referencia, 'importe' => $bloqueada->importe_pago, 'fecha_emision' => now(), 'fecha_vencimiento' => now()->addDays($bloqueada->pago_vigencia_dias), 'emisor_accesos_id' => $actor['id'], 'emisor_nombre_snapshot' => $actor['nombre']]);
+                abort_if(SolicitudPago::query()->where('referencia', $vistaPrevia['referencia'])->exists(), 422, 'La referencia de pago ya no está disponible. Revisa una nueva vista previa.');
+                $pago = new SolicitudPago(['id' => (string) Str::uuid(), 'solicitud_id' => $bloqueada->id, 'referencia' => $vistaPrevia['referencia'], 'importe' => $bloqueada->importe_pago, 'fecha_emision' => Carbon::parse($vistaPrevia['fecha_emision']), 'fecha_vencimiento' => Carbon::parse($vistaPrevia['fecha_vencimiento']), 'emisor_accesos_id' => $actor['id'], 'emisor_nombre_snapshot' => $actor['nombre']]);
                 $pago->setRelation('solicitud', $bloqueada->load('tramite'));
                 $contenido = Pdf::loadView('pdf.referencia-pago', ['solicitud' => $bloqueada, 'pago' => $pago])->output();
                 $pago->pdf_nombre_original = 'referencia-pago-'.$bloqueada->folio.'.pdf';
@@ -230,7 +242,7 @@ class SolicitudController extends Controller
                 $anterior = $bloqueada->solicitud_estado_id;
                 $nuevo = $this->estadoId('EN_ESPERA_DE_PAGO');
                 $bloqueada->update(['solicitud_estado_id' => $nuevo]);
-                $this->registrarMovimiento($bloqueada, $anterior, $nuevo, 'Referencia de pago generada: '.$referencia, $actor, 'SOLICITUD_REFERENCIA_PAGO_GENERADA', $request);
+                $this->registrarMovimiento($bloqueada, $anterior, $nuevo, 'Referencia de pago generada: '.$pago->referencia, $actor, 'SOLICITUD_REFERENCIA_PAGO_GENERADA', $request);
                 $notificacionId = $this->notificacionPendiente($bloqueada, 'SOLICITUD_REFERENCIA_PAGO', 'Referencia de pago · Folio '.$bloqueada->folio);
 
                 return [$pago, $notificacionId];
@@ -243,8 +255,26 @@ class SolicitudController extends Controller
         $solicitud->refresh()->load('tramite', 'estado');
         $pago->setRelation('solicitud', $solicitud);
         $this->enviarReferenciaPago($solicitud, $pago, $notificacionId);
+        $request->session()->forget($this->llaveVistaPreviaReferenciaPago($solicitud));
 
         return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La referencia de pago se generó y envió por correo.');
+    }
+
+    public function previsualizarReferenciaPago(Request $request, Solicitud $solicitud)
+    {
+        $solicitud->load(['estado', 'tramite']);
+        $this->autorizarReferenciaPago($solicitud);
+        abort_if(SolicitudPago::query()->where('solicitud_id', $solicitud->id)->exists(), 422, 'La solicitud ya tiene una referencia de pago.');
+
+        $vistaPrevia = $this->crearVistaPreviaReferenciaPago($request, $solicitud);
+        $pago = new SolicitudPago([
+            'referencia' => $vistaPrevia['referencia'],
+            'importe' => $solicitud->importe_pago,
+            'fecha_emision' => Carbon::parse($vistaPrevia['fecha_emision']),
+            'fecha_vencimiento' => Carbon::parse($vistaPrevia['fecha_vencimiento']),
+        ]);
+
+        return Pdf::loadView('pdf.referencia-pago', compact('solicitud', 'pago'))->stream('vista-previa-referencia-pago-'.$solicitud->folio.'.pdf');
     }
 
     public function validarPago(Request $request, Solicitud $solicitud)
@@ -522,6 +552,56 @@ class SolicitudController extends Controller
         return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La solicitud fue rechazada correctamente.');
     }
 
+    private function autorizarReferenciaPago(Solicitud $solicitud): void
+    {
+        $permitido = ($solicitud->flujo_pago === 'PAGO_DIRECTO' && $solicitud->estado?->clave === 'ENVIADA') || ($solicitud->flujo_pago === 'PAGO_POST_VALIDACION' && $solicitud->estado?->clave === 'VALIDADA_PARA_PAGO');
+
+        abort_unless($permitido && $solicitud->importe_pago !== null && $solicitud->pago_vigencia_dias, 422, 'La referencia de pago no esta disponible para esta solicitud.');
+    }
+
+    private function crearVistaPreviaReferenciaPago(Request $request, Solicitud $solicitud): array
+    {
+        $vistaPrevia = $this->vistaPreviaReferenciaPago($request, $solicitud);
+
+        if ($vistaPrevia) {
+            return $vistaPrevia;
+        }
+
+        do {
+            $referencia = 'NEZA-'.now()->format('Ymd').'-'.Str::upper(Str::random(8));
+        } while (SolicitudPago::query()->where('referencia', $referencia)->exists());
+
+        $fechaEmision = now();
+        $vistaPrevia = [
+            'referencia' => $referencia,
+            'fecha_emision' => $fechaEmision->toIso8601String(),
+            'fecha_vencimiento' => $fechaEmision->copy()->addDays($solicitud->pago_vigencia_dias)->toIso8601String(),
+            'expira_en' => now()->addMinutes(15)->toIso8601String(),
+        ];
+
+        $request->session()->put($this->llaveVistaPreviaReferenciaPago($solicitud), $vistaPrevia);
+
+        return $vistaPrevia;
+    }
+
+    private function vistaPreviaReferenciaPago(Request $request, Solicitud $solicitud): ?array
+    {
+        $vistaPrevia = $request->session()->get($this->llaveVistaPreviaReferenciaPago($solicitud));
+
+        if (! is_array($vistaPrevia) || ! isset($vistaPrevia['referencia'], $vistaPrevia['fecha_emision'], $vistaPrevia['fecha_vencimiento'], $vistaPrevia['expira_en']) || Carbon::parse($vistaPrevia['expira_en'])->isPast()) {
+            $request->session()->forget($this->llaveVistaPreviaReferenciaPago($solicitud));
+
+            return null;
+        }
+
+        return $vistaPrevia;
+    }
+
+    private function llaveVistaPreviaReferenciaPago(Solicitud $solicitud): string
+    {
+        return 'referencia_pago_previa.'.$solicitud->id;
+    }
+
     private function actor(Request $request): array
     {
         $actorId = $request->session()->get('accesos.id');
@@ -686,10 +766,15 @@ class SolicitudController extends Controller
         ]);
     }
 
-    private function formatearValor(mixed $valor): string
+    private function formatearValor(mixed $valor, ?string $tipoCampo = null): string
     {
+        if ($tipoCampo === 'ESTADO' && is_string($valor)) {
+            return config('formulario.entidades_federativas.'.$valor, $valor);
+        }
+
         if (is_array($valor)) {
             return collect($valor)
+                ->filter(fn ($elemento) => filled($elemento))
                 ->map(fn ($elemento) => is_scalar($elemento) ? (string) $elemento : json_encode($elemento, JSON_UNESCAPED_UNICODE))
                 ->implode(', ');
         }

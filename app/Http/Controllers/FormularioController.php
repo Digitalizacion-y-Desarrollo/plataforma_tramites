@@ -438,6 +438,24 @@ class FormularioController extends Controller
         return redirect()->route('formulario.edit', $formulario)->with('success', 'Se agregó la sección al borrador.');
     }
 
+    public function updateSeccion(Request $request, Formulario $formulario, FormularioSeccion $seccion)
+    {
+        $datos = $request->validate([
+            'titulo' => ['required', 'string', 'max:200'],
+            'descripcion' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $version = $this->versionBorrador($formulario);
+        abort_unless($seccion->formulario_version_id === $version->id, 404);
+
+        $seccion->update([
+            'titulo' => $datos['titulo'],
+            'descripcion' => $datos['descripcion'] ?? null,
+        ]);
+
+        return redirect()->route('formulario.edit', $formulario)->with('success', 'La sección se actualizó.');
+    }
+
     public function storeCampo(Request $request, Formulario $formulario, FormularioSeccion $seccion)
     {
         $datos = $request->validate([

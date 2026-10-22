@@ -15,6 +15,7 @@ class FormularioConfigTest extends TestCase
         $this->assertCount(32, $entidades);
         $this->assertArrayHasKey('DOMICILIO', $tiposCampo);
         $this->assertArrayHasKey('DOMICILIO_FUERA_NEZA', $tiposCampo);
+        $this->assertSame('Domicilio fuera de Ciudad Nezahualcóyotl', $tiposCampo['DOMICILIO_FUERA_NEZA']);
         $this->assertArrayHasKey('DOMICILIO_USA', $tiposCampo);
         $this->assertSame(
             ['colonia', 'codigo_postal', 'municipio', 'calle', 'numero'],
@@ -24,6 +25,12 @@ class FormularioConfigTest extends TestCase
             ['colonia', 'codigo_postal', 'municipio', 'calle', 'numero'],
             array_keys(config('formulario.campos_domicilio_fuera_neza')),
         );
+        $this->assertSame(100, config('formulario.campos_domicilio_fuera_neza.colonia.maxlength'));
+        $this->assertSame(5, config('formulario.campos_domicilio_fuera_neza.codigo_postal.maxlength'));
+        $this->assertSame('[0-9]{5}', config('formulario.campos_domicilio_fuera_neza.codigo_postal.pattern'));
+        $this->assertSame(100, config('formulario.campos_domicilio_fuera_neza.municipio.maxlength'));
+        $this->assertSame(100, config('formulario.campos_domicilio_fuera_neza.calle.maxlength'));
+        $this->assertSame(50, config('formulario.campos_domicilio_fuera_neza.numero.maxlength'));
         $this->assertSame(
             ['calle', 'numero', 'ciudad', 'estado', 'codigo_postal'],
             array_keys(config('formulario.campos_domicilio_usa')),

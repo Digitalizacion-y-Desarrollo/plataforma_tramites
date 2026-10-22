@@ -86,6 +86,58 @@ class SolicitudDomiciliosTest extends TestCase
         $this->assertDatabaseCount('solicitud_respuestas', 0);
     }
 
+    public function test_solicitud_rechaza_un_domicilio_fuera_de_neza_que_no_es_un_arreglo(): void
+    {
+        [$tramite, , $campoId] = $this->crearFormulario();
+        $datos = $this->datosSolicitud($campoId, []);
+        $datos['respuestas'][$campoId] = 'Avenida Juárez 123';
+
+        $this->post(route('portal.tramites.solicitudes.store', $tramite), $datos)
+            ->assertSessionHasErrors('respuestas.'.$campoId);
+
+        $this->assertDatabaseCount('solicitudes', 0);
+        $this->assertDatabaseCount('solicitud_respuestas', 0);
+    }
+
+    public function test_solicitud_rechaza_un_subcampo_del_domicilio_fuera_de_neza_que_excede_la_longitud_maxima(): void
+    {
+        [$tramite, , $campoId] = $this->crearFormulario();
+        $domicilio = [
+            'colonia' => str_repeat('A', 101),
+            'codigo_postal' => '06000',
+            'municipio' => 'Cuauhtémoc',
+            'calle' => 'Avenida Juárez',
+            'numero' => '123',
+        ];
+
+        $this->post(route('portal.tramites.solicitudes.store', $tramite), $this->datosSolicitud($campoId, $domicilio))
+            ->assertSessionHasErrors('respuestas.'.$campoId);
+
+        $this->assertDatabaseCount('solicitudes', 0);
+        $this->assertDatabaseCount('solicitud_respuestas', 0);
+    }
+
+    public function test_solicitud_descarta_coordenadas_y_datos_ajenos_al_domicilio_fuera_de_neza(): void
+    {
+        [$tramite, , $campoId] = $this->crearFormulario();
+        $domicilio = [
+            'colonia' => 'Centro',
+            'codigo_postal' => '06000',
+            'municipio' => 'Cuauhtémoc',
+            'calle' => 'Avenida Juárez',
+            'numero' => '123',
+        ];
+
+        $this->post(route('portal.tramites.solicitudes.store', $tramite), $this->datosSolicitud($campoId, $domicilio + [
+            'latitud' => '19.4326',
+            'longitud' => '-99.1332',
+            'pais' => 'MX',
+        ]))->assertRedirect(route('portal.tramites.iniciar', $tramite));
+
+        $valor = DB::table('solicitud_respuestas')->where('campo_id', $campoId)->value('valor');
+        $this->assertSame($domicilio, json_decode($valor, true));
+    }
+
     public function test_formulario_ciudadano_muestra_domicilio_usa_con_estado_y_zip(): void
     {
         [$tramite, $formulario, $campoId] = $this->crearFormulario('DOMICILIO_USA', 'Domicilio en Estados Unidos');

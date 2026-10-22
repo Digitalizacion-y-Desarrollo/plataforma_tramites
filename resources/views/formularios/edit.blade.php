@@ -58,6 +58,10 @@
             <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Esta versión no puede modificarse porque ya no está en borrador.</div>
         @else
             <section id="secciones" class="scroll-mt-24 rounded-xl border border-neza-line bg-white p-6 shadow-sm">
+                <div class="mb-5 rounded-lg border border-neza-wine-soft bg-neza-wine-soft/40 px-4 py-3 text-sm text-neza-ink" role="note">
+                    <p class="font-semibold">Datos solicitados por defecto</p>
+                    <p class="mt-1 text-neza-muted">Todos los trámites ya solicitan nombre(s), apellido paterno, apellido materno, correo, teléfono y CURP. No es necesario agregarlos nuevamente al formulario.</p>
+                </div>
                 <h2 class="text-lg font-bold text-neza-ink">Agregar sección</h2>
                 <p class="mt-1 text-sm text-neza-muted">Organiza los datos que solicitarás al ciudadano en bloques claros.</p>
                 <form action="{{ route('formulario.secciones.store', $formulario) }}" method="POST" class="mt-5 grid gap-4 md:grid-cols-[1fr_1fr_auto] md:items-end">
@@ -91,6 +95,17 @@
                             @endif
                         </div>
                     </div>
+                    @if ($esBorrador)
+                        <details class="border-b border-neza-line px-5 py-3">
+                            <summary class="cursor-pointer text-sm font-semibold text-neza-wine">Editar sección</summary>
+                            <form action="{{ route('formulario.secciones.update', [$formulario, $seccion]) }}" method="POST" class="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                                @csrf @method('PATCH')
+                                <div><label for="editar-seccion-titulo-{{ $seccion->id }}" class="block text-xs font-semibold text-neza-muted">Título de la sección <span class="text-rose-700">*</span></label><input id="editar-seccion-titulo-{{ $seccion->id }}" name="titulo" required maxlength="200" value="{{ old('titulo', $seccion->titulo) }}" class="mt-1 w-full rounded-lg border border-neza-line px-3 py-2 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft">@error('titulo')<p class="mt-1 text-xs text-rose-700">{{ $message }}</p>@enderror</div>
+                                <div><label for="editar-seccion-descripcion-{{ $seccion->id }}" class="block text-xs font-semibold text-neza-muted">Descripción</label><input id="editar-seccion-descripcion-{{ $seccion->id }}" name="descripcion" maxlength="5000" value="{{ old('descripcion', $seccion->descripcion) }}" class="mt-1 w-full rounded-lg border border-neza-line px-3 py-2 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft">@error('descripcion')<p class="mt-1 text-xs text-rose-700">{{ $message }}</p>@enderror</div>
+                                <button type="submit" class="rounded-lg bg-neza-wine px-3 py-2 text-sm font-semibold text-white hover:opacity-90">Guardar cambios</button>
+                            </form>
+                        </details>
+                    @endif
                     <div class="space-y-3 bg-neza-canvas p-4" data-campos-lista data-seccion-id="{{ $seccion->id }}">
                         @forelse ($seccion->campos->sortBy('orden') as $campo)
                             <div class="overflow-hidden rounded-xl border border-neza-line bg-white shadow-sm" @if ($esBorrador) draggable="true" data-campo-id="{{ $campo->id }}" @endif>
