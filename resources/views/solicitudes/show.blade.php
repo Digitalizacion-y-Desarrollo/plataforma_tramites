@@ -42,16 +42,39 @@
             </div>
         </section>
 
+        @if ($solicitud->flujo_pago !== 'SIN_PAGO' && $solicitud->pago)
+            <section class="rounded-2xl border border-neza-line bg-white p-5 shadow-sm" aria-labelledby="pago-titulo">
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                        <h2 id="pago-titulo" class="text-base font-bold text-neza-ink">Pago del trámite</h2>
+                        <p class="mt-1 text-sm text-neza-muted">Referencia {{ $solicitud->pago->referencia }} &middot; Importe ${{ number_format((float) $solicitud->pago->importe, 2) }} MXN &middot; Vence {{ $solicitud->pago->fecha_vencimiento->format('d/m/Y') }}</p>
+                        @if ($solicitud->pago->tieneComprobante())
+                            <p class="mt-1 text-xs text-neza-muted">Comprobante recibido el {{ $solicitud->pago->fecha_comprobante?->format('d/m/Y H:i') }}.</p>
+                        @endif
+                    </div>
+                    @if ($solicitud->pago->tieneComprobante())
+                        <a href="{{ route('solicitudes.pagos.comprobante.descargar', $solicitud) }}" class="inline-flex items-center gap-2 rounded-lg border border-neza-wine px-4 py-2 text-sm font-semibold text-neza-wine hover:bg-neza-wine-soft">
+                            <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5v-9m0 9-3.75-3.75M12 16.5l3.75-3.75M3.75 17.25v1.5A2.25 2.25 0 0 0 6 21h12a2.25 2.25 0 0 0 2.25-2.25v-1.5" /></svg>
+                            Descargar comprobante de pago
+                        </a>
+                    @else
+                        <span class="rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">Comprobante pendiente</span>
+                    @endif
+                </div>
+            </section>
+        @endif
+
         @php($modalidades = collect($solicitud->tramite?->modalidades ?? []))
         @php($puedeRechazar = in_array($solicitud->estado?->clave, ['ENVIADA', 'CORRECCION_SOLICITADA', 'VALIDADA_PARA_PAGO', 'EN_ESPERA_DE_PAGO', 'EN_REVISION_FINAL'], true))
         @php($puedeSolicitarCorreccion = $solicitud->estado?->clave === 'ENVIADA' && $archivosCorregibles->isNotEmpty())
+        @php($puedeAprobar = (($solicitud->flujo_pago === 'SIN_PAGO' && $solicitud->estado?->clave === 'ENVIADA') || ($solicitud->flujo_pago !== 'SIN_PAGO' && $solicitud->estado?->clave === 'EN_REVISION_FINAL')) && ($modalidades->contains('EN_LINEA') || $modalidades->contains('PRESENCIAL')))
         @if ($solicitud->flujo_pago !== 'SIN_PAGO')
             <section class="flex flex-wrap justify-end gap-3">
                 @if ($solicitud->flujo_pago === 'PAGO_POST_VALIDACION' && $solicitud->estado?->clave === 'ENVIADA')<form action="{{ route('solicitudes.validar', $solicitud) }}" method="POST" data-confirm-action data-confirm-title="¿Validar información?" data-confirm-text="Este cambio no podrá revertirse." data-confirm-button="Sí, validar">@csrf<button class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">Validar información</button></form>@endif
                 @if (($solicitud->flujo_pago === 'PAGO_DIRECTO' && $solicitud->estado?->clave === 'ENVIADA') || ($solicitud->flujo_pago === 'PAGO_POST_VALIDACION' && $solicitud->estado?->clave === 'VALIDADA_PARA_PAGO'))<button type="button" data-modal-open="previsualizar-referencia-pago" class="rounded-lg bg-neza-wine px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">Generar referencia de pago</button>@endif
                 @if ($solicitud->estado?->clave === 'EN_ESPERA_DE_PAGO')<button type="button" data-modal-open="validar-pago" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">Validar pago</button>@endif
                 @if ($puedeRechazar)<button type="button" data-modal-open="rechazar-pago" class="rounded-lg border border-rose-700 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50">Rechazar solicitud</button>@endif
-                @if ($solicitud->estado?->clave === 'EN_REVISION_FINAL' && $modalidades->contains('EN_LINEA'))<a href="{{ route('solicitudes.show', [$solicitud, 'aprobar' => 1]) }}" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">Aprobar solicitud</a>@endif
+                @if ($puedeAprobar)<a href="{{ route('solicitudes.show', [$solicitud, 'aprobar' => 1]) }}" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">Aprobar solicitud</a>@endif
             </section>
             @if (($solicitud->flujo_pago === 'PAGO_DIRECTO' && $solicitud->estado?->clave === 'ENVIADA') || ($solicitud->flujo_pago === 'PAGO_POST_VALIDACION' && $solicitud->estado?->clave === 'VALIDADA_PARA_PAGO'))
                 <dialog id="previsualizar-referencia-pago" data-referencia-pago-preview class="m-auto w-[min(96vw,960px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50">
@@ -64,8 +87,8 @@
                     </form>
                 </dialog>
             @endif
-            <dialog id="validar-pago" class="m-auto w-[min(96vw,620px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50"><div class="border-b border-neza-line px-6 py-4"><h2 class="text-lg font-bold">Validar pago</h2></div><form action="{{ route('solicitudes.pagos.validar', $solicitud) }}" method="POST" class="p-6" data-confirm-action data-confirm-title="¿Validar pago?" data-confirm-text="El pago se marcará como confirmado y pasará a revisión final." data-confirm-button="Sí, validar pago">@csrf<p class="text-sm text-neza-muted">Confirma que el pago fue validado para enviarlo a revisión final.</p><button class="mt-4 rounded-lg bg-neza-wine px-4 py-2.5 text-sm font-semibold text-white">Validar pago</button></form></dialog>
-            <dialog id="rechazar-pago" class="m-auto w-[min(96vw,620px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50"><div class="border-b border-neza-line px-6 py-4"><h2 class="text-lg font-bold">Rechazar solicitud</h2></div><form action="{{ route('solicitudes.rechazar', $solicitud) }}" method="POST" class="p-6" data-confirm-action data-confirm-title="¿Rechazar solicitud?" data-confirm-text="El motivo se enviará a la ciudadanía." data-confirm-button="Sí, rechazar">@csrf<label for="motivo-pago" class="block text-sm font-semibold">Motivo <span class="text-rose-700">*</span></label><textarea id="motivo-pago" name="motivo" required maxlength="5000" class="mt-2 min-h-28 w-full rounded-lg border border-neza-line px-3 py-2 text-sm"></textarea><button class="mt-4 rounded-lg bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white">Rechazar</button></form></dialog>
+            <dialog id="validar-pago" class="m-auto w-[min(96vw,620px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50"><div class="border-b border-neza-line px-6 py-4"><h2 class="text-lg font-bold">Validar pago</h2></div><form action="{{ route('solicitudes.pagos.validar', $solicitud) }}" method="POST" class="p-6" data-confirm-action data-confirm-title="¿Validar pago?" data-confirm-text="El pago se marcará como confirmado y pasará a revisión final." data-confirm-button="Sí, validar pago">@csrf @if ($solicitud->pago?->tieneComprobante())<a href="{{ route('solicitudes.pagos.comprobante.descargar', $solicitud) }}" class="text-sm font-semibold text-neza-wine underline-offset-2 hover:underline">Descargar comprobante de pago</a>@else<p class="text-sm font-semibold text-amber-800">La ciudadanía aún no ha subido el comprobante de pago.</p>@endif<p class="mt-2 text-sm text-neza-muted">Confirma que el pago fue validado para enviarlo a revisión final.</p><button class="mt-4 rounded-lg bg-neza-wine px-4 py-2.5 text-sm font-semibold text-white">Validar pago</button></form></dialog>
+            <dialog id="rechazar-pago" class="m-auto w-[min(96vw,620px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50"><div class="flex items-center justify-between border-b border-neza-line px-6 py-4"><h2 class="text-lg font-bold">Rechazar solicitud</h2><button type="button" data-modal-close="rechazar-pago" class="rounded-lg p-2 text-neza-muted hover:bg-neza-canvas" aria-label="Cerrar rechazo"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button></div><form action="{{ route('solicitudes.rechazar', $solicitud) }}" method="POST" class="p-6" data-confirm-action data-confirm-title="¿Rechazar solicitud?" data-confirm-text="El motivo se enviará a la ciudadanía." data-confirm-button="Sí, rechazar">@csrf<label for="motivo-pago" class="block text-sm font-semibold">Motivo <span class="text-rose-700">*</span></label><textarea id="motivo-pago" name="motivo" required maxlength="5000" class="mt-2 min-h-28 w-full rounded-lg border border-neza-line px-3 py-2 text-sm"></textarea><div class="mt-4 flex flex-wrap justify-end gap-3"><button type="button" data-modal-close="rechazar-pago" class="rounded-lg border border-neza-line px-4 py-2.5 text-sm font-semibold text-neza-ink hover:bg-neza-canvas">Cancelar</button><button type="submit" class="rounded-lg bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white">Rechazar</button></div></form></dialog>
         @endif
         <dialog id="comentario" @if ($errors->has('comentario')) open @endif class="m-auto w-[min(96vw,620px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50">
             <div class="flex items-center justify-between border-b border-neza-line px-6 py-4"><h2 class="text-lg font-bold text-neza-ink">Comentario para la ciudadanía</h2><button type="button" data-modal-close="comentario" class="rounded-lg p-2 text-neza-muted hover:bg-neza-canvas" aria-label="Cancelar y cerrar"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button></div>
@@ -81,7 +104,7 @@
         @if ($puedeRechazar && ($solicitud->flujo_pago === 'SIN_PAGO' || $puedeSolicitarCorreccion))
             @if ($solicitud->flujo_pago === 'SIN_PAGO')
             <section class="flex flex-wrap justify-end gap-3">
-                @if ($solicitud->flujo_pago === 'SIN_PAGO' && $solicitud->estado?->clave === 'ENVIADA' && $modalidades->contains('EN_LINEA'))
+                @if ($puedeAprobar)
                     <button type="button" data-modal-open="aprobar" class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">Aprobar solicitud</button>
                 @endif
                 @if ($solicitud->flujo_pago === 'SIN_PAGO')<button type="button" data-modal-open="rechazar" class="rounded-lg border border-rose-700 px-4 py-2.5 text-sm font-semibold text-rose-700 hover:bg-rose-50">Rechazar solicitud</button>@endif
@@ -110,11 +133,11 @@
                     <label for="motivo" class="block text-sm font-semibold text-neza-ink">Motivo del rechazo <span class="text-rose-700">*</span></label>
                     <textarea id="motivo" name="motivo" required maxlength="5000" placeholder="Describe claramente el motivo del rechazo y, si corresponde, qué debe corregirse." class="mt-2 min-h-32 w-full rounded-lg border border-neza-line px-3 py-2 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('motivo') border-rose-600 @enderror">{{ old('motivo') }}</textarea>
                     @error('motivo')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
-                    <button type="submit" class="mt-4 rounded-lg bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-800">Rechazar solicitud</button>
+                    <div class="mt-4 flex flex-wrap justify-end gap-3"><button type="button" data-modal-close="rechazar" class="rounded-lg border border-neza-line px-4 py-2.5 text-sm font-semibold text-neza-ink hover:bg-neza-canvas">Cancelar</button><button type="submit" class="rounded-lg bg-rose-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-rose-800">Rechazar solicitud</button></div>
                 </form>
             </dialog>
         @endif
-        @if ((($solicitud->flujo_pago === 'SIN_PAGO' && $solicitud->estado?->clave === 'ENVIADA') || ($solicitud->flujo_pago !== 'SIN_PAGO' && $solicitud->estado?->clave === 'EN_REVISION_FINAL')) && $modalidades->contains('EN_LINEA'))
+        @if ($puedeAprobar)
             <dialog id="aprobar" @if (request('aprobar')) open @endif class="m-auto w-[min(96vw,680px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50">
                 <div class="flex items-center justify-between border-b border-neza-line px-6 py-4"><h2 class="text-lg font-bold text-neza-ink">Aprobar solicitud</h2><a href="{{ route('solicitudes.show', $solicitud) }}" class="rounded-lg p-2 text-neza-muted hover:bg-neza-canvas" aria-label="Cerrar aprobación"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></a></div>
                 <div class="p-6">
@@ -154,10 +177,135 @@
             <section id="datos-proporcionados" class="scroll-mt-6 overflow-hidden rounded-xl border border-neza-line bg-white shadow-sm" aria-labelledby="datos-proporcionados-titulo">
                 <div class="flex flex-col gap-2 border-b border-neza-line px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div><h2 id="datos-proporcionados-titulo" class="text-lg font-bold text-neza-ink">Datos proporcionados</h2><p class="mt-1 text-sm text-neza-muted">Información capturada en el formulario enviado por la ciudadanía.</p></div>@if ($tieneRespuestas)<span class="w-fit rounded-full bg-neza-wine-soft px-3 py-1 text-xs font-bold text-neza-wine">{{ $respuestasPorSeccion->count() }} {{ $respuestasPorSeccion->count() === 1 ? 'sección' : 'secciones' }}</span>@endif</div>
                 <div class="divide-y divide-neza-line">
-                    @if ($datosPersonales->isNotEmpty())<article class="p-5 sm:p-6"><h3 class="text-base font-bold text-neza-ink">Datos de la persona solicitante</h3><dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">@foreach ($datosPersonales as $etiqueta => $valor)<div class="rounded-lg border border-neza-line bg-neza-canvas px-4 py-3"><dt class="text-xs font-bold uppercase tracking-wide text-neza-muted">{{ $etiqueta }}</dt><dd @class(['mt-1 break-words text-sm font-medium leading-6 text-neza-ink', 'font-mono' => $etiqueta === 'CURP'])>{{ $valor }}</dd></div>@endforeach</dl></article>@endif
-                    @foreach ($respuestasPorSeccion as $seccion => $respuestas)<article class="p-5 sm:p-6"><h3 class="text-base font-bold text-neza-ink">{{ $seccion }}</h3><dl class="mt-4 grid gap-3 sm:grid-cols-2">@foreach ($respuestas as $respuesta)<div class="rounded-lg border border-neza-line bg-neza-canvas px-4 py-3"><dt class="text-xs font-bold uppercase tracking-wide text-neza-muted">{{ $respuesta->campo_etiqueta }}</dt><dd class="mt-1 whitespace-pre-wrap break-words text-sm font-medium leading-6 text-neza-ink">{{ $respuesta->valor }}</dd></div>@endforeach</dl></article>@endforeach
+                    @if ($datosPersonales->isNotEmpty())
+                        <article class="p-5 sm:p-6">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <h3 class="text-base font-bold text-neza-ink">Datos de la persona solicitante</h3>
+                                @if ($puedeEditarRespuestas)
+                                    <button type="button" data-modal-open="editar-datos-personales" class="inline-flex w-fit items-center gap-2 rounded-lg border border-neza-wine px-3 py-2 text-xs font-semibold text-neza-wine hover:bg-neza-wine-soft">
+                                        <svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
+                                        Editar
+                                    </button>
+                                @endif
+                            </div>
+                            <dl class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                @foreach ($datosPersonales as $etiqueta => $valor)
+                                    <div class="rounded-lg border border-neza-line bg-neza-canvas px-4 py-3">
+                                        <dt class="text-xs font-bold uppercase tracking-wide text-neza-muted">{{ $etiqueta }}</dt>
+                                        <dd @class(['mt-1 break-words text-sm font-medium leading-6 text-neza-ink', 'font-mono' => $etiqueta === 'CURP'])>{{ $valor }}</dd>
+                                    </div>
+                                @endforeach
+                            </dl>
+                        </article>
+                    @endif
+                    @foreach ($respuestasPorSeccion as $seccionId => $respuestas)
+                        @php($seccionFormulario = $seccionesFormulario->get($seccionId))
+                        <article class="p-5 sm:p-6">
+                            <div class="flex flex-wrap items-start justify-between gap-3">
+                                <h3 class="text-base font-bold text-neza-ink">{{ $seccionFormulario?->titulo ?? $respuestas->first()->seccion_titulo }}</h3>
+                                @if ($puedeEditarRespuestas && $seccionFormulario && $seccionFormulario->campos->where('tipo', '!=', 'FILE')->isNotEmpty())
+                                    <button type="button" data-modal-open="editar-seccion-{{ $seccionId }}" class="inline-flex w-fit items-center gap-2 rounded-lg border border-neza-wine px-3 py-2 text-xs font-semibold text-neza-wine hover:bg-neza-wine-soft">
+                                        <svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
+                                        Editar
+                                    </button>
+                                @endif
+                            </div>
+                            <dl class="mt-4 grid gap-3 sm:grid-cols-2">
+                                @foreach ($respuestas as $respuesta)
+                                    <div class="rounded-lg border border-neza-line bg-neza-canvas px-4 py-3">
+                                        <dt class="text-xs font-bold uppercase tracking-wide text-neza-muted">{{ $respuesta->campo_etiqueta }}</dt>
+                                        <dd class="mt-1 whitespace-pre-wrap break-words text-sm font-medium leading-6 text-neza-ink">{{ $respuesta->valor }}</dd>
+                                    </div>
+                                @endforeach
+                            </dl>
+                        </article>
+                    @endforeach
                 </div>
             </section>
+        @endif
+
+        @if ($puedeEditarRespuestas && $tieneDatosProporcionados)
+            @if ($datosPersonales->isNotEmpty())
+                <dialog id="editar-datos-personales" @if (old('formulario') === 'datos-personales') open @endif class="m-auto w-[min(96vw,760px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50">
+                    <div class="flex items-start justify-between gap-4 border-b border-neza-line px-6 py-4">
+                        <div>
+                            <h2 class="text-lg font-bold text-neza-ink">Editar datos de la persona solicitante</h2>
+                            <p class="mt-1 text-sm text-neza-muted">Corrige errores de captura u ortografía. Los cambios quedarán registrados en la auditoría del expediente.</p>
+                        </div>
+                        <button type="button" data-modal-close="editar-datos-personales" class="rounded-lg p-2 text-neza-muted hover:bg-neza-canvas" aria-label="Cerrar edición de datos personales"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
+                    </div>
+                    <form action="{{ route('solicitudes.datos-personales.actualizar', $solicitud) }}" method="POST" class="p-6" data-confirm-action data-confirm-title="¿Guardar cambios?" data-confirm-text="Se actualizarán los datos de la persona solicitante y quedará registro de la edición en la auditoría." data-confirm-button="Sí, guardar">
+                        @csrf
+                        @method('PUT')
+                        <input type="hidden" name="formulario" value="datos-personales">
+                        <div class="grid gap-4 sm:grid-cols-2">
+                            <div class="sm:col-span-2">
+                                <label for="editar-nombres-solicitante" class="block text-sm font-semibold text-neza-ink">Nombre(s) <span class="text-rose-700">*</span></label>
+                                <input id="editar-nombres-solicitante" name="nombres_solicitante" value="{{ old('nombres_solicitante', $solicitud->nombres_solicitante) }}" maxlength="100" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('nombres_solicitante') border-rose-600 @enderror">
+                                @error('nombres_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="editar-paterno-solicitante" class="block text-sm font-semibold text-neza-ink">Apellido paterno <span class="text-rose-700">*</span></label>
+                                <input id="editar-paterno-solicitante" name="apellido_paterno_solicitante" value="{{ old('apellido_paterno_solicitante', $solicitud->apellido_paterno_solicitante) }}" maxlength="100" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('apellido_paterno_solicitante') border-rose-600 @enderror">
+                                @error('apellido_paterno_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="editar-materno-solicitante" class="block text-sm font-semibold text-neza-ink">Apellido materno <span class="text-rose-700">*</span></label>
+                                <input id="editar-materno-solicitante" name="apellido_materno_solicitante" value="{{ old('apellido_materno_solicitante', $solicitud->apellido_materno_solicitante) }}" maxlength="100" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('apellido_materno_solicitante') border-rose-600 @enderror">
+                                @error('apellido_materno_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="editar-curp-consulta" class="block text-sm font-semibold text-neza-ink">CURP <span class="text-rose-700">*</span></label>
+                                <input id="editar-curp-consulta" name="curp_consulta" value="{{ old('curp_consulta', $solicitud->curp_consulta) }}" maxlength="18" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm uppercase focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('curp_consulta') border-rose-600 @enderror">
+                                @error('curp_consulta')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="editar-email-contacto" class="block text-sm font-semibold text-neza-ink">Correo electrónico <span class="text-rose-700">*</span></label>
+                                <input id="editar-email-contacto" name="email_contacto" type="email" value="{{ old('email_contacto', $solicitud->email_contacto) }}" maxlength="200" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('email_contacto') border-rose-600 @enderror">
+                                @error('email_contacto')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                            <div class="sm:col-span-2">
+                                <label for="editar-telefono-contacto" class="block text-sm font-semibold text-neza-ink">Número telefónico <span class="text-rose-700">*</span></label>
+                                <input id="editar-telefono-contacto" name="telefono_contacto" type="tel" value="{{ old('telefono_contacto', $solicitud->telefono_contacto) }}" maxlength="30" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('telefono_contacto') border-rose-600 @enderror">
+                                @error('telefono_contacto')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                        </div>
+                        <p class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">La CURP y el correo son la llave de consulta de la ciudadanía. Si los corriges, la persona deberá usar los nuevos datos para consultar su trámite.</p>
+                        <div class="mt-5 flex flex-wrap justify-end gap-3">
+                            <button type="button" data-modal-close="editar-datos-personales" class="rounded-lg border border-neza-line px-4 py-2.5 text-sm font-semibold text-neza-ink hover:bg-neza-canvas">Cancelar</button>
+                            <button type="submit" class="rounded-lg bg-neza-wine px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">Guardar cambios</button>
+                        </div>
+                    </form>
+                </dialog>
+            @endif
+
+            @foreach ($respuestasPorSeccion as $seccionId => $respuestas)
+                @php($seccionFormulario = $seccionesFormulario->get($seccionId))
+                @php($camposEditables = $seccionFormulario?->campos->where('tipo', '!=', 'FILE'))
+                @if ($seccionFormulario && $camposEditables->isNotEmpty())
+                    <dialog id="editar-seccion-{{ $seccionId }}" @if (old('seccion') === $seccionId) open @endif class="m-auto w-[min(96vw,760px)] rounded-xl border border-neza-line bg-white p-0 shadow-2xl backdrop:bg-neza-ink/50">
+                        <div class="flex items-start justify-between gap-4 border-b border-neza-line px-6 py-4">
+                            <div>
+                                <h2 class="text-lg font-bold text-neza-ink">Editar {{ $seccionFormulario->titulo }}</h2>
+                                <p class="mt-1 text-sm text-neza-muted">Corrige errores de captura u ortografía. Los cambios quedarán registrados en la auditoría del expediente.</p>
+                            </div>
+                            <button type="button" data-modal-close="editar-seccion-{{ $seccionId }}" class="rounded-lg p-2 text-neza-muted hover:bg-neza-canvas" aria-label="Cerrar edición de {{ $seccionFormulario->titulo }}"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button>
+                        </div>
+                        <form action="{{ route('solicitudes.respuestas.actualizar', [$solicitud, $seccionId]) }}" method="POST" class="p-6" data-confirm-action data-confirm-title="¿Guardar cambios?" data-confirm-text="Se actualizarán los datos de esta sección y quedará registro de la edición en la auditoría." data-confirm-button="Sí, guardar">
+                            @csrf
+                            @method('PUT')
+                            <input type="hidden" name="seccion" value="{{ $seccionId }}">
+                            <div class="space-y-4">
+                                @include('solicitudes.partials.campos-edicion', ['campos' => $camposEditables, 'valores' => $valoresRespuestas])
+                            </div>
+                            <div class="mt-5 flex flex-wrap justify-end gap-3">
+                                <button type="button" data-modal-close="editar-seccion-{{ $seccionId }}" class="rounded-lg border border-neza-line px-4 py-2.5 text-sm font-semibold text-neza-ink hover:bg-neza-canvas">Cancelar</button>
+                                <button type="submit" class="rounded-lg bg-neza-wine px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">Guardar cambios</button>
+                            </div>
+                        </form>
+                    </dialog>
+                @endif
+            @endforeach
         @endif
 
         @if ($tieneDocumentos)
@@ -172,13 +320,57 @@
 
         <section id="comentarios" class="scroll-mt-6 rounded-xl border border-neza-line bg-white p-6 shadow-sm">
             <div class="flex flex-col gap-4 border-b border-neza-line pb-5 sm:flex-row sm:items-start sm:justify-between">
-                <div><h2 class="text-lg font-bold text-neza-ink">Historial de comentarios</h2><p class="mt-1 text-sm text-neza-muted">Mensajes enviados a la ciudadanía desde este expediente.</p></div>
+                <div><h2 class="text-lg font-bold text-neza-ink">Historial de mensajes</h2><p class="mt-1 text-sm text-neza-muted">Comunicación entre el área responsable y la ciudadanía.</p></div>
                 <button type="button" data-modal-open="comentario" class="w-fit rounded-lg border border-neza-wine px-4 py-2.5 text-sm font-semibold text-neza-wine hover:bg-neza-wine-soft">Enviar comentario</button>
             </div>
-            <div class="mt-4 space-y-3">@forelse($comentarios as $comentario)<article class="rounded-lg bg-neza-canvas p-4"><p class="whitespace-pre-wrap text-sm text-neza-ink">{{ $comentario->texto }}</p><p class="mt-2 text-xs text-neza-muted">{{ $comentario->actor_nombre_snapshot ?: 'Servidor público' }} · {{ \Illuminate\Support\Carbon::parse($comentario->created_at)->format('d/m/Y H:i') }}</p></article>@empty<p class="text-sm text-neza-muted">No se han enviado comentarios.</p>@endforelse</div>
+            <div class="mt-4 space-y-3">@forelse($comentarios as $comentario)<article @class(['rounded-lg p-4', 'bg-neza-wine-soft' => $comentario->actor_tipo === 'CIUDADANO', 'bg-neza-canvas' => $comentario->actor_tipo !== 'CIUDADANO'])><p class="text-xs font-bold text-neza-wine">{{ $comentario->actor_tipo === 'CIUDADANO' ? 'Ciudadanía' : ($comentario->actor_nombre_snapshot ?: 'Servidor público') }}</p><p class="mt-2 whitespace-pre-wrap text-sm text-neza-ink">{{ $comentario->texto }}</p><p class="mt-2 text-xs text-neza-muted">{{ \Illuminate\Support\Carbon::parse($comentario->created_at)->format('d/m/Y H:i') }}</p></article>@empty<p class="text-sm text-neza-muted">No se han enviado comentarios.</p>@endforelse</div>
         </section>
 
         <dialog id="documento-previsualizador" class="m-auto w-[min(96vw,1100px)] rounded-xl border border-neza-line p-0 shadow-2xl backdrop:bg-neza-ink/50"><div class="flex items-center justify-between border-b border-neza-line px-5 py-4"><h2 id="documento-previsualizador-titulo" class="truncate pr-4 text-base font-bold text-neza-ink">Previsualización</h2><button type="button" data-document-preview-close class="rounded-lg p-2 text-neza-muted hover:bg-neza-canvas hover:text-neza-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine" aria-label="Cerrar previsualización"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button></div><iframe id="documento-previsualizador-marco" title="Previsualización del documento" class="h-[72vh] w-full bg-neza-canvas" src="about:blank"></iframe></dialog>
     </div>
+
+    <script>
+        document.querySelectorAll('[data-domicilio-admin]').forEach((bloque) => {
+            const url = bloque.dataset.indiceUrl;
+            const codigoPostal = bloque.querySelector('[data-domicilio-campo="codigo_postal"]');
+            const colonia = bloque.querySelector('[data-domicilio-campo="colonia"]');
+            const colonias = bloque.querySelector('[data-domicilio-colonias]');
+            const calles = bloque.querySelector('[data-domicilio-calles]');
+
+            if (!url || !colonia || !colonias || !calles) return;
+
+            let indice;
+            const normalizar = (valor) => String(valor).trim().toLocaleUpperCase();
+            const llenar = (lista, valores) => lista.replaceChildren(...valores.map((valor) => Object.assign(document.createElement('option'), { value: String(valor) })));
+            const cargar = () => {
+                if (!indice) {
+                    indice = fetch(url, { headers: { Accept: 'application/json' } })
+                        .then((respuesta) => respuesta.ok ? respuesta.json() : {})
+                        .then((datos) => datos.porColonia ?? {});
+                }
+
+                return indice;
+            };
+            const actualizar = () => {
+                cargar().then((datos) => {
+                    const nombre = Object.keys(datos).find((clave) => normalizar(clave) === normalizar(colonia.value));
+
+                    if (!nombre) return;
+
+                    if (codigoPostal) {
+                        codigoPostal.value = (datos[nombre].codigosPostales ?? [])[0] ?? codigoPostal.value;
+                    }
+
+                    llenar(calles, datos[nombre].calles ?? []);
+                }).catch(() => {});
+            };
+
+            cargar().then((datos) => llenar(colonias, Object.keys(datos))).then(() => {
+                if (colonia.value) actualizar();
+            }).catch(() => {});
+
+            colonia.addEventListener('change', actualizar);
+        });
+    </script>
 @endsection
 

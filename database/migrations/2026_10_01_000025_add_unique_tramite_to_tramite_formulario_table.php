@@ -15,6 +15,10 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (! Schema::hasIndex('tramite_formulario', 'tramite_formulario_tramite_id_unique')) {
+            return;
+        }
+
         Schema::table('tramite_formulario', function (Blueprint $table) {
             $table->dropUnique('tramite_formulario_tramite_id_unique');
         });

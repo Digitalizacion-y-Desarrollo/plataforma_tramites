@@ -73,8 +73,20 @@ return new class extends Migration
         Schema::table('campo_condiciones', function (Blueprint $table) {
             $table->dropForeign(['grupo_destino_id']);
             $table->dropColumn('grupo_destino_id');
-            $table->uuid('campo_destino_id')->nullable(false)->change();
         });
+
+        // campo_destino_id se vuelve obligatorio solo si no existen condiciones
+        // dirigidas a un grupo (campo_destino_id NULL). Revertirlo con esos datos
+        // provocaría un error y obligaría a borrar configuración válida.
+        $hayCondicionesDeGrupo = DB::table('campo_condiciones')
+            ->whereNull('campo_destino_id')
+            ->exists();
+
+        if (! $hayCondicionesDeGrupo) {
+            Schema::table('campo_condiciones', function (Blueprint $table) {
+                $table->uuid('campo_destino_id')->nullable(false)->change();
+            });
+        }
 
         Schema::dropIfExists('formulario_grupo_campo');
         Schema::dropIfExists('formulario_grupos_campos');

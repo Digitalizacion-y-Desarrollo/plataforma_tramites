@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Mail\TokenConsultaMail;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\RateLimiter;
@@ -85,6 +86,55 @@ class ConsultaCiudadanaTest extends TestCase
         $this->get(route('consulta.solicitudes'))->assertRedirect(route('portal.publico').'#consulta');
     }
 
+    public function test_citizen_can_reply_once_to_the_latest_public_staff_comment(): void
+    {
+        $solicitud = $this->crearSolicitud('ana@example.test', 'SOL-ANA');
+        $comentario = (string) Str::uuid();
+        DB::table('solicitud_observaciones')->insert([
+            'id' => $comentario,
+            'solicitud_id' => $solicitud,
+            'texto' => 'Comparte la aclaración solicitada.',
+            'visible_ciudadano' => true,
+            'actor_tipo' => 'SERVIDOR_PUBLICO',
+            'actor_accesos_id' => 'empleado-1',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+        $this->withSession(['consulta_ciudadana' => ['curp' => self::CURP, 'email' => 'ana@example.test', 'expira' => now()->addMinutes(30)->timestamp]]);
+
+        $this->get(route('consulta.solicitudes.detalle', $solicitud))
+            ->assertOk()
+            ->assertSee('Responder al área responsable');
+        $this->post(route('consulta.solicitudes.comentarios.store', $solicitud), ['comentario' => 'Ya corregí la información solicitada.'])
+            ->assertRedirect(route('consulta.solicitudes.detalle', $solicitud))
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('solicitud_observaciones', [
+            'solicitud_id' => $solicitud,
+            'respuesta_a_id' => $comentario,
+            'actor_tipo' => 'CIUDADANO',
+            'texto' => 'Ya corregí la información solicitada.',
+        ]);
+        $this->get(route('consulta.solicitudes.detalle', $solicitud))
+            ->assertOk()
+            ->assertSee('Ya corregí la información solicitada.')
+            ->assertDontSee('Responder al área responsable');
+        $this->post(route('consulta.solicitudes.comentarios.store', $solicitud), ['comentario' => 'Segundo mensaje'])
+            ->assertStatus(422);
+    }
+
+    public function test_citizen_cannot_reply_without_a_current_staff_comment_or_to_another_request(): void
+    {
+        $propia = $this->crearSolicitud('ana@example.test', 'SOL-ANA');
+        $ajena = $this->crearSolicitud('otra@example.test', 'SOL-OTRA');
+        $this->withSession(['consulta_ciudadana' => ['curp' => self::CURP, 'email' => 'ana@example.test', 'expira' => now()->addMinutes(30)->timestamp]]);
+
+        $this->post(route('consulta.solicitudes.comentarios.store', $propia), ['comentario' => 'No debo poder enviar esto'])
+            ->assertStatus(422);
+        $this->post(route('consulta.solicitudes.comentarios.store', $ajena), ['comentario' => 'No debo ver esta solicitud'])
+            ->assertNotFound();
+    }
+
     public function test_document_download_requires_ownership_approval_and_validity(): void
     {
         Storage::fake('local');
@@ -137,6 +187,57 @@ class ConsultaCiudadanaTest extends TestCase
         DB::table('solicitud_estados')->insert(['id' => 3, 'clave' => 'EN_REVISION_FINAL', 'nombre' => 'En revisión final']);
         DB::table('solicitudes')->where('id', $propia)->update(['solicitud_estado_id' => 3]);
         $this->get(route('consulta.pagos.referencia.descargar', $pagoPropio))->assertNotFound();
+    }
+
+    public function test_citizen_can_upload_payment_receipt_for_own_pending_payment(): void
+    {
+        Storage::fake('local');
+        $propia = $this->crearSolicitud('ana@example.test', 'SOL-ANA');
+        $ajena = $this->crearSolicitud('otra@example.test', 'SOL-OTRA');
+        DB::table('solicitud_estados')->insert(['id' => 2, 'clave' => 'EN_ESPERA_DE_PAGO', 'nombre' => 'En espera de pago']);
+        DB::table('solicitudes')->whereIn('id', [$propia, $ajena])->update(['solicitud_estado_id' => 2]);
+
+        $pagoPropio = (string) Str::uuid();
+        $pagoAjeno = (string) Str::uuid();
+        foreach ([[$pagoPropio, $propia], [$pagoAjeno, $ajena]] as [$id, $solicitudId]) {
+            DB::table('solicitud_pagos')->insert([
+                'id' => $id, 'solicitud_id' => $solicitudId, 'referencia' => 'NEZA-'.$id,
+                'importe' => 117.31, 'fecha_emision' => now(), 'fecha_vencimiento' => now()->addDays(30),
+                'pdf_nombre_original' => 'referencia-pago.pdf', 'pdf_storage_key' => 'pagos/'.$id.'.pdf', 'pdf_hash_archivo' => hash('sha256', $id),
+                'created_at' => now(), 'updated_at' => now(),
+            ]);
+        }
+
+        $this->withSession(['consulta_ciudadana' => ['curp' => self::CURP, 'email' => 'ana@example.test', 'expira' => now()->addMinutes(30)->timestamp]]);
+
+        $this->get(route('consulta.solicitudes.detalle', $propia))
+            ->assertOk()
+            ->assertSee('Sube tu comprobante de pago');
+
+        $this->post(route('consulta.pagos.comprobante.subir', $pagoAjeno), [
+            'comprobante' => UploadedFile::fake()->create('comprobante.pdf', 100, 'application/pdf'),
+        ])->assertNotFound();
+
+        $this->post(route('consulta.pagos.comprobante.subir', $pagoPropio), [
+            'comprobante' => UploadedFile::fake()->create('comprobante.txt', 10, 'text/plain'),
+        ])->assertSessionHasErrors('comprobante');
+
+        $this->post(route('consulta.pagos.comprobante.subir', $pagoPropio), [
+            'comprobante' => UploadedFile::fake()->create('comprobante.pdf', 100, 'application/pdf'),
+        ])->assertRedirect()->assertSessionHas('success');
+
+        $this->assertDatabaseHas('solicitud_pagos', [
+            'id' => $pagoPropio,
+            'comprobante_nombre_original' => 'comprobante.pdf',
+        ]);
+        Storage::disk('local')->assertExists(
+            DB::table('solicitud_pagos')->where('id', $pagoPropio)->value('comprobante_storage_key')
+        );
+
+        DB::table('solicitud_pagos')->where('id', $pagoPropio)->update(['fecha_vencimiento' => now()->subDay()]);
+        $this->post(route('consulta.pagos.comprobante.subir', $pagoPropio), [
+            'comprobante' => UploadedFile::fake()->create('comprobante.pdf', 100, 'application/pdf'),
+        ])->assertStatus(422);
     }
 
     public function test_five_wrong_codes_invalidate_the_token(): void
@@ -281,6 +382,12 @@ class ConsultaCiudadanaTest extends TestCase
             $table->string('pdf_nombre_original');
             $table->string('pdf_storage_key');
             $table->string('pdf_hash_archivo');
+            $table->string('comprobante_nombre_original')->nullable();
+            $table->string('comprobante_storage_key')->nullable();
+            $table->string('comprobante_mime_type')->nullable();
+            $table->unsignedBigInteger('comprobante_tamano_bytes')->nullable();
+            $table->string('comprobante_hash_archivo')->nullable();
+            $table->timestamp('fecha_comprobante')->nullable();
             $table->timestamps();
         });
         Schema::create('solicitud_historial_estados', function (Blueprint $table): void {
@@ -292,8 +399,12 @@ class ConsultaCiudadanaTest extends TestCase
             $table->uuid('id')->primary();
             $table->uuid('solicitud_id');
             $table->text('texto');
+            $table->string('tipo')->nullable();
             $table->boolean('visible_ciudadano');
-            $table->string('actor_accesos_id');
+            $table->string('actor_tipo', 30)->nullable();
+            $table->string('actor_accesos_id')->nullable();
+            $table->string('actor_nombre_snapshot')->nullable();
+            $table->uuid('respuesta_a_id')->nullable()->unique();
             $table->timestamps();
         });
         DB::table('tramites')->insert(['id' => 1, 'nombre' => 'Constancia de prueba']);

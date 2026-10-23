@@ -77,7 +77,6 @@
                                                 </div>
                                             @endforeach
                                         </div>
-                                        <p class="mt-2 text-xs text-neza-muted">Captura el domicilio completo fuera de Ciudad Nezahualcóyotl. Todos los datos, incluidos el código postal y el municipio, son editables.</p>
                                     @elseif ($campo->tipo === 'DOMICILIO_USA')
                                         <div class="mt-2 grid gap-3 sm:grid-cols-2" @error('respuestas.'.$campo->id) aria-invalid="true" @enderror>
                                             @foreach (config('formulario.campos_domicilio_usa') as $clave => $subcampo)

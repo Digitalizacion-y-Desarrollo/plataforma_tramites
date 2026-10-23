@@ -72,6 +72,21 @@
                         </td>
                     </tr>
 
+                    @if (! empty($highlightMessage))
+                        <tr>
+                            <td style="padding:0 32px 24px;">
+                                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%; background-color:#f5e9ee; border:1px solid #dcb9c7; border-left:5px solid #601633; border-radius:12px; border-collapse:separate;">
+                                    <tr>
+                                        <td style="padding:20px 22px;">
+                                            <p style="margin:0 0 10px; color:#601633; font-size:12px; font-weight:700; line-height:18px; letter-spacing:.02em; text-transform:uppercase;">{{ $highlightMessageTitle ?? 'Mensaje importante' }}</p>
+                                            <p style="margin:0; color:#340c1b; font-size:16px; font-weight:700; line-height:25px; white-space:pre-line;">{{ $highlightMessage }}</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                            </td>
+                        </tr>
+                    @endif
+
                     @if (! empty($tramiteName) || ! empty($folio) || ! empty($statusLabel) || ! empty($applicantName))
                         <tr>
                             <td style="padding:0 32px 24px;">

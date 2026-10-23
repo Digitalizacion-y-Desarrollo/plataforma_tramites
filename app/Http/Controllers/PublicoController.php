@@ -12,6 +12,7 @@ use App\Models\SolicitudDocumentoEmitido;
 use App\Models\SolicitudPago;
 use App\Models\Tramite;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -48,13 +49,22 @@ class PublicoController extends Controller
             'q' => ['nullable', 'string', 'max:150'],
             'modalidad' => ['nullable', 'array'],
             'modalidad.*' => ['string', 'max:20'],
+            'dependencia' => ['nullable', 'string', 'max:100'],
         ]);
         $tramites = $this->tramitesPublicados()->map(function ($tramite) {
             return (object) [
                 'tramite' => $tramite,
                 'modalidad' => $this->modalidadEtiqueta($tramite),
+                'dependencia_clave' => $this->claveDependencia($tramite),
+                'dependencia_nombre' => $this->etiquetaDependencia($tramite->departamento_nombre_snapshot),
             ];
         });
+
+        $dependencias = $tramites
+            ->map(fn ($carta) => ['clave' => $carta->dependencia_clave, 'nombre' => $carta->dependencia_nombre])
+            ->unique('clave')
+            ->sortBy('nombre')
+            ->values();
 
         $modalidadesDisponibles = $tramites->pluck('modalidad')->filter()->unique()->sort()->values();
         $termino = trim($filtros['q'] ?? '');
@@ -64,19 +74,42 @@ class PublicoController extends Controller
                 $tramite = $carta->tramite;
 
                 return str_contains(mb_strtolower($tramite->nombre, 'UTF-8'), $termino)
-                    || str_contains(mb_strtolower((string) $tramite->descripcion, 'UTF-8'), $termino);
+                    || str_contains(mb_strtolower((string) $tramite->descripcion, 'UTF-8'), $termino)
+                    || str_contains(mb_strtolower($carta->dependencia_nombre, 'UTF-8'), $termino);
             });
         }
         $seleccion = array_values(array_intersect($modalidadesDisponibles->all(), $filtros['modalidad'] ?? []));
         if ($seleccion !== []) {
-            $tramites = $tramites->filter(fn ($carta) => in_array($carta->modalidad, $seleccion, true))->values();
+            $tramites = $tramites->filter(fn ($carta) => in_array($carta->modalidad, $seleccion, true));
+        }
+        $totalSinFiltroDependencia = $tramites->count();
+        $conteosDependencias = $tramites->countBy('dependencia_clave');
+        $dependencias = $dependencias->map(fn (array $dependencia) => [
+            ...$dependencia,
+            'total' => (int) $conteosDependencias->get($dependencia['clave'], 0),
+        ]);
+        $claveDependencia = (string) ($filtros['dependencia'] ?? '');
+        $dependenciaSeleccionada = $dependencias->contains('clave', $claveDependencia) ? $claveDependencia : '';
+        if ($dependenciaSeleccionada !== '') {
+            $tramites = $tramites->filter(fn ($carta) => $carta->dependencia_clave === $dependenciaSeleccionada);
         }
 
+        $grupos = $tramites
+            ->groupBy('dependencia_clave')
+            ->map(fn ($cartas) => [
+                'nombre' => $cartas->first()->dependencia_nombre,
+                'tramites' => $cartas->pluck('tramite')->values(),
+            ])
+            ->sortBy('nombre')
+            ->values();
+
         return view('publico.tramites.index', [
-            'tramites' => $tramites->pluck('tramite'),
+            'grupos' => $grupos,
+            'dependencias' => $dependencias,
             'modalidades' => $modalidadesDisponibles,
-            'filtros' => ['q' => $termino, 'modalidad' => $seleccion],
+            'filtros' => ['q' => $termino, 'modalidad' => $seleccion, 'dependencia' => $dependenciaSeleccionada],
             'total' => $tramites->count(),
+            'totalSinFiltroDependencia' => $totalSinFiltroDependencia,
             'canalesAyuda' => Schema::hasTable('canales_ayuda') ? CanalAyuda::query()->first() : null,
         ]);
     }
@@ -418,9 +451,81 @@ class PublicoController extends Controller
             ->where('historial.solicitud_id', $solicitud->id)
             ->orderBy('historial.fecha')->get(['estado.nombre as estado', 'historial.fecha']);
         $observaciones = DB::table('solicitud_observaciones')->where('solicitud_id', $solicitud->id)
-            ->where('visible_ciudadano', true)->orderBy('created_at')->get(['texto', 'created_at']);
+            ->where('visible_ciudadano', true)->orderBy('created_at')
+            ->get(['id', 'respuesta_a_id', 'texto', 'actor_tipo', 'actor_nombre_snapshot', 'created_at']);
+        $comentarioPendiente = DB::table('solicitud_observaciones as observacion')
+            ->where('observacion.solicitud_id', $solicitud->id)
+            ->where('observacion.visible_ciudadano', true)
+            ->where('observacion.actor_tipo', 'SERVIDOR_PUBLICO')
+            ->whereNotExists(function ($consulta): void {
+                $consulta->selectRaw('1')
+                    ->from('solicitud_observaciones as respuesta')
+                    ->whereColumn('respuesta.respuesta_a_id', 'observacion.id');
+            })
+            ->orderByDesc('observacion.created_at')
+            ->first(['observacion.id']);
+        $puedeResponderComentario = $comentarioPendiente !== null;
 
-        return view('publico.solicitudes.detalle', compact('solicitud', 'historial', 'observaciones', 'pago'));
+        return view('publico.solicitudes.detalle', compact('solicitud', 'historial', 'observaciones', 'pago', 'puedeResponderComentario'));
+    }
+
+    public function responderComentario(Request $request, Solicitud $solicitud): RedirectResponse
+    {
+        $acceso = $this->accesoCiudadano($request);
+        abort_unless($solicitud->curp_consulta === $acceso['curp'] && Str::lower($solicitud->email_contacto) === $acceso['email'], 404);
+        $datos = $request->validate(['comentario' => ['required', 'string', 'max:5000']]);
+        $texto = trim($datos['comentario']);
+
+        if ($texto === '') {
+            return back()->withErrors(['comentario' => 'Escribe un mensaje antes de enviarlo.'])->withInput();
+        }
+
+        DB::transaction(function () use ($request, $solicitud, $texto): void {
+            $comentarioServidor = DB::table('solicitud_observaciones as observacion')
+                ->where('observacion.solicitud_id', $solicitud->id)
+                ->where('observacion.visible_ciudadano', true)
+                ->where('observacion.actor_tipo', 'SERVIDOR_PUBLICO')
+                ->whereNotExists(function ($consulta): void {
+                    $consulta->selectRaw('1')
+                        ->from('solicitud_observaciones as respuesta')
+                        ->whereColumn('respuesta.respuesta_a_id', 'observacion.id');
+                })
+                ->orderByDesc('observacion.created_at')
+                ->lockForUpdate()
+                ->first(['observacion.id']);
+
+            abort_unless($comentarioServidor, 422, 'No hay un comentario del área responsable pendiente de respuesta.');
+
+            DB::table('solicitud_observaciones')->insert([
+                'id' => (string) Str::uuid(),
+                'solicitud_id' => $solicitud->id,
+                'respuesta_a_id' => $comentarioServidor->id,
+                'texto' => $texto,
+                'tipo' => 'RESPUESTA_CIUDADANO',
+                'visible_ciudadano' => true,
+                'actor_tipo' => 'CIUDADANO',
+                'actor_nombre_snapshot' => $solicitud->nombre_solicitante_snapshot ?: 'Ciudadanía',
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
+            if (Schema::hasTable('auditorias')) {
+                DB::table('auditorias')->insert([
+                    'id' => (string) Str::uuid(),
+                    'actor_accesos_id' => null,
+                    'actor_nombre_snapshot' => $solicitud->nombre_solicitante_snapshot ?: 'Ciudadanía',
+                    'accion' => 'COMENTARIO_CIUDADANO_ENVIADO',
+                    'entidad' => 'SOLICITUD_OBSERVACION',
+                    'entidad_id' => $comentarioServidor->id,
+                    'datos_anteriores' => null,
+                    'datos_nuevos' => json_encode(['solicitud_id' => $solicitud->id, 'respuesta_a_id' => $comentarioServidor->id]),
+                    'ip' => $request->ip(),
+                    'created_at' => now(),
+                ]);
+            }
+        });
+
+        return redirect()->route('consulta.solicitudes.detalle', $solicitud)->with('success', 'Tu respuesta fue enviada al área responsable.');
     }
 
     public function cerrarConsulta(Request $request)
@@ -461,6 +566,45 @@ class PublicoController extends Controller
         return Storage::disk('local')->download($pago->pdf_storage_key, $pago->pdf_nombre_original);
     }
 
+    public function subirComprobantePago(Request $request, SolicitudPago $pago): RedirectResponse
+    {
+        $acceso = $this->accesoCiudadano($request);
+        $pago->load(['solicitud.estado']);
+
+        abort_unless($acceso['curp'] === $pago->solicitud->curp_consulta && $acceso['email'] === Str::lower($pago->solicitud->email_contacto), 404);
+        abort_unless($pago->solicitud->estado?->clave === 'EN_ESPERA_DE_PAGO', 422, 'La solicitud no está en espera de pago.');
+        abort_if($pago->vencido(), 422, 'La referencia de pago ya venció.');
+        abort_if($pago->fecha_pago_validado !== null, 422, 'El pago ya fue validado.');
+
+        $request->validate([
+            'comprobante' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:10240'],
+        ], [
+            'comprobante.required' => 'Selecciona tu comprobante de pago.',
+            'comprobante.file' => 'El comprobante no se pudo cargar. Intenta nuevamente.',
+            'comprobante.mimes' => 'El comprobante debe ser un archivo PDF, JPG o PNG.',
+            'comprobante.max' => 'El comprobante no debe superar los 10 MB.',
+        ]);
+
+        $archivo = $request->file('comprobante');
+        $ruta = $archivo->store('solicitudes/'.$pago->solicitud_id.'/pagos/comprobantes', 'local');
+        $anterior = $pago->comprobante_storage_key;
+
+        $pago->update([
+            'comprobante_nombre_original' => $archivo->getClientOriginalName(),
+            'comprobante_storage_key' => $ruta,
+            'comprobante_mime_type' => $archivo->getMimeType(),
+            'comprobante_tamano_bytes' => $archivo->getSize(),
+            'comprobante_hash_archivo' => hash_file('sha256', $archivo->getRealPath()),
+            'fecha_comprobante' => now(),
+        ]);
+
+        if ($anterior && $anterior !== $ruta && Storage::disk('local')->exists($anterior)) {
+            Storage::disk('local')->delete($anterior);
+        }
+
+        return back()->with('success', 'Tu comprobante de pago se cargó correctamente. El área responsable lo validará.');
+    }
+
     private function accesoCiudadano(Request $request): array
     {
         $acceso = $request->session()->get('consulta_ciudadana');
@@ -479,6 +623,35 @@ class PublicoController extends Controller
             1 => collect($tramite->modalidades ?? [])->first() === 'EN_LINEA' ? 'En línea' : 'Presencial',
             default => 'Mixto',
         };
+    }
+
+    private function claveDependencia(Tramite $tramite): string
+    {
+        $clave = trim((string) $tramite->departamento_accesos_id);
+
+        return $clave !== '' ? $clave : 'sin-dependencia';
+    }
+
+    private function etiquetaDependencia(?string $nombre): string
+    {
+        $nombre = trim((string) $nombre);
+
+        if ($nombre === '') {
+            return 'Sin dependencia asignada';
+        }
+
+        $conectores = ['de', 'del', 'la', 'las', 'los', 'y', 'e', 'el'];
+        $palabras = preg_split('/\s+/u', mb_strtolower($nombre, 'UTF-8')) ?: [];
+
+        foreach ($palabras as $indice => $palabra) {
+            if ($indice > 0 && in_array($palabra, $conectores, true)) {
+                continue;
+            }
+
+            $palabras[$indice] = mb_strtoupper(mb_substr($palabra, 0, 1, 'UTF-8'), 'UTF-8').mb_substr($palabra, 1, null, 'UTF-8');
+        }
+
+        return implode(' ', $palabras);
     }
 
     private function validarDomicilioFueraNeza(array $domicilio, bool $requerido): ?string

@@ -50,9 +50,21 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('tramite_formulario', function (Blueprint $table): void {
-            $table->unique('tramite_id', 'tramite_formulario_tramite_id_unique');
-        });
+        // El índice único de tramite_id solo se restaura si un trámite no tiene
+        // más de un vínculo. Si existen varios formularios por trámite (estado
+        // válido desde esta migración) recrearlo fallaría y obligaría a borrar
+        // información histórica, por lo que se omite.
+        $hayVinculosMultiples = DB::table('tramite_formulario')
+            ->select('tramite_id')
+            ->groupBy('tramite_id')
+            ->havingRaw('COUNT(*) > 1')
+            ->exists();
+
+        if (! $hayVinculosMultiples) {
+            Schema::table('tramite_formulario', function (Blueprint $table): void {
+                $table->unique('tramite_id', 'tramite_formulario_tramite_id_unique');
+            });
+        }
 
         Schema::table('solicitudes', function (Blueprint $table): void {
             $table->dropIndex(['departamento_accesos_id_snapshot']);

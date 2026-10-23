@@ -46,12 +46,32 @@
                         <p class="text-sm font-semibold text-neza-ink">Tu referencia de pago está lista.</p>
                         <p class="mt-1 text-sm text-neza-muted">Realiza el pago antes del {{ $pago->fecha_vencimiento->format('d/m/Y') }} para continuar con tu trámite.</p>
                         <a href="{{ route('consulta.pagos.referencia.descargar', $pago) }}" class="mt-4 inline-flex items-center gap-2 rounded-xl bg-neza-wine px-5 py-3 text-sm font-bold text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5v-9m0 9-3.75-3.75M12 16.5l3.75-3.75M3.75 17.25v1.5A2.25 2.25 0 0 0 6 21h12a2.25 2.25 0 0 0 2.25-2.25v-1.5" /></svg>Descargar referencia de pago</a>
+
+                        @if (session('success'))
+                            <p role="status" class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{{ session('success') }}</p>
+                        @endif
+
+                        @if ($pago->vencido())
+                            <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">La referencia de pago venció. Comunícate con el área responsable para continuar con tu trámite.</p>
+                        @else
+                            @if ($pago->tieneComprobante())
+                                <p class="mt-4 rounded-xl border border-neza-line bg-neza-canvas px-4 py-3 text-sm text-neza-ink">Comprobante de pago recibido el {{ $pago->fecha_comprobante?->format('d/m/Y H:i') }}. El área responsable lo validará; si necesitas reemplazarlo, puedes subir otro archivo.</p>
+                            @endif
+                            <form action="{{ route('consulta.pagos.comprobante.subir', $pago) }}" method="POST" enctype="multipart/form-data" class="mt-4 rounded-xl border border-neza-line bg-neza-canvas p-4">
+                                @csrf
+                                <label for="comprobante-pago" class="block text-sm font-bold text-neza-ink">Sube tu comprobante de pago</label>
+                                <p class="mt-1 text-xs text-neza-muted">Formatos PDF, JPG o PNG. Tamaño máximo: 10 MB.</p>
+                                <input id="comprobante-pago" name="comprobante" type="file" accept=".pdf,.jpg,.jpeg,.png" required class="mt-3 block w-full cursor-pointer rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm text-neza-ink file:mr-3 file:rounded-md file:border-0 file:bg-neza-wine-soft file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-neza-wine">
+                                @error('comprobante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                                <button type="submit" class="mt-4 inline-flex min-h-11 items-center rounded-xl bg-neza-wine px-5 text-sm font-bold text-white hover:bg-neza-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Subir comprobante de pago</button>
+                            </form>
+                        @endif
                     </div>
                 @endif
             </div>
             <div class="mt-6 grid gap-6 md:grid-cols-2">
                 <section class="rounded-2xl border border-neza-line bg-white p-6 shadow-sm" aria-labelledby="historial-titulo"><h2 id="historial-titulo" class="text-lg font-bold">Historial de estados</h2><ol class="mt-5 space-y-4 border-l-2 border-neza-line pl-5">@forelse ($historial as $evento)<li><p class="font-semibold text-neza-ink">{{ $evento->estado }}</p><p class="mt-1 text-xs text-neza-muted">{{ \Illuminate\Support\Carbon::parse($evento->fecha)->format('d/m/Y H:i') }}</p></li>@empty<li class="text-sm text-neza-muted">Aún no hay movimientos registrados.</li>@endforelse</ol></section>
-                <section class="rounded-2xl border border-neza-line bg-white p-6 shadow-sm" aria-labelledby="observaciones-titulo"><h2 id="observaciones-titulo" class="text-lg font-bold">Observaciones para ti</h2><div class="mt-5 space-y-4">@forelse ($observaciones as $observacion)<article class="rounded-xl bg-neza-canvas p-4"><p class="whitespace-pre-line text-sm text-neza-ink">{{ $observacion->texto }}</p><p class="mt-2 text-xs text-neza-muted">{{ \Illuminate\Support\Carbon::parse($observacion->created_at)->format('d/m/Y H:i') }}</p></article>@empty<p class="text-sm text-neza-muted">No hay observaciones públicas para esta solicitud.</p>@endforelse</div></section>
+                <section class="rounded-2xl border border-neza-line bg-white p-6 shadow-sm" aria-labelledby="observaciones-titulo"><h2 id="observaciones-titulo" class="text-lg font-bold">Mensajes del trámite</h2><div class="mt-5 space-y-4">@forelse ($observaciones as $observacion)<article @class(['rounded-xl p-4', 'bg-neza-wine-soft' => $observacion->actor_tipo === 'CIUDADANO', 'bg-neza-canvas' => $observacion->actor_tipo !== 'CIUDADANO'])><p class="text-xs font-bold text-neza-wine">{{ $observacion->actor_tipo === 'CIUDADANO' ? 'Tú' : 'Área responsable' }}</p><p class="mt-2 whitespace-pre-line text-sm text-neza-ink">{{ $observacion->texto }}</p><p class="mt-2 text-xs text-neza-muted">{{ \Illuminate\Support\Carbon::parse($observacion->created_at)->format('d/m/Y H:i') }}</p></article>@empty<p class="text-sm text-neza-muted">No hay mensajes para esta solicitud.</p>@endforelse</div>@if($puedeResponderComentario)<form action="{{ route('consulta.solicitudes.comentarios.store', $solicitud) }}" method="POST" class="mt-5 border-t border-neza-line pt-5">@csrf<label for="comentario" class="block text-sm font-bold text-neza-ink">Responder al área responsable</label><textarea id="comentario" name="comentario" required maxlength="5000" class="mt-2 min-h-28 w-full rounded-xl border border-neza-line bg-white px-3 py-2 text-sm text-neza-ink focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('comentario') border-rose-600 @enderror">{{ old('comentario') }}</textarea>@error('comentario')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror<button type="submit" class="mt-4 inline-flex min-h-11 items-center rounded-xl bg-neza-wine px-5 text-sm font-bold text-white hover:bg-neza-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Enviar respuesta</button></form>@endif</section>
             </div>
         </div>
     </section>

@@ -8,6 +8,8 @@ use App\Mail\SolicitudCorreccionDocumentosMail;
 use App\Mail\SolicitudRechazadaMail;
 use App\Mail\SolicitudReferenciaPagoMail;
 use App\Models\EstadoSolicitud;
+use App\Models\FormularioCampo;
+use App\Models\FormularioSeccion;
 use App\Models\Solicitud;
 use App\Models\SolicitudDocumentoEmitido;
 use App\Models\SolicitudPago;
@@ -21,11 +23,14 @@ use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\View\View;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SolicitudController extends Controller
 {
+    private const ESTADOS_EDITABLES = ['BORRADOR', 'ENVIADA', 'CORRECCION_SOLICITADA', 'VALIDADA_PARA_PAGO', 'EN_ESPERA_DE_PAGO', 'EN_REVISION_FINAL'];
+
     public function index(Request $request): View
     {
         $dependencia = $request->attributes->get('dependencia');
@@ -63,7 +68,18 @@ class SolicitudController extends Controller
         $solicitudesAprobadas = (clone $metricas)->whereHas('estado', fn ($consulta) => $consulta->where('clave', 'APROBADA'))->count();
         $solicitudesRechazadas = (clone $metricas)->whereHas('estado', fn ($consulta) => $consulta->where('clave', 'RECHAZADA'))->count();
 
-        $solicitudes = $consulta->orderByDesc('fecha_envio')->orderByDesc('created_at')->paginate(15)->withQueryString();
+        $solicitudes = $consulta
+            ->select('solicitudes.*')
+            ->selectSub(
+                DB::table('solicitud_observaciones as observacion')
+                    ->select('observacion.actor_tipo')
+                    ->whereColumn('observacion.solicitud_id', 'solicitudes.id')
+                    ->where('observacion.visible_ciudadano', true)
+                    ->orderByDesc('observacion.created_at')
+                    ->limit(1),
+                'ultimo_actor_comentario'
+            )
+            ->orderByDesc('fecha_envio')->orderByDesc('created_at')->paginate(15)->withQueryString();
         $estados = EstadoSolicitud::query()->where('activo', true)->orderBy('orden')->get(['id', 'clave', 'nombre']);
         $tramites = Tramite::query()
             ->when($nombreDependencia, fn ($consulta, string $nombre) => $consulta->where('departamento_nombre_snapshot', $nombre))
@@ -141,27 +157,57 @@ class SolicitudController extends Controller
     {
         $solicitud->load(['estado:id,clave,nombre', 'tramite:id,clave,nombre,modalidades,descarga_expira_dias', 'documentoEmitido', 'pago']);
 
-        $respuestasPorSeccion = DB::table('solicitud_respuestas as respuesta')
+        $seccionesFormulario = FormularioSeccion::query()
+            ->where('formulario_version_id', $solicitud->formulario_version_id)
+            ->where('activo', true)
+            ->with([
+                'campos' => fn ($consulta) => $consulta->where('activo', true)->orderBy('orden'),
+                'campos.opciones' => fn ($consulta) => $consulta->where('activo', true)->orderBy('orden'),
+            ])
+            ->orderBy('orden')
+            ->get()
+            ->keyBy('id');
+
+        $valoresRespuestas = DB::table('solicitud_respuestas')
+            ->where('solicitud_id', $solicitud->id)
+            ->get(['campo_id', 'valor'])
+            ->mapWithKeys(fn ($respuesta) => [$respuesta->campo_id => json_decode($respuesta->valor, true)]);
+
+        $puedeEditarRespuestas = in_array($solicitud->estado?->clave, self::ESTADOS_EDITABLES, true);
+
+        $respuestas = DB::table('solicitud_respuestas as respuesta')
             ->join('formulario_campos as campo', 'campo.id', '=', 'respuesta.campo_id')
             ->join('formulario_secciones as seccion', 'seccion.id', '=', 'campo.seccion_id')
             ->where('respuesta.solicitud_id', $solicitud->id)
             ->where('campo.tipo', '!=', 'FILE')
             ->orderBy('seccion.orden')
             ->orderBy('campo.orden')
-            ->get(['seccion.titulo as seccion_titulo', 'campo.etiqueta as campo_etiqueta', 'campo.tipo as campo_tipo', 'respuesta.valor'])
-            ->map(function ($respuesta) {
+            ->get(['seccion.id as seccion_id', 'seccion.titulo as seccion_titulo', 'campo.id as campo_id', 'campo.etiqueta as campo_etiqueta', 'campo.tipo as campo_tipo', 'respuesta.valor']);
+
+        $opcionesPorCampo = DB::table('campo_opciones')
+            ->whereIn('campo_id', $respuestas->pluck('campo_id')->unique()->all())
+            ->orderBy('orden')
+            ->get(['campo_id', 'valor', 'etiqueta'])
+            ->groupBy('campo_id');
+
+        $respuestasPorSeccion = $respuestas
+            ->map(function ($respuesta) use ($opcionesPorCampo) {
                 $valor = json_decode($respuesta->valor, true);
 
                 if (! filled($valor)) {
                     return null;
                 }
 
-                $respuesta->valor = $this->formatearValor($valor, $respuesta->campo_tipo);
+                $respuesta->valor = $this->formatearValor(
+                    $valor,
+                    $respuesta->campo_tipo,
+                    $opcionesPorCampo->get($respuesta->campo_id)
+                );
 
                 return $respuesta;
             })
             ->filter()
-            ->groupBy('seccion_titulo');
+            ->groupBy('seccion_id');
 
         $documentos = DB::table('solicitud_documentos as documento')
             ->join('requisito_documentos as requisito', 'requisito.id', '=', 'documento.requisito_documento_id')
@@ -200,9 +246,332 @@ class SolicitudController extends Controller
         $documentos = $documentos->concat($archivosDeRespuestas);
         $archivosCorregibles = $archivosDeRespuestas->values();
 
-        $comentarios = DB::table('solicitud_observaciones')->where('solicitud_id', $solicitud->id)->where('visible_ciudadano', true)->orderByDesc('created_at')->get(['texto', 'actor_nombre_snapshot', 'created_at']);
+        $comentarios = DB::table('solicitud_observaciones')
+            ->where('solicitud_id', $solicitud->id)
+            ->where('visible_ciudadano', true)
+            ->orderBy('created_at')
+            ->get(['id', 'respuesta_a_id', 'texto', 'actor_tipo', 'actor_nombre_snapshot', 'created_at']);
 
-        return view('solicitudes.show', compact('solicitud', 'respuestasPorSeccion', 'documentos', 'archivosCorregibles', 'comentarios'));
+        return view('solicitudes.show', compact('solicitud', 'respuestasPorSeccion', 'seccionesFormulario', 'valoresRespuestas', 'puedeEditarRespuestas', 'documentos', 'archivosCorregibles', 'comentarios'));
+    }
+
+    public function actualizarDatosPersonales(Request $request, Solicitud $solicitud)
+    {
+        $solicitud->loadMissing('estado:id,clave');
+        $this->autorizarEdicionRespuestas($solicitud);
+
+        $datos = $request->validate([
+            'nombres_solicitante' => ['required', 'string', 'min:2', 'max:100'],
+            'apellido_paterno_solicitante' => ['required', 'string', 'min:2', 'max:100'],
+            'apellido_materno_solicitante' => ['required', 'string', 'min:2', 'max:100'],
+            'curp_consulta' => ['required', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'],
+            'email_contacto' => ['required', 'email', 'max:200'],
+            'telefono_contacto' => ['required', 'string', 'regex:/^[0-9+()\-\s]{7,30}$/'],
+        ]);
+
+        $datos['nombres_solicitante'] = trim($datos['nombres_solicitante']);
+        $datos['apellido_paterno_solicitante'] = trim($datos['apellido_paterno_solicitante']);
+        $datos['apellido_materno_solicitante'] = trim($datos['apellido_materno_solicitante']);
+        $datos['curp_consulta'] = Str::upper(trim($datos['curp_consulta']));
+        $datos['email_contacto'] = Str::lower(trim($datos['email_contacto']));
+        $datos['telefono_contacto'] = trim($datos['telefono_contacto']);
+        $datos['nombre_solicitante_snapshot'] = implode(' ', array_filter([
+            $datos['nombres_solicitante'],
+            $datos['apellido_paterno_solicitante'],
+            $datos['apellido_materno_solicitante'],
+        ], fn ($valor) => filled($valor)));
+
+        $campos = array_keys($datos);
+        $actor = $this->actor($request);
+
+        DB::transaction(function () use ($solicitud, $datos, $campos, $actor, $request) {
+            $bloqueada = Solicitud::query()->with('estado:id,clave')->lockForUpdate()->findOrFail($solicitud->id);
+            $this->autorizarEdicionRespuestas($bloqueada);
+
+            $anteriores = $bloqueada->only($campos);
+            $nuevos = array_intersect_key($datos, array_flip($campos));
+
+            if ($anteriores == $nuevos) {
+                return;
+            }
+
+            $bloqueada->update($nuevos);
+
+            DB::table('auditorias')->insert([
+                'id' => (string) Str::uuid(),
+                'actor_accesos_id' => $actor['id'],
+                'actor_nombre_snapshot' => $actor['nombre'],
+                'accion' => 'SOLICITUD_DATOS_PERSONALES_EDITADOS',
+                'entidad' => 'SOLICITUD',
+                'entidad_id' => $bloqueada->id,
+                'datos_anteriores' => json_encode($anteriores),
+                'datos_nuevos' => json_encode($nuevos),
+                'ip' => $request->ip(),
+                'created_at' => now(),
+            ]);
+        });
+
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'Los datos de la persona solicitante se actualizaron correctamente.');
+    }
+
+    public function actualizarRespuestas(Request $request, Solicitud $solicitud, FormularioSeccion $seccion)
+    {
+        $solicitud->loadMissing('estado:id,clave');
+        $this->autorizarEdicionRespuestas($solicitud);
+        abort_unless($seccion->activo && $seccion->formulario_version_id === $solicitud->formulario_version_id, 404);
+
+        $campos = $seccion->campos()
+            ->where('activo', true)
+            ->where('tipo', '!=', 'FILE')
+            ->with(['opciones' => fn ($consulta) => $consulta->where('activo', true)->orderBy('orden')])
+            ->orderBy('orden')
+            ->get();
+
+        $reglas = [];
+        $mensajes = [];
+        foreach ($campos as $campo) {
+            $this->agregarReglasEdicion($campo, $reglas, $mensajes);
+        }
+
+        $validados = $request->validate($reglas, $mensajes);
+        $respuestas = $validados['respuestas'] ?? [];
+        $actor = $this->actor($request);
+
+        DB::transaction(function () use ($solicitud, $seccion, $campos, $respuestas, $actor, $request) {
+            $bloqueada = Solicitud::query()->with('estado:id,clave')->lockForUpdate()->findOrFail($solicitud->id);
+            $this->autorizarEdicionRespuestas($bloqueada);
+
+            $actuales = DB::table('solicitud_respuestas')
+                ->where('solicitud_id', $bloqueada->id)
+                ->whereIn('campo_id', $campos->pluck('id'))
+                ->get()
+                ->keyBy('campo_id');
+
+            $anteriores = [];
+            $nuevos = [];
+
+            foreach ($campos as $campo) {
+                $registro = $actuales->get($campo->id);
+                $anterior = $registro ? json_decode($registro->valor, true) : null;
+                $nuevo = $this->normalizarValorEdicion($campo, $respuestas[$campo->id] ?? null);
+
+                $sinCambios = $anterior === $nuevo || (is_array($anterior) && is_array($nuevo) && $anterior == $nuevo);
+
+                if ($sinCambios) {
+                    continue;
+                }
+
+                if ($nuevo === null) {
+                    if ($registro) {
+                        DB::table('solicitud_respuestas')->where('id', $registro->id)->delete();
+                    }
+                } elseif ($registro) {
+                    DB::table('solicitud_respuestas')->where('id', $registro->id)->update(['valor' => json_encode($nuevo), 'updated_at' => now()]);
+                } else {
+                    DB::table('solicitud_respuestas')->insert([
+                        'id' => (string) Str::uuid(),
+                        'solicitud_id' => $bloqueada->id,
+                        'campo_id' => $campo->id,
+                        'valor' => json_encode($nuevo),
+                        'created_at' => now(),
+                        'updated_at' => now(),
+                    ]);
+                }
+
+                $anteriores[$campo->clave] = $anterior;
+                $nuevos[$campo->clave] = $nuevo;
+            }
+
+            if ($anteriores === []) {
+                return;
+            }
+
+            DB::table('auditorias')->insert([
+                'id' => (string) Str::uuid(),
+                'actor_accesos_id' => $actor['id'],
+                'actor_nombre_snapshot' => $actor['nombre'],
+                'accion' => 'SOLICITUD_RESPUESTAS_EDITADAS',
+                'entidad' => 'SOLICITUD',
+                'entidad_id' => $bloqueada->id,
+                'datos_anteriores' => json_encode(['seccion' => $seccion->clave, 'respuestas' => $anteriores]),
+                'datos_nuevos' => json_encode(['seccion' => $seccion->clave, 'respuestas' => $nuevos]),
+                'ip' => $request->ip(),
+                'created_at' => now(),
+            ]);
+        });
+
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'Los datos de la sección se actualizaron correctamente.');
+    }
+
+    private function autorizarEdicionRespuestas(Solicitud $solicitud): void
+    {
+        abort_unless(in_array($solicitud->estado?->clave, self::ESTADOS_EDITABLES, true), 422, 'No se pueden editar los datos de una solicitud finalizada.');
+    }
+
+    private function agregarReglasEdicion(FormularioCampo $campo, array &$reglas, array &$mensajes): void
+    {
+        $clave = 'respuestas.'.$campo->id;
+        $requerido = (bool) $campo->requerido;
+        $base = [$requerido ? 'required' : 'nullable'];
+
+        $mensajes[$clave.'.required'] = 'El campo "'.$campo->etiqueta.'" es obligatorio.';
+        $mensajes[$clave.'.string'] = 'El campo "'.$campo->etiqueta.'" debe ser texto.';
+        $mensajes[$clave.'.array'] = 'El campo "'.$campo->etiqueta.'" debe ser una lista.';
+        $mensajes[$clave.'.in'] = 'Selecciona una opción válida en "'.$campo->etiqueta.'".';
+        $mensajes[$clave.'.*.in'] = 'Selecciona solo opciones válidas en "'.$campo->etiqueta.'".';
+        $mensajes[$clave.'.email'] = 'Captura un correo electrónico válido.';
+        $mensajes[$clave.'.numeric'] = 'Captura un valor numérico en "'.$campo->etiqueta.'".';
+        $mensajes[$clave.'.date'] = 'Captura una fecha válida en "'.$campo->etiqueta.'".';
+        $mensajes[$clave.'.regex'] = 'El formato de "'.$campo->etiqueta.'" no es válido.';
+        $mensajes[$clave.'.max'] = 'El campo "'.$campo->etiqueta.'" excede la longitud permitida.';
+
+        switch ($campo->tipo) {
+            case 'ESTADO':
+                $reglas[$clave] = [...$base, 'string', Rule::in(array_keys(config('formulario.entidades_federativas')))];
+                break;
+            case 'EMAIL':
+                $reglas[$clave] = [...$base, 'email:rfc'];
+                break;
+            case 'NUMBER':
+                $reglas[$clave] = [...$base, 'numeric'];
+                break;
+            case 'DATE':
+                $reglas[$clave] = [...$base, 'date'];
+                break;
+            case 'CURP':
+                $reglas[$clave] = [...$base, 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'];
+                break;
+            case 'RFC':
+                $reglas[$clave] = [...$base, 'string', 'regex:/^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i'];
+                break;
+            case 'CP':
+                $reglas[$clave] = [...$base, 'string', 'regex:/^[0-9]{5}$/'];
+                break;
+            case 'SELECT':
+            case 'RADIO':
+                $reglas[$clave] = [...$base, 'string', Rule::in($campo->opciones->pluck('valor')->all())];
+                break;
+            case 'MULTISELECT':
+                $reglas[$clave] = [...$base, 'array'];
+                $reglas[$clave.'.*'] = ['string', Rule::in($campo->opciones->pluck('valor')->all())];
+                break;
+            case 'CHECKBOX':
+                $reglas[$clave] = $requerido ? ['accepted'] : ['nullable', 'boolean'];
+                $mensajes[$clave.'.accepted'] = 'Debes marcar "'.$campo->etiqueta.'".';
+                break;
+            case 'DOMICILIO':
+            case 'DOMICILIO_FUERA_NEZA':
+            case 'DOMICILIO_USA':
+                $this->agregarReglasDomicilio($campo, $clave, $requerido, $reglas, $mensajes);
+                break;
+            case 'TEXTAREA':
+            default:
+                $reglas[$clave] = [...$base, 'string', 'max:5000'];
+        }
+    }
+
+    private function agregarReglasDomicilio(FormularioCampo $campo, string $clave, bool $requerido, array &$reglas, array &$mensajes): void
+    {
+        $reglas[$clave] = [$requerido ? 'required' : 'nullable', 'array'];
+
+        $subcampos = match ($campo->tipo) {
+            'DOMICILIO' => config('formulario.campos_domicilio'),
+            'DOMICILIO_FUERA_NEZA' => config('formulario.campos_domicilio_fuera_neza'),
+            'DOMICILIO_USA' => config('formulario.campos_domicilio_usa'),
+        };
+
+        foreach ($subcampos as $subclave => $subcampo) {
+            $claveSubcampo = $clave.'.'.$subclave;
+
+            if ($campo->tipo === 'DOMICILIO' && $subclave === 'municipio') {
+                $reglas[$claveSubcampo] = ['required', 'string', 'max:100'];
+
+                continue;
+            }
+
+            if ($campo->tipo === 'DOMICILIO' && $subclave === 'numero') {
+                $reglas[$claveSubcampo] = ['nullable', 'string', 'max:50'];
+
+                continue;
+            }
+
+            $obligatorio = $requerido && ($campo->tipo !== 'DOMICILIO_USA' || ($subcampo['requerido'] ?? true));
+            $reglasSubcampo = [$obligatorio ? 'required' : 'nullable', 'string'];
+
+            if ($subclave === 'codigo_postal') {
+                $reglasSubcampo[] = $campo->tipo === 'DOMICILIO_USA' ? 'regex:/^[0-9]{5}(-[0-9]{4})?$/' : 'regex:/^[0-9]{5}$/';
+            } elseif ($campo->tipo === 'DOMICILIO_USA' && $subclave === 'estado') {
+                $reglasSubcampo = [$obligatorio ? 'required' : 'nullable', Rule::in(array_keys(config('formulario.estados_usa')))];
+            } elseif (isset($subcampo['maxlength'])) {
+                $reglasSubcampo[] = 'max:'.$subcampo['maxlength'];
+            }
+
+            $reglas[$claveSubcampo] = $reglasSubcampo;
+            $mensajes[$claveSubcampo.'.required'] = 'Captura '.mb_strtolower($subcampo['etiqueta'], 'UTF-8').' del domicilio.';
+            $mensajes[$claveSubcampo.'.regex'] = 'El formato de '.mb_strtolower($subcampo['etiqueta'], 'UTF-8').' no es válido.';
+            $mensajes[$claveSubcampo.'.in'] = 'Selecciona un valor válido en '.mb_strtolower($subcampo['etiqueta'], 'UTF-8').'.';
+            $mensajes[$claveSubcampo.'.max'] = $subcampo['etiqueta'].' excede la longitud permitida.';
+        }
+
+        $reglas[$clave.'.latitud'] = ['nullable', 'string', 'max:50'];
+        $reglas[$clave.'.longitud'] = ['nullable', 'string', 'max:50'];
+    }
+
+    private function normalizarValorEdicion(FormularioCampo $campo, mixed $valor): mixed
+    {
+        if ($campo->tipo === 'CHECKBOX') {
+            return filled($valor) ? '1' : null;
+        }
+
+        if ($campo->tipo === 'MULTISELECT') {
+            $valores = collect(is_array($valor) ? $valor : [])
+                ->filter(fn ($elemento) => filled($elemento))
+                ->values()
+                ->all();
+
+            return $valores === [] ? null : $valores;
+        }
+
+        if (in_array($campo->tipo, ['DOMICILIO', 'DOMICILIO_FUERA_NEZA', 'DOMICILIO_USA'], true)) {
+            $subcampos = match ($campo->tipo) {
+                'DOMICILIO' => config('formulario.campos_domicilio'),
+                'DOMICILIO_FUERA_NEZA' => config('formulario.campos_domicilio_fuera_neza'),
+                'DOMICILIO_USA' => config('formulario.campos_domicilio_usa'),
+            };
+
+            $claves = array_keys($subcampos);
+            if ($campo->tipo === 'DOMICILIO') {
+                $claves = [...$claves, 'latitud', 'longitud'];
+            }
+
+            $limpio = [];
+            foreach ($claves as $subclave) {
+                $elemento = is_array($valor) ? ($valor[$subclave] ?? null) : null;
+                $elemento = is_string($elemento) ? trim($elemento) : $elemento;
+                $limpio[$subclave] = $elemento === '' ? null : $elemento;
+            }
+
+            if ($campo->tipo === 'DOMICILIO' && blank($limpio['municipio'] ?? null)) {
+                $limpio['municipio'] = config('formulario.campos_domicilio.municipio.valor');
+            }
+
+            if ($campo->tipo === 'DOMICILIO_USA') {
+                $limpio['pais'] = 'US';
+            }
+
+            return $limpio;
+        }
+
+        if (is_string($valor)) {
+            $limpio = trim($valor);
+            if (in_array($campo->tipo, ['CURP', 'RFC'], true)) {
+                $limpio = Str::upper($limpio);
+            }
+
+            return $limpio === '' ? null : $limpio;
+        }
+
+        return $valor;
     }
 
     public function validarParaPago(Request $request, Solicitud $solicitud)
@@ -284,6 +653,7 @@ class SolicitudController extends Controller
         DB::transaction(function () use ($request, $solicitud, $actor) {
             $bloqueada = Solicitud::query()->with('estado')->lockForUpdate()->findOrFail($solicitud->id);
             $pago = SolicitudPago::query()->where('solicitud_id', $bloqueada->id)->lockForUpdate()->firstOrFail();
+            abort_unless($bloqueada->flujo_pago !== 'PAGO_POST_VALIDACION' || $pago->tieneComprobante(), 422, 'El ciudadano aún no ha subido el comprobante de pago.');
             abort_unless($bloqueada->estado?->clave === 'EN_ESPERA_DE_PAGO' && ! $pago->fecha_pago_validado && ! $pago->vencido(), 422, 'El pago no puede validarse.');
             $pago->update(['fecha_pago_validado' => now(), 'comentario_validacion' => null, 'validador_accesos_id' => $actor['id'], 'validador_nombre_snapshot' => $actor['nombre'], 'validador_departamento_snapshot' => $actor['departamento']]);
             $anterior = $bloqueada->solicitud_estado_id;
@@ -295,13 +665,22 @@ class SolicitudController extends Controller
         return redirect()->route('solicitudes.show', $solicitud)->with('success', 'El pago fue validado; la solicitud pasó a revisión final.');
     }
 
+    public function descargarComprobantePago(Solicitud $solicitud): StreamedResponse
+    {
+        $pago = $solicitud->pago;
+        abort_unless($pago && $pago->tieneComprobante(), 404);
+        abort_unless(Storage::disk('local')->exists($pago->comprobante_storage_key), 404);
+
+        return Storage::disk('local')->download($pago->comprobante_storage_key, $pago->comprobante_nombre_original);
+    }
+
     public function comentar(Request $request, Solicitud $solicitud)
     {
         $datos = $request->validate(['comentario' => ['required', 'string', 'max:5000']]);
         $actor = $this->actor($request);
         $texto = trim($datos['comentario']);
         $notificacionId = DB::transaction(function () use ($solicitud, $actor, $texto) {
-            DB::table('solicitud_observaciones')->insert(['id' => (string) Str::uuid(), 'solicitud_id' => $solicitud->id, 'texto' => $texto, 'tipo' => 'COMENTARIO', 'visible_ciudadano' => true, 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'], 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('solicitud_observaciones')->insert(['id' => (string) Str::uuid(), 'solicitud_id' => $solicitud->id, 'texto' => $texto, 'tipo' => 'COMENTARIO', 'visible_ciudadano' => true, 'actor_tipo' => 'SERVIDOR_PUBLICO', 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'], 'created_at' => now(), 'updated_at' => now()]);
 
             return $this->notificacionPendiente($solicitud, 'SOLICITUD_COMENTARIO', 'Actualización de tu trámite · Folio '.$solicitud->folio);
         });
@@ -403,8 +782,8 @@ class SolicitudController extends Controller
 
         $modalidades = collect($solicitud->tramite?->modalidades ?? [])->unique()->values();
         $esEnLinea = $modalidades->count() === 1 && $modalidades->contains('EN_LINEA');
-        $esMixto = $modalidades->contains('EN_LINEA') && $modalidades->contains('PRESENCIAL');
-        abort_unless($esEnLinea || $esMixto, 422, 'Este trámite no puede aprobarse desde el portal.');
+        $esPresencial = $modalidades->contains('PRESENCIAL');
+        abort_unless($esEnLinea || $esPresencial, 422, 'Este trámite no puede aprobarse desde el portal.');
 
         $datos = $request->validate($esEnLinea ? [
             'documento_final' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:10240'],
@@ -766,10 +1145,29 @@ class SolicitudController extends Controller
         ]);
     }
 
-    private function formatearValor(mixed $valor, ?string $tipoCampo = null): string
+    private function formatearValor(mixed $valor, ?string $tipoCampo = null, $opciones = null): string
     {
         if ($tipoCampo === 'ESTADO' && is_string($valor)) {
             return config('formulario.entidades_federativas.'.$valor, $valor);
+        }
+
+        if (in_array($tipoCampo, ['SELECT', 'RADIO', 'MULTISELECT'], true) && $opciones) {
+            $etiquetas = collect($opciones)->mapWithKeys(
+                fn ($opcion) => [(string) $opcion->valor => $opcion->etiqueta]
+            );
+
+            if (is_array($valor)) {
+                return collect($valor)
+                    ->filter(fn ($elemento) => filled($elemento))
+                    ->map(fn ($elemento) => $etiquetas->get((string) $elemento, (string) $elemento))
+                    ->implode(', ');
+            }
+
+            return (string) $etiquetas->get((string) $valor, (string) $valor);
+        }
+
+        if ($tipoCampo === 'CHECKBOX') {
+            return filled($valor) ? 'Sí' : 'No';
         }
 
         if (is_array($valor)) {
