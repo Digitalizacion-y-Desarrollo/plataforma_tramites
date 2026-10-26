@@ -13,8 +13,8 @@
                         'BORRADOR' => ['Solicitud en borrador', 'Este expediente aún no se ha enviado. Revisa la información de tu solicitud.'],
                         'ENVIADA' => ['Solicitud recibida', 'Siguiente paso: espera la revisión del área responsable. Te avisaremos por correo cuando haya un cambio.'],
                         'CORRECCION_SOLICITADA' => ['Se requiere una corrección', 'Siguiente paso: usa el enlace del correo recibido para subir los documentos corregidos. Tu solicitud volverá a revisión.'],
-                        'VALIDADA_PARA_PAGO' => ['Información validada', 'Siguiente paso: el área responsable generará tu referencia de pago.'],
-                        'EN_ESPERA_DE_PAGO' => ['En espera de pago', 'Siguiente paso: realiza el pago con la referencia enviada a tu correo antes de su vencimiento.'],
+                        'VALIDADA_PARA_PAGO' => ['Información validada', 'Siguiente paso: el área responsable enviará tu ficha de pago.'],
+                        'EN_ESPERA_DE_PAGO' => ['En espera de pago', 'Siguiente paso: realiza el pago con la ficha enviada a tu correo antes de su vencimiento.'],
                         'EN_REVISION_FINAL' => ['Pago validado', 'Siguiente paso: el área responsable emitirá la resolución final de tu solicitud.'],
                         'APROBADA' => ['Solicitud aprobada', 'Siguiente paso: descarga tu documento final desde esta pantalla mientras esté disponible.'],
                         'RECHAZADA' => ['Solicitud rechazada', 'Consulta las observaciones visibles y el correo recibido para conocer el motivo. Si tienes dudas, usa los canales de atención oficial.'],
@@ -43,16 +43,17 @@
                 @endif
                 @if ($solicitud->estado->clave === 'EN_ESPERA_DE_PAGO' && $pago)
                     <div class="mt-6 border-t border-neza-line pt-5">
-                        <p class="text-sm font-semibold text-neza-ink">Tu referencia de pago está lista.</p>
+                        <p class="text-sm font-semibold text-neza-ink">Tu ficha de pago está lista.</p>
                         <p class="mt-1 text-sm text-neza-muted">Realiza el pago antes del {{ $pago->fecha_vencimiento->format('d/m/Y') }} para continuar con tu trámite.</p>
-                        <a href="{{ route('consulta.pagos.referencia.descargar', $pago) }}" class="mt-4 inline-flex items-center gap-2 rounded-xl bg-neza-wine px-5 py-3 text-sm font-bold text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5v-9m0 9-3.75-3.75M12 16.5l3.75-3.75M3.75 17.25v1.5A2.25 2.25 0 0 0 6 21h12a2.25 2.25 0 0 0 2.25-2.25v-1.5" /></svg>Descargar referencia de pago</a>
+                        @if (filled($pago->fichaVigente?->indicaciones))<div class="mt-4 rounded-xl border border-neza-line bg-neza-canvas p-4"><p class="text-sm font-bold text-neza-ink">Indicaciones de pago</p><p class="mt-2 whitespace-pre-line text-sm text-neza-ink">{{ $pago->fichaVigente->indicaciones }}</p></div>@endif
+                        <a href="{{ route('consulta.pagos.referencia.descargar', $pago) }}" class="mt-4 inline-flex items-center gap-2 rounded-xl bg-neza-wine px-5 py-3 text-sm font-bold text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5v-9m0 9-3.75-3.75M12 16.5l3.75-3.75M3.75 17.25v1.5A2.25 2.25 0 0 0 6 21h12a2.25 2.25 0 0 0 2.25-2.25v-1.5" /></svg>Descargar ficha de pago</a>
 
                         @if (session('success'))
                             <p role="status" class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{{ session('success') }}</p>
                         @endif
 
                         @if ($pago->vencido())
-                            <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">La referencia de pago venció. Comunícate con el área responsable para continuar con tu trámite.</p>
+                            <p class="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-800">La ficha de pago venció. Comunícate con el área responsable para continuar con tu trámite.</p>
                         @else
                             @if ($pago->tieneComprobante())
                                 <p class="mt-4 rounded-xl border border-neza-line bg-neza-canvas px-4 py-3 text-sm text-neza-ink">Comprobante de pago recibido el {{ $pago->fecha_comprobante?->format('d/m/Y H:i') }}. El área responsable lo validará; si necesitas reemplazarlo, puedes subir otro archivo.</p>

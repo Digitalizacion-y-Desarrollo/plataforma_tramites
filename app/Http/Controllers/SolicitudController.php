@@ -7,12 +7,14 @@ use App\Mail\SolicitudComentarioMail;
 use App\Mail\SolicitudCorreccionDocumentosMail;
 use App\Mail\SolicitudRechazadaMail;
 use App\Mail\SolicitudReferenciaPagoMail;
+use App\Models\ConfiguracionGeneral;
 use App\Models\EstadoSolicitud;
 use App\Models\FormularioCampo;
 use App\Models\FormularioSeccion;
 use App\Models\Solicitud;
 use App\Models\SolicitudDocumentoEmitido;
 use App\Models\SolicitudPago;
+use App\Models\SolicitudPagoFicha;
 use App\Models\Tramite;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
@@ -21,6 +23,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -156,6 +159,11 @@ class SolicitudController extends Controller
     public function show(Solicitud $solicitud): View
     {
         $solicitud->load(['estado:id,clave,nombre', 'tramite:id,clave,nombre,modalidades,descarga_expira_dias', 'documentoEmitido', 'pago']);
+        if ($solicitud->pago && Schema::hasTable('solicitud_pago_fichas')) {
+            $solicitud->pago->load('fichaVigente');
+        } elseif ($solicitud->pago) {
+            $solicitud->pago->setRelation('fichaVigente', null);
+        }
 
         $seccionesFormulario = FormularioSeccion::query()
             ->where('formulario_version_id', $solicitud->formulario_version_id)
@@ -252,7 +260,9 @@ class SolicitudController extends Controller
             ->orderBy('created_at')
             ->get(['id', 'respuesta_a_id', 'texto', 'actor_tipo', 'actor_nombre_snapshot', 'created_at']);
 
-        return view('solicitudes.show', compact('solicitud', 'respuestasPorSeccion', 'seccionesFormulario', 'valoresRespuestas', 'puedeEditarRespuestas', 'documentos', 'archivosCorregibles', 'comentarios'));
+        $origenFichaPago = $this->origenFichaPago();
+
+        return view('solicitudes.show', compact('solicitud', 'respuestasPorSeccion', 'seccionesFormulario', 'valoresRespuestas', 'puedeEditarRespuestas', 'documentos', 'archivosCorregibles', 'comentarios', 'origenFichaPago'));
     }
 
     public function actualizarDatosPersonales(Request $request, Solicitud $solicitud)
@@ -579,11 +589,108 @@ class SolicitudController extends Controller
         abort_unless($solicitud->flujo_pago === 'PAGO_POST_VALIDACION' && $solicitud->estado?->clave === 'ENVIADA', 422, 'Esta solicitud no puede validarse para pago.');
         $this->moverEstado($request, $solicitud, 'VALIDADA_PARA_PAGO', 'SOLICITUD_VALIDADA_PARA_PAGO', 'La información fue validada y no podrá revertirse.');
 
-        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La información fue validada; ya puedes generar la referencia de pago.');
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La información fue validada; ya puedes enviar la ficha de pago.');
+    }
+
+    public function enviarFichaPago(Request $request, Solicitud $solicitud)
+    {
+        abort_unless($this->origenFichaPago() === 'SISTEMA_EXTERNO', 422, 'La configuración actual genera la ficha de pago desde el portal.');
+        $solicitud->load('estado');
+        $this->autorizarFichaPago($solicitud);
+        abort_if(SolicitudPago::query()->where('solicitud_id', $solicitud->id)->exists(), 422, 'La solicitud ya tiene una ficha de pago.');
+        $datos = $this->validarFichaPago($request);
+        $actor = $this->actor($request);
+        $archivoGuardado = null;
+
+        try {
+            [$pago, $ficha, $notificacionId] = DB::transaction(function () use ($request, $solicitud, $datos, $actor, &$archivoGuardado) {
+                $bloqueada = Solicitud::query()->with('estado')->lockForUpdate()->findOrFail($solicitud->id);
+                $this->autorizarFichaPago($bloqueada);
+                abort_if(SolicitudPago::query()->where('solicitud_id', $bloqueada->id)->exists(), 422, 'La solicitud ya tiene una ficha de pago.');
+
+                $pago = SolicitudPago::query()->create([
+                    'id' => (string) Str::uuid(),
+                    'solicitud_id' => $bloqueada->id,
+                    'importe' => $bloqueada->importe_pago,
+                    'fecha_emision' => now(),
+                    'fecha_vencimiento' => now()->addDays($bloqueada->pago_vigencia_dias),
+                    'emisor_accesos_id' => $actor['id'],
+                    'emisor_nombre_snapshot' => $actor['nombre'],
+                ]);
+                $ficha = $this->guardarFichaPago($datos['ficha'], $datos['indicaciones'], $pago, 1, null, $actor, $archivoGuardado);
+                $anterior = $bloqueada->solicitud_estado_id;
+                $nuevo = $this->estadoId('EN_ESPERA_DE_PAGO');
+                $bloqueada->update(['solicitud_estado_id' => $nuevo]);
+                $this->registrarMovimiento($bloqueada, $anterior, $nuevo, 'Ficha de pago enviada.', $actor, 'SOLICITUD_FICHA_PAGO_ENVIADA', $request);
+                $notificacionId = $this->notificacionPendiente($bloqueada, 'SOLICITUD_FICHA_PAGO_ENVIADA', 'Ficha de pago · Folio '.$bloqueada->folio);
+
+                return [$pago, $ficha, $notificacionId];
+            });
+        } catch (\Throwable $exception) {
+            if ($archivoGuardado) {
+                Storage::disk('local')->delete($archivoGuardado);
+            }
+
+            throw $exception;
+        }
+
+        $solicitud->refresh()->load('tramite');
+        $this->enviarFichaPagoPorCorreo($solicitud, $ficha, $notificacionId, false);
+
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La ficha de pago se envió por correo.');
+    }
+
+    public function reemplazarFichaPago(Request $request, Solicitud $solicitud)
+    {
+        abort_unless($this->origenFichaPago() === 'SISTEMA_EXTERNO', 422, 'La configuración actual genera la ficha de pago desde el portal.');
+        $solicitud->load(['estado', 'pago']);
+        $this->autorizarReemplazoFichaPago($solicitud);
+        $datos = $request->validate([
+            'ficha' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'indicaciones' => ['required', 'string', 'max:5000'],
+            'motivo_reemplazo' => ['required', 'string', 'max:5000'],
+        ]);
+        $actor = $this->actor($request);
+        $archivoGuardado = null;
+
+        try {
+            [$ficha, $notificacionId] = DB::transaction(function () use ($request, $solicitud, $datos, $actor, &$archivoGuardado) {
+                $bloqueada = Solicitud::query()->with('estado')->lockForUpdate()->findOrFail($solicitud->id);
+                $pago = SolicitudPago::query()->where('solicitud_id', $bloqueada->id)->lockForUpdate()->firstOrFail();
+                $bloqueada->setRelation('pago', $pago);
+                $this->autorizarReemplazoFichaPago($bloqueada);
+                $fichaAnterior = SolicitudPagoFicha::query()->where('solicitud_pago_id', $pago->id)->where('es_vigente', true)->lockForUpdate()->firstOrFail();
+                $fichaAnterior->update(['es_vigente' => false]);
+                $version = ((int) SolicitudPagoFicha::query()->where('solicitud_pago_id', $pago->id)->max('version')) + 1;
+                $ficha = $this->guardarFichaPago($datos['ficha'], $datos['indicaciones'], $pago, $version, trim($datos['motivo_reemplazo']), $actor, $archivoGuardado);
+                DB::table('auditorias')->insert([
+                    'id' => (string) Str::uuid(), 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'],
+                    'accion' => 'SOLICITUD_FICHA_PAGO_REEMPLAZADA', 'entidad' => 'SOLICITUD_PAGO_FICHA', 'entidad_id' => $ficha->id,
+                    'datos_anteriores' => json_encode(['ficha_id' => $fichaAnterior->id, 'version' => $fichaAnterior->version]),
+                    'datos_nuevos' => json_encode(['ficha_id' => $ficha->id, 'version' => $ficha->version, 'motivo_reemplazo' => $ficha->motivo_reemplazo]),
+                    'ip' => $request->ip(), 'created_at' => now(),
+                ]);
+                $notificacionId = $this->notificacionPendiente($bloqueada, 'SOLICITUD_FICHA_PAGO_REEMPLAZADA', 'Ficha de pago actualizada · Folio '.$bloqueada->folio);
+
+                return [$ficha, $notificacionId];
+            });
+        } catch (\Throwable $exception) {
+            if ($archivoGuardado) {
+                Storage::disk('local')->delete($archivoGuardado);
+            }
+
+            throw $exception;
+        }
+
+        $solicitud->refresh()->load('tramite');
+        $this->enviarFichaPagoPorCorreo($solicitud, $ficha, $notificacionId, true);
+
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La ficha de pago se reemplazó y envió por correo.');
     }
 
     public function generarReferenciaPago(Request $request, Solicitud $solicitud)
     {
+        abort_unless($this->origenFichaPago() === 'GENERADA_EN_PORTAL', 422, 'La configuración actual requiere cargar una ficha de pago externa.');
         $solicitud->load(['estado', 'tramite']);
         $this->autorizarReferenciaPago($solicitud);
         $vistaPrevia = $this->vistaPreviaReferenciaPago($request, $solicitud);
@@ -631,6 +738,7 @@ class SolicitudController extends Controller
 
     public function previsualizarReferenciaPago(Request $request, Solicitud $solicitud)
     {
+        abort_unless($this->origenFichaPago() === 'GENERADA_EN_PORTAL', 422, 'La configuración actual requiere cargar una ficha de pago externa.');
         $solicitud->load(['estado', 'tramite']);
         $this->autorizarReferenciaPago($solicitud);
         abort_if(SolicitudPago::query()->where('solicitud_id', $solicitud->id)->exists(), 422, 'La solicitud ya tiene una referencia de pago.');
@@ -931,6 +1039,60 @@ class SolicitudController extends Controller
         return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La solicitud fue rechazada correctamente.');
     }
 
+    private function origenFichaPago(): string
+    {
+        if (! Schema::hasTable('configuraciones_generales')) {
+            return 'SISTEMA_EXTERNO';
+        }
+
+        return ConfiguracionGeneral::query()->value('origen_ficha_pago') ?? 'SISTEMA_EXTERNO';
+    }
+
+    private function validarFichaPago(Request $request): array
+    {
+        return $request->validate([
+            'ficha' => ['required', 'file', 'mimes:pdf', 'max:10240'],
+            'indicaciones' => ['required', 'string', 'max:5000'],
+        ]);
+    }
+
+    private function autorizarFichaPago(Solicitud $solicitud): void
+    {
+        $permitido = ($solicitud->flujo_pago === 'PAGO_DIRECTO' && $solicitud->estado?->clave === 'ENVIADA')
+            || ($solicitud->flujo_pago === 'PAGO_POST_VALIDACION' && $solicitud->estado?->clave === 'VALIDADA_PARA_PAGO');
+
+        abort_unless($permitido && $solicitud->importe_pago !== null && $solicitud->pago_vigencia_dias, 422, 'La ficha de pago no está disponible para esta solicitud.');
+    }
+
+    private function autorizarReemplazoFichaPago(Solicitud $solicitud): void
+    {
+        $pago = $solicitud->pago;
+        abort_unless($solicitud->estado?->clave === 'EN_ESPERA_DE_PAGO' && $pago && ! $pago->fecha_pago_validado && ! $pago->vencido(), 422, 'La ficha de pago no puede reemplazarse.');
+    }
+
+    private function guardarFichaPago($archivo, string $indicaciones, SolicitudPago $pago, int $version, ?string $motivoReemplazo, array $actor, ?string &$archivoGuardado): SolicitudPagoFicha
+    {
+        $storageKey = $archivo->store('solicitudes/'.$pago->solicitud_id.'/pagos/fichas', 'local');
+        $archivoGuardado = $storageKey;
+
+        return SolicitudPagoFicha::query()->create([
+            'id' => (string) Str::uuid(),
+            'solicitud_pago_id' => $pago->id,
+            'version' => $version,
+            'nombre_original' => $archivo->getClientOriginalName(),
+            'storage_key' => $storageKey,
+            'mime_type' => $archivo->getMimeType(),
+            'tamano_bytes' => $archivo->getSize(),
+            'hash_archivo' => hash_file('sha256', $archivo->getRealPath()),
+            'indicaciones' => trim($indicaciones),
+            'motivo_reemplazo' => $motivoReemplazo,
+            'es_vigente' => true,
+            'actor_accesos_id' => $actor['id'],
+            'actor_nombre_snapshot' => $actor['nombre'],
+            'actor_departamento_snapshot' => $actor['departamento'],
+        ]);
+    }
+
     private function autorizarReferenciaPago(Solicitud $solicitud): void
     {
         $permitido = ($solicitud->flujo_pago === 'PAGO_DIRECTO' && $solicitud->estado?->clave === 'ENVIADA') || ($solicitud->flujo_pago === 'PAGO_POST_VALIDACION' && $solicitud->estado?->clave === 'VALIDADA_PARA_PAGO');
@@ -1028,6 +1190,11 @@ class SolicitudController extends Controller
     private function enviarReferenciaPago(Solicitud $solicitud, SolicitudPago $pago, string $notificacionId): void
     {
         $this->enviarCorreo($solicitud, $notificacionId, new SolicitudReferenciaPagoMail($solicitud, $pago), 'referencia de pago');
+    }
+
+    private function enviarFichaPagoPorCorreo(Solicitud $solicitud, SolicitudPagoFicha $ficha, string $notificacionId, bool $esReemplazo): void
+    {
+        $this->enviarCorreo($solicitud, $notificacionId, new SolicitudReferenciaPagoMail($solicitud, $ficha, $esReemplazo), 'ficha de pago');
     }
 
     private function enviarComentario(Solicitud $solicitud, string $comentario, string $notificacionId): void

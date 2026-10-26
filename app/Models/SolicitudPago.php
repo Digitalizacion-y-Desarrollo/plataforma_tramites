@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class SolicitudPago extends Model
 {
@@ -23,6 +25,16 @@ class SolicitudPago extends Model
     public function solicitud(): BelongsTo
     {
         return $this->belongsTo(Solicitud::class);
+    }
+
+    public function fichas(): HasMany
+    {
+        return $this->hasMany(SolicitudPagoFicha::class, 'solicitud_pago_id')->orderBy('version');
+    }
+
+    public function fichaVigente(): HasOne
+    {
+        return $this->hasOne(SolicitudPagoFicha::class, 'solicitud_pago_id')->where('es_vigente', true);
     }
 
     public function vencido(): bool

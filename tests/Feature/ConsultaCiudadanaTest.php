@@ -189,6 +189,39 @@ class ConsultaCiudadanaTest extends TestCase
         $this->get(route('consulta.pagos.referencia.descargar', $pagoPropio))->assertNotFound();
     }
 
+    public function test_citizen_downloads_the_current_uploaded_payment_sheet_and_sees_its_instructions(): void
+    {
+        Storage::fake('local');
+        $solicitudId = $this->crearSolicitud('ana@example.test', 'SOL-FICHA');
+        DB::table('solicitud_estados')->insert(['id' => 2, 'clave' => 'EN_ESPERA_DE_PAGO', 'nombre' => 'En espera de pago']);
+        DB::table('solicitudes')->where('id', $solicitudId)->update(['solicitud_estado_id' => 2]);
+        $pagoId = (string) Str::uuid();
+        DB::table('solicitud_pagos')->insert([
+            'id' => $pagoId, 'solicitud_id' => $solicitudId, 'referencia' => 'HISTORICA-'.$pagoId,
+            'importe' => 100, 'fecha_emision' => now(), 'fecha_vencimiento' => now()->addDays(5),
+            'pdf_nombre_original' => 'anterior.pdf', 'pdf_storage_key' => 'pagos/anterior.pdf', 'pdf_hash_archivo' => hash('sha256', 'anterior'),
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        $fichaId = (string) Str::uuid();
+        DB::table('solicitud_pago_fichas')->insert([
+            'id' => $fichaId, 'solicitud_pago_id' => $pagoId, 'version' => 2,
+            'nombre_original' => 'ficha-vigente.pdf', 'storage_key' => 'pagos/ficha-vigente.pdf',
+            'mime_type' => 'application/pdf', 'tamano_bytes' => 8, 'hash_archivo' => hash('sha256', 'vigente'),
+            'indicaciones' => 'Paga en ventanilla y conserva tu comprobante.', 'es_vigente' => true,
+            'created_at' => now(), 'updated_at' => now(),
+        ]);
+        Storage::disk('local')->put('pagos/ficha-vigente.pdf', '%PDF-1.4');
+        $this->withSession(['consulta_ciudadana' => ['curp' => self::CURP, 'email' => 'ana@example.test', 'expira' => now()->addMinutes(30)->timestamp]]);
+
+        $this->get(route('consulta.solicitudes.detalle', $solicitudId))
+            ->assertOk()
+            ->assertSee('Indicaciones de pago')
+            ->assertSee('Paga en ventanilla y conserva tu comprobante.');
+        $this->get(route('consulta.pagos.referencia.descargar', $pagoId))
+            ->assertOk()
+            ->assertHeader('content-disposition', 'attachment; filename=ficha-vigente.pdf');
+    }
+
     public function test_citizen_can_upload_payment_receipt_for_own_pending_payment(): void
     {
         Storage::fake('local');
@@ -388,6 +421,23 @@ class ConsultaCiudadanaTest extends TestCase
             $table->unsignedBigInteger('comprobante_tamano_bytes')->nullable();
             $table->string('comprobante_hash_archivo')->nullable();
             $table->timestamp('fecha_comprobante')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('solicitud_pago_fichas', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->uuid('solicitud_pago_id');
+            $table->unsignedSmallInteger('version');
+            $table->string('nombre_original');
+            $table->string('storage_key');
+            $table->string('mime_type');
+            $table->unsignedBigInteger('tamano_bytes');
+            $table->string('hash_archivo');
+            $table->text('indicaciones')->nullable();
+            $table->text('motivo_reemplazo')->nullable();
+            $table->boolean('es_vigente')->default(true);
+            $table->string('actor_accesos_id')->nullable();
+            $table->string('actor_nombre_snapshot')->nullable();
+            $table->string('actor_departamento_snapshot')->nullable();
             $table->timestamps();
         });
         Schema::create('solicitud_historial_estados', function (Blueprint $table): void {

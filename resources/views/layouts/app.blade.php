@@ -74,7 +74,7 @@
                         <a href="{{ route('catalogo-estados-notificaciones.index') }}" class="!py-2 !text-xs">Estados de notificaciones</a>
                     </div>
                 </details>
-                <details class="group" @if (request()->routeIs('servicios-interes.*') || request()->routeIs('canales-ayuda.*')) open @endif>
+                <details class="group" @if (request()->routeIs('servicios-interes.*') || request()->routeIs('canales-ayuda.*') || request()->routeIs('configuracion-general.*')) open @endif>
                     <summary
                         class="flex cursor-pointer list-none items-center gap-[11px] rounded-[10px] px-3 py-[11px] text-[13px] font-medium text-[#667085] outline-none transition hover:bg-neza-wine-soft hover:text-neza-wine focus-visible:ring-2 focus-visible:ring-neza-wine [&::-webkit-details-marker]:hidden">
                     <svg class="nav-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24"
@@ -91,6 +91,7 @@
                     </svg>
                     </summary>
                     <div class="mt-1 grid gap-1 border-l border-neza-line pl-3">
+                        <a href="{{ route('configuracion-general.edit') }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('configuracion-general.*')])>Configuración general</a>
                         <a href="{{ route('canales-ayuda.edit') }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('canales-ayuda.*')])>Canales de ayuda</a>
                         <a href="#" class="!py-2 !text-xs">Foto de portada</a>
                         <a href="{{ route('servicios-interes.index') }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('servicios-interes.*')])>Servicios y enlaces de interés</a>

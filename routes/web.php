@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\CanalAyudaController;
+use App\Http\Controllers\ConfiguracionGeneralController;
 use App\Http\Controllers\CorreccionDocumentoController;
 use App\Http\Controllers\PublicoController;
 use App\Http\Controllers\ServicioInteresController;
@@ -20,6 +21,8 @@ Route::post('/solicitudes/{solicitud}/aprobar', [SolicitudController::class, 'ap
 Route::post('/solicitudes/{solicitud}/rechazar', [SolicitudController::class, 'rechazar'])->name('solicitudes.rechazar');
 Route::post('/solicitudes/{solicitud}/correcciones', [SolicitudController::class, 'solicitarCorreccion'])->name('solicitudes.correcciones.solicitar');
 Route::post('/solicitudes/{solicitud}/validar', [SolicitudController::class, 'validarParaPago'])->name('solicitudes.validar');
+Route::post('/solicitudes/{solicitud}/ficha-pago', [SolicitudController::class, 'enviarFichaPago'])->name('solicitudes.pagos.ficha.enviar');
+Route::post('/solicitudes/{solicitud}/ficha-pago/reemplazar', [SolicitudController::class, 'reemplazarFichaPago'])->name('solicitudes.pagos.ficha.reemplazar');
 Route::get('/solicitudes/{solicitud}/referencia-pago/previsualizar', [SolicitudController::class, 'previsualizarReferenciaPago'])->name('solicitudes.pagos.previsualizar');
 Route::post('/solicitudes/{solicitud}/referencia-pago', [SolicitudController::class, 'generarReferenciaPago'])->name('solicitudes.pagos.generar');
 Route::post('/solicitudes/{solicitud}/validar-pago', [SolicitudController::class, 'validarPago'])->name('solicitudes.pagos.validar');
@@ -87,6 +90,8 @@ Route::resource('servicios-interes', ServicioInteresController::class)
     ->parameters(['servicios-interes' => 'servicio_interes']);
 Route::get('configuracion/canales-ayuda', [CanalAyudaController::class, 'edit'])->name('canales-ayuda.edit');
 Route::put('configuracion/canales-ayuda', [CanalAyudaController::class, 'update'])->name('canales-ayuda.update');
+Route::get('configuracion/general', [ConfiguracionGeneralController::class, 'edit'])->name('configuracion-general.edit');
+Route::put('configuracion/general', [ConfiguracionGeneralController::class, 'update'])->name('configuracion-general.update');
 Route::patch('catalogo-tramites/{catalogo_tramite}/estado', 'App\Http\Controllers\TramiteController@cambiarEstado')
     ->name('catalogo-tramites.estado');
 

@@ -23,7 +23,7 @@
         $pasos[] = [
             'estados' => ['VALIDADA_PARA_PAGO'],
             'titulo' => 'Información validada',
-            'descripcion' => 'El área responsable validó la información y generará la referencia de pago.',
+            'descripcion' => 'El área responsable validó la información y enviará la ficha de pago.',
         ];
     }
 
@@ -31,7 +31,7 @@
         $pasos[] = [
             'estados' => ['EN_ESPERA_DE_PAGO'],
             'titulo' => 'En espera de pago',
-            'descripcion' => 'Realiza el pago con la referencia enviada a tu correo.',
+            'descripcion' => 'Realiza el pago con la ficha enviada a tu correo.',
         ];
         $pasos[] = [
             'estados' => ['EN_REVISION_FINAL'],

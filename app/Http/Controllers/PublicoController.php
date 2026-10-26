@@ -445,6 +445,11 @@ class PublicoController extends Controller
         if (Schema::hasTable('solicitud_pagos')) {
             $solicitud->load('pago');
             $pago = $solicitud->pago;
+            if ($pago && Schema::hasTable('solicitud_pago_fichas')) {
+                $pago->load('fichaVigente');
+            } elseif ($pago) {
+                $pago->setRelation('fichaVigente', null);
+            }
         }
         $historial = DB::table('solicitud_historial_estados as historial')
             ->join('solicitud_estados as estado', 'estado.id', '=', 'historial.estado_nuevo_id')
@@ -558,12 +563,18 @@ class PublicoController extends Controller
     {
         $acceso = $this->accesoCiudadano($request);
         $pago->load(['solicitud.estado']);
+        if (Schema::hasTable('solicitud_pago_fichas')) {
+            $pago->load('fichaVigente');
+        }
 
         abort_unless($acceso['curp'] === $pago->solicitud->curp_consulta && $acceso['email'] === Str::lower($pago->solicitud->email_contacto), 404);
         abort_unless($pago->solicitud->estado?->clave === 'EN_ESPERA_DE_PAGO', 404);
-        abort_unless(Storage::disk('local')->exists($pago->pdf_storage_key), 404);
+        $ficha = $pago->relationLoaded('fichaVigente') ? $pago->getRelation('fichaVigente') : null;
+        $storageKey = $ficha?->storage_key ?? $pago->pdf_storage_key;
+        $nombreOriginal = $ficha?->nombre_original ?? $pago->pdf_nombre_original;
+        abort_unless($storageKey && $nombreOriginal && Storage::disk('local')->exists($storageKey), 404);
 
-        return Storage::disk('local')->download($pago->pdf_storage_key, $pago->pdf_nombre_original);
+        return Storage::disk('local')->download($storageKey, $nombreOriginal);
     }
 
     public function subirComprobantePago(Request $request, SolicitudPago $pago): RedirectResponse
