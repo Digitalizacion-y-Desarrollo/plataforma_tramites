@@ -21,6 +21,7 @@ class SolicitudDomiciliosTest extends TestCase
         $this->withoutVite();
         $this->crearEsquemaDeSolicitud();
         Mail::fake();
+        $this->withSession(['accesos' => ['id' => 'superuser-1', 'roles' => ['superuser']]]);
     }
 
     public function test_formulario_ciudadano_muestra_domicilio_fuera_de_neza_sin_autocompletado(): void

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\CanalAyuda;
+use App\Models\ConfiguracionGeneral;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -27,7 +28,8 @@ class AppServiceProvider extends ServiceProvider
 
         View::composer(['publico.index', 'partials.publico.footer'], function ($view): void {
             $canalesAyuda = Schema::hasTable('canales_ayuda') ? CanalAyuda::query()->first() : null;
-            $view->with('canalesAyuda', $canalesAyuda);
+            $portada = Schema::hasTable('configuraciones_generales') ? ConfiguracionGeneral::query()->value('portada_storage_key') : null;
+            $view->with(compact('canalesAyuda', 'portada'));
         });
     }
 }

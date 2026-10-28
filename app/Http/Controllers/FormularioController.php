@@ -3,13 +3,14 @@
 namespace App\Http\Controllers;
 
 use App\Integrations\AccesosClient;
+use App\Models\Auditoria;
 use App\Models\CampoCondicion;
 use App\Models\Formulario;
-use App\Models\Tramite;
 use App\Models\FormularioCampo;
 use App\Models\FormularioEstado;
 use App\Models\FormularioGrupoCampo;
 use App\Models\FormularioSeccion;
+use App\Models\Tramite;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -155,7 +156,7 @@ class FormularioController extends Controller
             ->where('activo', true)
             ->firstOrFail();
 
-        $duplicado = DB::transaction(function () use ($datos, $formulario, $versionOrigen, $requisitosOrigen, $estadoBorrador, $departamento, $subdepartamento): Formulario {
+        $duplicado = DB::transaction(function () use ($formulario, $versionOrigen, $requisitosOrigen, $estadoBorrador, $departamento, $subdepartamento): Formulario {
             $duplicado = Formulario::create([
                 'id' => (string) Str::uuid(),
                 'nombre' => $formulario->nombre.' (copia)',
@@ -275,6 +276,7 @@ class FormularioController extends Controller
 
             return $duplicado;
         });
+        Auditoria::registrar($request, 'FORMULARIO_DUPLICADO', 'FORMULARIO', $duplicado->id, ['formulario_origen_id' => $formulario->id], ['nombre' => $duplicado->nombre, 'departamento_accesos_id' => $duplicado->departamento_accesos_id]);
 
         return redirect()->route('formulario.edit', $duplicado)
             ->with('success', 'El formulario se duplicó como borrador para el trámite seleccionado.');
@@ -324,7 +326,7 @@ class FormularioController extends Controller
             ->where('activo', true)
             ->firstOrFail();
 
-        $formulario = DB::transaction(function () use ($datos, $departamento, $subdepartamento, $estadoInicial): Formulario {
+        $formulario = DB::transaction(function () use ($request, $datos, $departamento, $subdepartamento, $estadoInicial): Formulario {
             $formulario = Formulario::create([
                 'id' => (string) Str::uuid(),
                 'nombre' => $datos['nombre'],
@@ -342,6 +344,8 @@ class FormularioController extends Controller
                 'numero_version' => 1,
                 'creado_por_accesos_id' => null,
             ]);
+
+            Auditoria::registrar($request, 'FORMULARIO_CREADO', 'FORMULARIO', $formulario->id, null, $formulario->only(['nombre', 'descripcion', 'departamento_accesos_id', 'departamento_nombre_snapshot', 'subdepartamento_accesos_id', 'subdepartamento_nombre_snapshot']));
 
             return $formulario;
         });
@@ -426,7 +430,7 @@ class FormularioController extends Controller
             $clave = $baseClave.'_'.$sufijo++;
         }
 
-        $version->secciones()->create([
+        $seccion = $version->secciones()->create([
             'id' => (string) Str::uuid(),
             'clave' => $clave,
             'titulo' => $datos['titulo'],
@@ -434,6 +438,7 @@ class FormularioController extends Controller
             'orden' => $version->secciones()->count() + 1,
             'activo' => true,
         ]);
+        Auditoria::registrar($request, 'FORMULARIO_SECCION_CREADA', 'FORMULARIO_SECCION', $seccion->id, null, $seccion->only(['clave', 'titulo', 'descripcion', 'orden', 'activo']));
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'Se agregó la sección al borrador.');
     }
@@ -448,10 +453,12 @@ class FormularioController extends Controller
         $version = $this->versionBorrador($formulario);
         abort_unless($seccion->formulario_version_id === $version->id, 404);
 
+        $anteriores = $seccion->only(['titulo', 'descripcion']);
         $seccion->update([
             'titulo' => $datos['titulo'],
             'descripcion' => $datos['descripcion'] ?? null,
         ]);
+        Auditoria::registrar($request, 'FORMULARIO_SECCION_ACTUALIZADA', 'FORMULARIO_SECCION', $seccion->id, $anteriores, $seccion->only(['titulo', 'descripcion']));
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'La sección se actualizó.');
     }
@@ -508,12 +515,14 @@ class FormularioController extends Controller
                     'activo' => true,
                 ]);
             });
+
+            Auditoria::registrar($request, 'FORMULARIO_CAMPO_CREADO', 'FORMULARIO_CAMPO', $campo->id, null, $campo->only(['clave', 'etiqueta', 'tipo', 'requerido', 'orden', 'activo']) + ['opciones' => $opciones->all()]);
         });
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'Se agregó el campo al borrador.');
     }
 
-    public function destroyCampo(Formulario $formulario, FormularioSeccion $seccion, FormularioCampo $campo)
+    public function destroyCampo(Request $request, Formulario $formulario, FormularioSeccion $seccion, FormularioCampo $campo)
     {
         $version = $this->versionBorrador($formulario);
         abort_unless($seccion->formulario_version_id === $version->id && $campo->seccion_id === $seccion->id, 404);
@@ -524,12 +533,16 @@ class FormularioController extends Controller
             ]);
         }
 
-        $campo->delete();
+        $anteriores = $campo->only(['clave', 'etiqueta', 'tipo', 'requerido', 'orden', 'activo']);
+        DB::transaction(function () use ($request, $campo, $anteriores): void {
+            $campo->delete();
+            Auditoria::registrar($request, 'FORMULARIO_CAMPO_ELIMINADO', 'FORMULARIO_CAMPO', $campo->id, $anteriores, null);
+        });
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'El campo se eliminó del borrador.');
     }
 
-    public function destroySeccion(Formulario $formulario, FormularioSeccion $seccion)
+    public function destroySeccion(Request $request, Formulario $formulario, FormularioSeccion $seccion)
     {
         $version = $this->versionBorrador($formulario);
         abort_unless($seccion->formulario_version_id === $version->id, 404);
@@ -543,9 +556,11 @@ class FormularioController extends Controller
             return redirect()->route('formulario.edit', $formulario)->withErrors(['seccion' => 'Primero retira del grupo los campos de esta sección.']);
         }
 
-        DB::transaction(function () use ($seccion, $version): void {
+        $anteriores = ['seccion' => $seccion->only(['clave', 'titulo', 'descripcion', 'orden', 'activo']), 'campos' => $seccion->campos()->get(['id', 'clave', 'etiqueta', 'tipo', 'requerido', 'orden', 'activo'])->toArray()];
+        DB::transaction(function () use ($request, $seccion, $version, $anteriores): void {
             $seccion->delete();
             $version->secciones()->orderBy('orden')->get()->each(fn (FormularioSeccion $item, int $indice) => $item->update(['orden' => $indice + 1]));
+            Auditoria::registrar($request, 'FORMULARIO_SECCION_ELIMINADA', 'FORMULARIO_SECCION', $seccion->id, $anteriores, null);
         });
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'La sección se eliminó.');
@@ -572,7 +587,7 @@ class FormularioController extends Controller
         $totalCampos = FormularioCampo::query()->whereHas('seccion', fn ($query) => $query->where('formulario_version_id', $version->id))->count();
         abort_unless($campos->count() === $ids->count() && $ids->count() === $totalCampos && $seccionesValidas === $seccionIds->count(), 422);
 
-        DB::transaction(function () use ($datos, $campos, $ids): void {
+        DB::transaction(function () use ($request, $datos, $campos, $ids, $version): void {
             $clavesOriginales = $campos->mapWithKeys(fn (FormularioCampo $campo) => [$campo->id => $campo->clave]);
             $campos->each(fn (FormularioCampo $campo) => $campo->update(['clave' => 'moviendo_'.str_replace('-', '', $campo->id)]));
             $clavesPorSeccion = [];
@@ -592,6 +607,8 @@ class FormularioController extends Controller
                 $clavesPorSeccion[$dato['seccion_id']][] = $clave;
                 $campo->update(['seccion_id' => $dato['seccion_id'], 'orden' => $dato['orden'], 'clave' => $clave]);
             }
+
+            Auditoria::registrar($request, 'FORMULARIO_CAMPOS_ORDENADOS', 'FORMULARIO_VERSION', $version->id, null, ['campos' => collect($datos['campos'])->map(fn (array $dato) => ['campo_id' => $dato['id'], 'seccion_id' => $dato['seccion_id'], 'orden' => $dato['orden']])->all()]);
         });
 
         return response()->json(['message' => 'El orden de las preguntas se guardó.']);
@@ -621,7 +638,8 @@ class FormularioController extends Controller
             return back()->withInput()->withErrors(['opciones' => 'Agrega al menos una opción para este tipo de campo.']);
         }
 
-        DB::transaction(function () use ($campo, $datos, $opciones, $request): void {
+        $anteriores = $campo->only(['etiqueta', 'tipo', 'requerido']) + ['opciones' => $campo->opciones()->orderBy('orden')->pluck('etiqueta')->all()];
+        DB::transaction(function () use ($request, $campo, $datos, $opciones, $anteriores): void {
             $campo->update(['etiqueta' => $datos['etiqueta'], 'tipo' => $datos['tipo'], 'requerido' => $request->boolean('requerido')]);
             $campo->opciones()->delete();
 
@@ -630,6 +648,8 @@ class FormularioController extends Controller
                     $campo->opciones()->create(['id' => (string) Str::uuid(), 'valor' => (string) ($indice + 1), 'etiqueta' => $opcion, 'orden' => $indice + 1, 'activo' => true]);
                 });
             }
+
+            Auditoria::registrar($request, 'FORMULARIO_CAMPO_ACTUALIZADO', 'FORMULARIO_CAMPO', $campo->id, $anteriores, $campo->only(['etiqueta', 'tipo', 'requerido']) + ['opciones' => $opciones->all()]);
         });
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'La pregunta se actualizó.');
@@ -645,10 +665,12 @@ class FormularioController extends Controller
         $vecino = $seccion->campos()->where('orden', $operador, $campo->orden)->orderBy('orden', $orden)->first();
 
         if ($vecino) {
-            DB::transaction(function () use ($campo, $vecino): void {
+            DB::transaction(function () use ($request, $campo, $vecino, $datos): void {
+                $anterior = $campo->orden;
                 [$campo->orden, $vecino->orden] = [$vecino->orden, $campo->orden];
                 $campo->save();
                 $vecino->save();
+                Auditoria::registrar($request, 'FORMULARIO_CAMPO_MOVIDO', 'FORMULARIO_CAMPO', $campo->id, ['orden' => $anterior], ['orden' => $campo->orden, 'direccion' => $datos['direccion'], 'campo_vecino_id' => $vecino->id]);
             });
         }
 
@@ -665,10 +687,12 @@ class FormularioController extends Controller
         $vecino = $version->secciones()->where('orden', $operador, $seccion->orden)->orderBy('orden', $orden)->first();
 
         if ($vecino) {
-            DB::transaction(function () use ($seccion, $vecino): void {
+            DB::transaction(function () use ($request, $seccion, $vecino, $datos): void {
+                $anterior = $seccion->orden;
                 [$seccion->orden, $vecino->orden] = [$vecino->orden, $seccion->orden];
                 $seccion->save();
                 $vecino->save();
+                Auditoria::registrar($request, 'FORMULARIO_SECCION_MOVIDA', 'FORMULARIO_SECCION', $seccion->id, ['orden' => $anterior], ['orden' => $seccion->orden, 'direccion' => $datos['direccion'], 'seccion_vecina_id' => $vecino->id]);
             });
         }
 
@@ -704,13 +728,14 @@ class FormularioController extends Controller
             ]);
         }
 
-        $campo->condicionesDestino()->create([
+        $condicion = $campo->condicionesDestino()->create([
             'id' => (string) Str::uuid(),
             'campo_origen_id' => $campoOrigen->id,
             'operador' => $datos['operador'],
             'valor_comparacion' => in_array($datos['operador'], ['IS_EMPTY', 'IS_NOT_EMPTY'], true) ? null : ['valor' => $datos['valor']],
             'accion' => $datos['accion'],
         ]);
+        Auditoria::registrar($request, 'FORMULARIO_CONDICION_CREADA', 'FORMULARIO_CONDICION', $condicion->id, null, $condicion->only(['campo_destino_id', 'campo_origen_id', 'operador', 'valor_comparacion', 'accion']));
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'Se agregó la condición al campo.');
     }
@@ -744,7 +769,7 @@ class FormularioController extends Controller
             ]);
         }
 
-        DB::transaction(function () use ($datos, $version, $campos): void {
+        DB::transaction(function () use ($request, $datos, $version, $campos): void {
             $grupo = $version->gruposCampos()->create([
                 'id' => (string) Str::uuid(),
                 'titulo' => $datos['titulo'],
@@ -755,23 +780,26 @@ class FormularioController extends Controller
             $grupo->campos()->attach($campos->mapWithKeys(fn ($campo) => [
                 $campo->id => ['id' => (string) Str::uuid()],
             ])->all());
+
+            Auditoria::registrar($request, 'FORMULARIO_GRUPO_CREADO', 'FORMULARIO_GRUPO', $grupo->id, null, ['titulo' => $grupo->titulo, 'orden' => $grupo->orden, 'campos' => $campos->pluck('id')->all()]);
         });
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'Se creó el grupo de campos.');
     }
 
-    public function destroyCampoGrupo(Formulario $formulario, FormularioGrupoCampo $grupo, FormularioCampo $campo)
+    public function destroyCampoGrupo(Request $request, Formulario $formulario, FormularioGrupoCampo $grupo, FormularioCampo $campo)
     {
         $version = $this->versionBorrador($formulario);
         abort_unless($grupo->formulario_version_id === $version->id, 404);
         abort_unless($grupo->campos()->whereKey($campo->id)->exists(), 404);
 
         $grupo->campos()->detach($campo->id);
+        Auditoria::registrar($request, 'FORMULARIO_GRUPO_CAMPO_ELIMINADO', 'FORMULARIO_GRUPO', $grupo->id, ['campo_id' => $campo->id, 'campo_etiqueta' => $campo->etiqueta, 'grupo_titulo' => $grupo->titulo], null);
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'El campo se retiró del grupo.');
     }
 
-    public function destroyCondicion(Formulario $formulario, CampoCondicion $condicion)
+    public function destroyCondicion(Request $request, Formulario $formulario, CampoCondicion $condicion)
     {
         $version = $this->versionBorrador($formulario);
         $perteneceAVersion = $condicion->campoDestino()
@@ -781,7 +809,11 @@ class FormularioController extends Controller
 
         abort_unless($perteneceAVersion, 404);
 
-        $condicion->delete();
+        $anteriores = $condicion->only(['campo_destino_id', 'grupo_destino_id', 'campo_origen_id', 'operador', 'valor_comparacion', 'accion', 'grupo']);
+        DB::transaction(function () use ($request, $condicion, $anteriores): void {
+            $condicion->delete();
+            Auditoria::registrar($request, 'FORMULARIO_CONDICION_ELIMINADA', 'FORMULARIO_CONDICION', $condicion->id, $anteriores, null);
+        });
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'La condición se eliminó.');
     }
@@ -807,13 +839,14 @@ class FormularioController extends Controller
             return back()->withInput()->withErrors(['valor' => 'Indica el valor para evaluar la condición.']);
         }
 
-        $grupo->condicionesDestino()->create([
+        $condicion = $grupo->condicionesDestino()->create([
             'id' => (string) Str::uuid(),
             'campo_origen_id' => $campoOrigen->id,
             'operador' => $datos['operador'],
             'valor_comparacion' => in_array($datos['operador'], ['IS_EMPTY', 'IS_NOT_EMPTY'], true) ? null : ['valor' => $datos['valor']],
             'accion' => $datos['accion'],
         ]);
+        Auditoria::registrar($request, 'FORMULARIO_GRUPO_CONDICION_CREADA', 'FORMULARIO_CONDICION', $condicion->id, null, $condicion->only(['campo_destino_id', 'grupo_destino_id', 'campo_origen_id', 'operador', 'valor_comparacion', 'accion']));
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'Se agregó la condición al grupo.');
     }
@@ -867,7 +900,8 @@ class FormularioController extends Controller
             }
         }
 
-        DB::transaction(function () use ($formulario, $version, $datos, $departamento, $subdepartamento): void {
+        $anteriores = $formulario->only(['nombre', 'descripcion', 'departamento_accesos_id', 'departamento_nombre_snapshot', 'subdepartamento_accesos_id', 'subdepartamento_nombre_snapshot']);
+        DB::transaction(function () use ($request, $formulario, $datos, $departamento, $subdepartamento, $anteriores): void {
             $formulario->update([
                 'nombre' => $datos['nombre'],
                 'descripcion' => $datos['descripcion'] ?? null,
@@ -876,7 +910,7 @@ class FormularioController extends Controller
                 'subdepartamento_accesos_id' => $subdepartamento['id'] ?? null,
                 'subdepartamento_nombre_snapshot' => $subdepartamento['nombre'] ?? null,
             ]);
-
+            Auditoria::registrar($request, 'FORMULARIO_ACTUALIZADO', 'FORMULARIO', $formulario->id, $anteriores, $formulario->only(['nombre', 'descripcion', 'departamento_accesos_id', 'departamento_nombre_snapshot', 'subdepartamento_accesos_id', 'subdepartamento_nombre_snapshot']));
         });
 
         return redirect()->route('formulario.edit', $formulario)->with('success', 'La información general se actualizó.');
@@ -885,9 +919,13 @@ class FormularioController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Formulario $formulario)
+    public function destroy(Request $request, Formulario $formulario)
     {
-        $formulario->delete();
+        $anteriores = $formulario->only(['nombre', 'descripcion', 'departamento_accesos_id', 'departamento_nombre_snapshot', 'subdepartamento_accesos_id', 'subdepartamento_nombre_snapshot']);
+        DB::transaction(function () use ($request, $formulario, $anteriores): void {
+            $formulario->delete();
+            Auditoria::registrar($request, 'FORMULARIO_ELIMINADO', 'FORMULARIO', $formulario->id, $anteriores, null);
+        });
 
         return redirect()->route('formulario.index')->with('success', 'El formulario se eliminó correctamente.');
     }

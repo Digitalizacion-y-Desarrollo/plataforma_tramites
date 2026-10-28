@@ -2,12 +2,12 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Auditoria;
 use App\Models\ServicioInteres;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class ServicioInteresController extends Controller
@@ -107,17 +107,6 @@ class ServicioInteresController extends Controller
 
     private function registrarAuditoria(Request $request, string $accion, ServicioInteres $servicio, ?array $anteriores, ?array $nuevos): void
     {
-        DB::table('auditorias')->insert([
-            'id' => (string) Str::uuid(),
-            'actor_accesos_id' => $request->session()->get('accesos.id'),
-            'actor_nombre_snapshot' => $request->session()->get('accesos.nombre'),
-            'accion' => $accion,
-            'entidad' => 'servicios_interes',
-            'entidad_id' => $servicio->id,
-            'datos_anteriores' => $anteriores ? json_encode($anteriores) : null,
-            'datos_nuevos' => $nuevos ? json_encode($nuevos) : null,
-            'ip' => $request->ip(),
-            'created_at' => now(),
-        ]);
+        Auditoria::registrar($request, $accion, 'servicios_interes', $servicio->id, $anteriores, $nuevos);
     }
 }

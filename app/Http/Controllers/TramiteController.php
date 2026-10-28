@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Integrations\AccesosClient;
+use App\Models\AreaOperativa;
+use App\Models\Auditoria;
 use App\Models\FormularioVersion;
 use App\Models\Tramite;
+use App\Models\TramiteEstado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -26,7 +29,9 @@ class TramiteController extends Controller
         $tramitesInactivos = $totalTramites - $tramitesActivos;
 
         try {
-            $departamentos = $accesos->departamentosActivos();
+            $departamentos = collect($accesos->departamentosActivos())
+                ->whereIn('id', AreaOperativa::query()->where('activa', true)->pluck('accesos_departamento_id'))
+                ->values()->all();
         } catch (\Throwable) {
             $departamentos = [];
         }
@@ -83,7 +88,9 @@ class TramiteController extends Controller
         ]);
 
         $departamento = $this->departamentoValido($datos['departamento_accesos_id'], $accesos);
-        if (! $departamento) return back()->withInput()->withErrors(['departamento_accesos_id' => 'Selecciona un departamento válido de Accesos.']);
+        if (! $departamento) {
+            return back()->withInput()->withErrors(['departamento_accesos_id' => 'Selecciona un departamento válido de Accesos.']);
+        }
 
         DB::transaction(function () use ($datos, $request, $departamento): void {
             $tramite = Tramite::create([
@@ -92,6 +99,7 @@ class TramiteController extends Controller
                 ...$this->datosPublicos($datos), 'activo' => $request->boolean('activo'),
             ]);
             $this->sincronizarFormulario($tramite, $datos['formulario_version_id'] ?? null, $departamento['id']);
+            Auditoria::registrar($request, 'TRAMITE_CREADO', 'TRAMITE', $tramite->id, null, $this->datosAuditoria($tramite->refresh()));
         });
 
         return redirect()->route('catalogo-tramites.index')->with('success', 'El trámite se creó correctamente.');
@@ -141,15 +149,19 @@ class TramiteController extends Controller
         ]);
 
         $departamento = $this->departamentoValido($datos['departamento_accesos_id'], $accesos);
-        if (! $departamento) return back()->withInput()->withErrors(['departamento_accesos_id' => 'Selecciona un departamento válido de Accesos.']);
+        if (! $departamento) {
+            return back()->withInput()->withErrors(['departamento_accesos_id' => 'Selecciona un departamento válido de Accesos.']);
+        }
 
         DB::transaction(function () use ($catalogo_tramite, $datos, $request, $departamento): void {
+            $anteriores = $this->datosAuditoria($catalogo_tramite);
             $catalogo_tramite->update([
                 'nombre' => $datos['nombre'], 'descripcion' => $datos['descripcion'] ?? null,
                 'departamento_accesos_id' => $departamento['id'], 'departamento_nombre_snapshot' => $departamento['nombre'],
                 ...$this->datosPublicos($datos), 'activo' => $request->boolean('activo'),
             ]);
             $this->sincronizarFormulario($catalogo_tramite, $datos['formulario_version_id'] ?? null, $departamento['id']);
+            Auditoria::registrar($request, 'TRAMITE_ACTUALIZADO', 'TRAMITE', $catalogo_tramite->id, $anteriores, $this->datosAuditoria($catalogo_tramite->refresh()));
         });
 
         return redirect()->route('catalogo-tramites.index')->with('success', 'El trámite se actualizó correctamente.');
@@ -158,16 +170,22 @@ class TramiteController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(Tramite $catalogo_tramite)
+    public function destroy(Request $request, Tramite $catalogo_tramite)
     {
-        $catalogo_tramite->delete();
+        DB::transaction(function () use ($request, $catalogo_tramite): void {
+            $anteriores = $this->datosAuditoria($catalogo_tramite);
+            $catalogo_tramite->delete();
+            Auditoria::registrar($request, 'TRAMITE_ELIMINADO', 'TRAMITE', $catalogo_tramite->id, $anteriores, null);
+        });
 
         return redirect()->route('catalogo-tramites.index')->with('success', 'El trámite se eliminó correctamente.');
     }
 
-    public function cambiarEstado(Tramite $catalogo_tramite)
+    public function cambiarEstado(Request $request, Tramite $catalogo_tramite)
     {
+        $anterior = $catalogo_tramite->activo;
         $catalogo_tramite->update(['activo' => ! $catalogo_tramite->activo]);
+        Auditoria::registrar($request, 'TRAMITE_ESTADO_CAMBIADO', 'TRAMITE', $catalogo_tramite->id, ['activo' => $anterior], ['activo' => $catalogo_tramite->activo]);
 
         return redirect()->route('catalogo-tramites.index')->with(
             'success',
@@ -175,28 +193,42 @@ class TramiteController extends Controller
         );
     }
 
-    public function publicar(Tramite $catalogo_tramite)
+    public function publicar(Request $request, Tramite $catalogo_tramite)
     {
         $catalogo_tramite->load('estado');
         if ($catalogo_tramite->estado?->clave !== 'BORRADOR') {
             return back()->withErrors(['estado' => 'Solo los trámites en borrador pueden publicarse.']);
         }
 
+        $anterior = $catalogo_tramite->tramite_estado_id;
         $catalogo_tramite->update(['tramite_estado_id' => $this->estadoId('PUBLICADO')]);
+        Auditoria::registrar($request, 'TRAMITE_PUBLICADO', 'TRAMITE', $catalogo_tramite->id, ['tramite_estado_id' => $anterior], ['tramite_estado_id' => $catalogo_tramite->tramite_estado_id]);
 
         return back()->with('success', 'El trámite se publicó correctamente.');
     }
 
-    public function archivar(Tramite $catalogo_tramite)
+    public function archivar(Request $request, Tramite $catalogo_tramite)
     {
         $catalogo_tramite->load('estado');
         if ($catalogo_tramite->estado?->clave !== 'PUBLICADO') {
             return back()->withErrors(['estado' => 'Solo los trámites publicados pueden archivarse.']);
         }
 
+        $anterior = $catalogo_tramite->tramite_estado_id;
         $catalogo_tramite->update(['tramite_estado_id' => $this->estadoId('ARCHIVADO')]);
+        Auditoria::registrar($request, 'TRAMITE_ARCHIVADO', 'TRAMITE', $catalogo_tramite->id, ['tramite_estado_id' => $anterior], ['tramite_estado_id' => $catalogo_tramite->tramite_estado_id]);
 
         return back()->with('success', 'El trámite se archivó correctamente.');
+    }
+
+    private function datosAuditoria(Tramite $tramite): array
+    {
+        return $tramite->only([
+            'clave', 'nombre', 'descripcion', 'departamento_accesos_id', 'departamento_nombre_snapshot',
+            'activo', 'tramite_estado_id', 'duracion', 'costo', 'costo_pago', 'flujo_pago',
+            'pago_vigencia_dias', 'tiempo_estimado', 'modalidades', 'requisitos', 'proceso',
+            'preguntas_frecuentes', 'descarga_expira_dias',
+        ]);
     }
 
     private function generarClave(): string
@@ -245,16 +277,26 @@ class TramiteController extends Controller
             return null;
         }
 
-        return $departamento && $departamento['parent_id'] === null ? $departamento : null;
+        return $departamento
+            && $departamento['parent_id'] === null
+            && AreaOperativa::query()->where('accesos_departamento_id', $departamento['id'])->where('activa', true)->exists()
+            ? $departamento
+            : null;
     }
 
     private function sincronizarFormulario(Tramite $tramite, ?string $versionId, string $departamentoId): void
     {
         $actual = DB::table('tramite_formulario')->where('tramite_id', $tramite->id)->where('activo', true)->lockForUpdate()->first();
-        if (($actual->formulario_version_id ?? null) === $versionId) return;
+        if (($actual->formulario_version_id ?? null) === $versionId) {
+            return;
+        }
 
-        if ($actual) DB::table('tramite_formulario')->where('id', $actual->id)->update(['activo' => false, 'fecha_fin_vigencia' => now(), 'updated_at' => now()]);
-        if (! $versionId) return;
+        if ($actual) {
+            DB::table('tramite_formulario')->where('id', $actual->id)->update(['activo' => false, 'fecha_fin_vigencia' => now(), 'updated_at' => now()]);
+        }
+        if (! $versionId) {
+            return;
+        }
 
         $version = FormularioVersion::query()->with(['formulario', 'estado'])->lockForUpdate()->findOrFail($versionId);
         abort_unless(in_array($version->estado?->clave, ['BORRADOR', 'PUBLICADO'], true)

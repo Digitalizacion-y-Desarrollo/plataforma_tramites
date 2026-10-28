@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Auditoria;
 use App\Models\FormularioEstado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -26,7 +27,8 @@ class FormularioEstadosController extends Controller
     public function store(Request $request)
     {
         $datos = $this->validar($request);
-        FormularioEstado::create(['clave' => $this->generarClave(), ...$datos, 'activo' => $request->boolean('activo')]);
+        $estado = FormularioEstado::create(['clave' => $this->generarClave(), ...$datos, 'activo' => $request->boolean('activo')]);
+        Auditoria::registrar($request, 'ESTADO_FORMULARIO_CREADO', 'ESTADO_FORMULARIO', (string) $estado->id, null, $estado->only(['clave', 'nombre', 'descripcion', 'orden', 'activo']));
 
         return redirect()->route('catalogo-estados-formularios.index')->with('success', 'El estado de formulario se creó correctamente.');
     }
@@ -44,25 +46,33 @@ class FormularioEstadosController extends Controller
     public function update(Request $request, FormularioEstado $catalogo_estado_formulario)
     {
         $datos = $this->validar($request);
+        $anteriores = $catalogo_estado_formulario->only(['clave', 'nombre', 'descripcion', 'orden', 'activo']);
         $catalogo_estado_formulario->update([...$datos, 'activo' => $request->boolean('activo')]);
+        Auditoria::registrar($request, 'ESTADO_FORMULARIO_ACTUALIZADO', 'ESTADO_FORMULARIO', (string) $catalogo_estado_formulario->id, $anteriores, $catalogo_estado_formulario->only(['clave', 'nombre', 'descripcion', 'orden', 'activo']));
 
         return redirect()->route('catalogo-estados-formularios.index')->with('success', 'El estado de formulario se actualizó correctamente.');
     }
 
-    public function destroy(FormularioEstado $catalogo_estado_formulario)
+    public function destroy(Request $request, FormularioEstado $catalogo_estado_formulario)
     {
         if (DB::table('formulario_versiones')->where('formulario_estado_id', $catalogo_estado_formulario->id)->exists()) {
             return redirect()->route('catalogo-estados-formularios.index')->withErrors(['estado' => 'No se puede eliminar un estado utilizado por versiones de formularios.']);
         }
 
-        $catalogo_estado_formulario->delete();
+        DB::transaction(function () use ($request, $catalogo_estado_formulario): void {
+            $anteriores = $catalogo_estado_formulario->only(['clave', 'nombre', 'descripcion', 'orden', 'activo']);
+            $catalogo_estado_formulario->delete();
+            Auditoria::registrar($request, 'ESTADO_FORMULARIO_ELIMINADO', 'ESTADO_FORMULARIO', (string) $catalogo_estado_formulario->id, $anteriores, null);
+        });
 
         return redirect()->route('catalogo-estados-formularios.index')->with('success', 'El estado de formulario se eliminó correctamente.');
     }
 
-    public function cambiarEstado(FormularioEstado $catalogo_estado_formulario)
+    public function cambiarEstado(Request $request, FormularioEstado $catalogo_estado_formulario)
     {
+        $anterior = $catalogo_estado_formulario->activo;
         $catalogo_estado_formulario->update(['activo' => ! $catalogo_estado_formulario->activo]);
+        Auditoria::registrar($request, $catalogo_estado_formulario->activo ? 'ESTADO_FORMULARIO_ACTIVADO' : 'ESTADO_FORMULARIO_DESACTIVADO', 'ESTADO_FORMULARIO', (string) $catalogo_estado_formulario->id, ['activo' => $anterior], ['activo' => $catalogo_estado_formulario->activo]);
 
         return redirect()->route('catalogo-estados-formularios.index')->with('success', $catalogo_estado_formulario->activo ? 'El estado de formulario se activó correctamente.' : 'El estado de formulario se deshabilitó correctamente.');
     }

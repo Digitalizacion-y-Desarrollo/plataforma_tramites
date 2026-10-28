@@ -36,12 +36,16 @@ return [
     ],
 
     'accesos' => [
+        'login_url' => env('ACCESOS_LOGIN_URL', 'https://accesos.digitalneza.com/api/auth/login'),
+        'profile_url' => env('ACCESOS_PROFILE_URL', 'https://accesos.digitalneza.com/api/auth/me'),
+        'logout_url' => env('ACCESOS_LOGOUT_URL', 'https://accesos.digitalneza.com/api/auth/logout'),
         'departamentos_url' => env(
             'ACCESOS_DEPARTAMENTOS_URL',
             'https://accesos.digitalneza.com/api/departamentos'
         ),
         'timeout' => (int) env('ACCESOS_TIMEOUT', 15),
         'ca_bundle' => env('ACCESOS_CA_BUNDLE'),
+        'system_key' => env('ACCESOS_SYSTEM_KEY'),
     ],
 
 ];

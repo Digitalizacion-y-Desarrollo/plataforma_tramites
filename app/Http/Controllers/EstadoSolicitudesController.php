@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Auditoria;
 use App\Models\EstadoSolicitud;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -37,12 +38,13 @@ class EstadoSolicitudesController extends Controller
     {
         $datos = $this->validar($request);
 
-        EstadoSolicitud::create([
+        $estado = EstadoSolicitud::create([
             'clave' => $this->generarClave(),
             ...$datos,
             'activo' => $request->boolean('activo'),
             'es_final' => $request->boolean('es_final'),
         ]);
+        Auditoria::registrar($request, 'ESTADO_SOLICITUD_CREADO', 'ESTADO_SOLICITUD', (string) $estado->id, null, $estado->only(['clave', 'nombre', 'descripcion', 'orden', 'activo', 'es_final']));
 
         return redirect()->route('catalogo-estados.index')->with('success', 'El estado de solicitud se creó correctamente.');
     }
@@ -70,11 +72,13 @@ class EstadoSolicitudesController extends Controller
     {
         $datos = $this->validar($request);
 
+        $anteriores = $catalogo_estado->only(['clave', 'nombre', 'descripcion', 'orden', 'activo', 'es_final']);
         $catalogo_estado->update([
             ...$datos,
             'activo' => $request->boolean('activo'),
             'es_final' => $request->boolean('es_final'),
         ]);
+        Auditoria::registrar($request, 'ESTADO_SOLICITUD_ACTUALIZADO', 'ESTADO_SOLICITUD', (string) $catalogo_estado->id, $anteriores, $catalogo_estado->only(['clave', 'nombre', 'descripcion', 'orden', 'activo', 'es_final']));
 
         return redirect()->route('catalogo-estados.index')->with('success', 'El estado de solicitud se actualizó correctamente.');
     }
@@ -82,7 +86,7 @@ class EstadoSolicitudesController extends Controller
     /**
      * Remove the specified resource from storage.
      */
-    public function destroy(EstadoSolicitud $catalogo_estado)
+    public function destroy(Request $request, EstadoSolicitud $catalogo_estado)
     {
         $enUso = DB::table('solicitudes')->where('solicitud_estado_id', $catalogo_estado->id)->exists()
             || DB::table('solicitud_historial_estados')
@@ -96,14 +100,20 @@ class EstadoSolicitudesController extends Controller
             ]);
         }
 
-        $catalogo_estado->delete();
+        DB::transaction(function () use ($request, $catalogo_estado): void {
+            $anteriores = $catalogo_estado->only(['clave', 'nombre', 'descripcion', 'orden', 'activo', 'es_final']);
+            $catalogo_estado->delete();
+            Auditoria::registrar($request, 'ESTADO_SOLICITUD_ELIMINADO', 'ESTADO_SOLICITUD', (string) $catalogo_estado->id, $anteriores, null);
+        });
 
         return redirect()->route('catalogo-estados.index')->with('success', 'El estado de solicitud se eliminó correctamente.');
     }
 
-    public function cambiarEstado(EstadoSolicitud $catalogo_estado)
+    public function cambiarEstado(Request $request, EstadoSolicitud $catalogo_estado)
     {
+        $anterior = $catalogo_estado->activo;
         $catalogo_estado->update(['activo' => ! $catalogo_estado->activo]);
+        Auditoria::registrar($request, $catalogo_estado->activo ? 'ESTADO_SOLICITUD_ACTIVADO' : 'ESTADO_SOLICITUD_DESACTIVADO', 'ESTADO_SOLICITUD', (string) $catalogo_estado->id, ['activo' => $anterior], ['activo' => $catalogo_estado->activo]);
 
         return redirect()->route('catalogo-estados.index')->with(
             'success',

@@ -6,6 +6,25 @@ use Illuminate\Support\Facades\Http;
 
 class AccesosClient
 {
+    public function iniciarSesion(string $email, string $password): array
+    {
+        $respuesta = $this->peticion()->post(config('services.accesos.login_url'), ['email' => $email, 'password' => $password, 'system_key' => config('services.accesos.system_key')])->throw();
+
+        return $respuesta->json('data', []);
+    }
+
+    public function perfil(string $token): array
+    {
+        $respuesta = $this->peticion()->withToken($token)->get(config('services.accesos.profile_url'), ['system_key' => config('services.accesos.system_key')])->throw();
+
+        return $respuesta->json('data', []);
+    }
+
+    public function cerrarSesion(string $token): void
+    {
+        $this->peticion()->withToken($token)->post(config('services.accesos.logout_url'))->throw();
+    }
+
     public function departamentosActivos(): array
     {
         $pagina = 1;
@@ -13,11 +32,7 @@ class AccesosClient
         $departamentos = [];
 
         do {
-            $peticion = Http::acceptJson()->timeout(config('services.accesos.timeout'));
-
-            if ($caBundle = config('services.accesos.ca_bundle')) {
-                $peticion = $peticion->withOptions(['verify' => $caBundle]);
-            }
+            $peticion = $this->peticion();
 
             $respuesta = $peticion
                 ->get(config('services.accesos.departamentos_url'), ['page' => $pagina])
@@ -39,5 +54,15 @@ class AccesosClient
             ->sortBy('nombre')
             ->values()
             ->all();
+    }
+
+    private function peticion()
+    {
+        $peticion = Http::acceptJson()->timeout(config('services.accesos.timeout'));
+        if ($caBundle = config('services.accesos.ca_bundle')) {
+            $peticion = $peticion->withOptions(['verify' => $caBundle]);
+        }
+
+        return $peticion;
     }
 }

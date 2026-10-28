@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Auditoria;
 use App\Models\CanalAyuda;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -29,18 +30,7 @@ class CanalAyudaController extends Controller
             $canalesAyuda->fill($datos);
             $canalesAyuda->save();
 
-            DB::table('auditorias')->insert([
-                'id' => (string) Str::uuid(),
-                'actor_accesos_id' => $request->session()->get('accesos.id'),
-                'actor_nombre_snapshot' => $request->session()->get('accesos.nombre'),
-                'accion' => 'CANALES_AYUDA_ACTUALIZADOS',
-                'entidad' => 'canales_ayuda',
-                'entidad_id' => $canalesAyuda->id,
-                'datos_anteriores' => $anteriores ? json_encode($anteriores) : null,
-                'datos_nuevos' => json_encode($canalesAyuda->only(array_keys($datos))),
-                'ip' => $request->ip(),
-                'created_at' => now(),
-            ]);
+            Auditoria::registrar($request, 'CANALES_AYUDA_ACTUALIZADOS', 'canales_ayuda', $canalesAyuda->id, $anteriores, $canalesAyuda->only(array_keys($datos)));
         });
 
         return redirect()->route('canales-ayuda.edit')->with('success', 'Los canales de ayuda se actualizaron correctamente.');

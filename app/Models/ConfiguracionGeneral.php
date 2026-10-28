@@ -11,5 +11,5 @@ class ConfiguracionGeneral extends Model
 
     protected $table = 'configuraciones_generales';
 
-    protected $fillable = ['origen_ficha_pago'];
+    protected $fillable = ['origen_ficha_pago', 'portada_storage_key'];
 }

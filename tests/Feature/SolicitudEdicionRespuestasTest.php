@@ -23,6 +23,7 @@ class SolicitudEdicionRespuestasTest extends TestCase
         parent::setUp();
         $this->crearEsquema();
         $this->crearSolicitudConFormulario();
+        $this->withSession(['accesos' => ['id' => 'superuser-1', 'roles' => ['superuser']]]);
     }
 
     public function test_actualiza_los_datos_personales_y_registra_auditoria(): void
@@ -302,6 +303,7 @@ class SolicitudEdicionRespuestasTest extends TestCase
             $table->uuid('id')->primary();
             $table->string('actor_accesos_id', 100)->nullable();
             $table->string('actor_nombre_snapshot', 200)->nullable();
+            $table->string('actor_departamento_snapshot', 200)->nullable();
             $table->string('accion', 100);
             $table->string('entidad', 100);
             $table->uuid('entidad_id')->nullable();

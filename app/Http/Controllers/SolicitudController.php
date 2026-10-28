@@ -7,6 +7,8 @@ use App\Mail\SolicitudComentarioMail;
 use App\Mail\SolicitudCorreccionDocumentosMail;
 use App\Mail\SolicitudRechazadaMail;
 use App\Mail\SolicitudReferenciaPagoMail;
+use App\Models\AreaOperativa;
+use App\Models\Auditoria;
 use App\Models\ConfiguracionGeneral;
 use App\Models\EstadoSolicitud;
 use App\Models\FormularioCampo;
@@ -49,7 +51,7 @@ class SolicitudController extends Controller
             'estadistica_fecha_hasta' => ['nullable', 'date', 'required_if:estadistica_periodo,RANGO', 'after_or_equal:estadistica_fecha_desde'],
         ]);
 
-        $consulta = Solicitud::query()
+        $consulta = $this->consultaPorActor($request)
             ->with(['estado:id,clave,nombre', 'tramite:id,clave,nombre,modalidades,descarga_expira_dias'])
             ->when($nombreDependencia, fn ($consulta, string $nombre) => $consulta->where('departamento_nombre_snapshot', $nombre))
             ->when($filtros['q'] ?? null, function ($consulta, string $busqueda): void {
@@ -65,7 +67,7 @@ class SolicitudController extends Controller
             ->when($filtros['fecha_hasta'] ?? null, fn ($consulta, string $fecha) => $consulta->whereDate('fecha_envio', '<=', $fecha));
 
         $filtroEstadisticas = $this->filtroEstadisticas($filtros);
-        $metricas = $this->aplicarFiltroEstadisticas(Solicitud::query()->when($nombreDependencia, fn ($consulta, string $nombre) => $consulta->where('departamento_nombre_snapshot', $nombre)), $filtroEstadisticas);
+        $metricas = $this->aplicarFiltroEstadisticas($this->consultaPorActor($request)->when($nombreDependencia, fn ($consulta, string $nombre) => $consulta->where('departamento_nombre_snapshot', $nombre)), $filtroEstadisticas);
         $totalSolicitudes = (clone $metricas)->count();
         $solicitudesEnviadas = (clone $metricas)->whereHas('estado', fn ($consulta) => $consulta->where('clave', 'ENVIADA'))->count();
         $solicitudesAprobadas = (clone $metricas)->whereHas('estado', fn ($consulta) => $consulta->where('clave', 'APROBADA'))->count();
@@ -85,6 +87,7 @@ class SolicitudController extends Controller
             ->orderByDesc('fecha_envio')->orderByDesc('created_at')->paginate(15)->withQueryString();
         $estados = EstadoSolicitud::query()->where('activo', true)->orderBy('orden')->get(['id', 'clave', 'nombre']);
         $tramites = Tramite::query()
+            ->when(! $this->esSuperuser($request), fn ($consulta) => $consulta->whereIn('departamento_accesos_id', $this->areasPermitidas($request)))
             ->when($nombreDependencia, fn ($consulta, string $nombre) => $consulta->where('departamento_nombre_snapshot', $nombre))
             ->orderBy('nombre')
             ->get(['id', 'nombre']);
@@ -99,6 +102,21 @@ class SolicitudController extends Controller
         $request->attributes->set('dependencia', $this->dependencia($dependencia));
 
         return $this->index($request);
+    }
+
+    public function dashboard(Request $request): View
+    {
+        $consulta = $this->aplicarFiltroEstadisticas($this->consultaPorActor($request), $this->filtroEstadisticas([]));
+
+        return view('solicitudes.resumen-dependencia', [
+            'dependencia' => ['etiqueta' => $this->esSuperuser($request) || $this->esSuperadmin($request) ? 'Todas las áreas operativas' : 'Mi área', 'slug' => null],
+            'totalSolicitudes' => (clone $consulta)->count(),
+            'solicitudesEnviadas' => (clone $consulta)->whereHas('estado', fn ($query) => $query->where('clave', 'ENVIADA'))->count(),
+            'solicitudesAprobadas' => (clone $consulta)->whereHas('estado', fn ($query) => $query->where('clave', 'APROBADA'))->count(),
+            'solicitudesRechazadas' => (clone $consulta)->whereHas('estado', fn ($query) => $query->where('clave', 'RECHAZADA'))->count(),
+            'filtroEstadisticas' => $this->filtroEstadisticas([]),
+            'rutaEstadisticas' => route('admin.dashboard'),
+        ]);
     }
 
     public function resumenDependencia(Request $request, string $dependencia): View
@@ -154,6 +172,44 @@ class SolicitudController extends Controller
         abort_unless(isset($dependencias[$slug]), 404);
 
         return $dependencias[$slug];
+    }
+
+    private function consultaPorActor(Request $request)
+    {
+        $consulta = Solicitud::query();
+
+        if ($this->esSuperuser($request)) {
+            return $consulta;
+        }
+
+        return $consulta->whereIn('departamento_accesos_id_snapshot', $this->areasPermitidas($request));
+    }
+
+    private function areasPermitidas(Request $request): array
+    {
+        $areas = AreaOperativa::query()->where('activa', true);
+
+        if (! $this->esSuperadmin($request)) {
+            $areas->where('accesos_departamento_id', (string) $request->session()->get('accesos.departamento_accesos_id'));
+        }
+
+        return $areas->pluck('accesos_departamento_id')->all();
+    }
+
+    private function esSuperuser(Request $request): bool
+    {
+        return $this->roles($request)->contains('superuser');
+    }
+
+    private function esSuperadmin(Request $request): bool
+    {
+        return $this->roles($request)->contains('superadmin');
+    }
+
+    private function roles(Request $request)
+    {
+        return collect($request->session()->get('accesos.roles', $request->session()->get('accesos.role', [])))
+            ->flatten()->map(fn ($role) => mb_strtolower(trim((string) $role)));
     }
 
     public function show(Solicitud $solicitud): View
@@ -260,9 +316,32 @@ class SolicitudController extends Controller
             ->orderBy('created_at')
             ->get(['id', 'respuesta_a_id', 'texto', 'actor_tipo', 'actor_nombre_snapshot', 'created_at']);
 
+        $historialEstados = DB::table('solicitud_historial_estados as historial')
+            ->join('solicitud_estados as estado_nuevo', 'estado_nuevo.id', '=', 'historial.estado_nuevo_id')
+            ->leftJoin('solicitud_estados as estado_anterior', 'estado_anterior.id', '=', 'historial.estado_anterior_id')
+            ->where('historial.solicitud_id', $solicitud->id)
+            ->orderBy('historial.fecha')
+            ->get([
+                'historial.id',
+                'historial.comentario',
+                'historial.actor_tipo',
+                'historial.actor_nombre_snapshot',
+                'historial.actor_departamento_snapshot',
+                'historial.fecha',
+                'estado_anterior.nombre as estado_anterior',
+                'estado_nuevo.nombre as estado_nuevo',
+            ])
+            ->map(function ($movimiento) {
+                if (in_array($movimiento->actor_nombre_snapshot, [null, '', 'Servidor público pendiente de integración con Accesos'], true)) {
+                    $movimiento->actor_nombre_snapshot = null;
+                }
+
+                return $movimiento;
+            });
+
         $origenFichaPago = $this->origenFichaPago();
 
-        return view('solicitudes.show', compact('solicitud', 'respuestasPorSeccion', 'seccionesFormulario', 'valoresRespuestas', 'puedeEditarRespuestas', 'documentos', 'archivosCorregibles', 'comentarios', 'origenFichaPago'));
+        return view('solicitudes.show', compact('solicitud', 'respuestasPorSeccion', 'seccionesFormulario', 'valoresRespuestas', 'puedeEditarRespuestas', 'documentos', 'archivosCorregibles', 'comentarios', 'historialEstados', 'origenFichaPago'));
     }
 
     public function actualizarDatosPersonales(Request $request, Solicitud $solicitud)
@@ -294,7 +373,7 @@ class SolicitudController extends Controller
         $campos = array_keys($datos);
         $actor = $this->actor($request);
 
-        DB::transaction(function () use ($solicitud, $datos, $campos, $actor, $request) {
+        DB::transaction(function () use ($solicitud, $datos, $campos, $request) {
             $bloqueada = Solicitud::query()->with('estado:id,clave')->lockForUpdate()->findOrFail($solicitud->id);
             $this->autorizarEdicionRespuestas($bloqueada);
 
@@ -307,18 +386,7 @@ class SolicitudController extends Controller
 
             $bloqueada->update($nuevos);
 
-            DB::table('auditorias')->insert([
-                'id' => (string) Str::uuid(),
-                'actor_accesos_id' => $actor['id'],
-                'actor_nombre_snapshot' => $actor['nombre'],
-                'accion' => 'SOLICITUD_DATOS_PERSONALES_EDITADOS',
-                'entidad' => 'SOLICITUD',
-                'entidad_id' => $bloqueada->id,
-                'datos_anteriores' => json_encode($anteriores),
-                'datos_nuevos' => json_encode($nuevos),
-                'ip' => $request->ip(),
-                'created_at' => now(),
-            ]);
+            Auditoria::registrar($request, 'SOLICITUD_DATOS_PERSONALES_EDITADOS', 'SOLICITUD', $bloqueada->id, $anteriores, $nuevos);
         });
 
         return redirect()->route('solicitudes.show', $solicitud)->with('success', 'Los datos de la persona solicitante se actualizaron correctamente.');
@@ -347,7 +415,7 @@ class SolicitudController extends Controller
         $respuestas = $validados['respuestas'] ?? [];
         $actor = $this->actor($request);
 
-        DB::transaction(function () use ($solicitud, $seccion, $campos, $respuestas, $actor, $request) {
+        DB::transaction(function () use ($solicitud, $seccion, $campos, $respuestas, $request) {
             $bloqueada = Solicitud::query()->with('estado:id,clave')->lockForUpdate()->findOrFail($solicitud->id);
             $this->autorizarEdicionRespuestas($bloqueada);
 
@@ -396,18 +464,7 @@ class SolicitudController extends Controller
                 return;
             }
 
-            DB::table('auditorias')->insert([
-                'id' => (string) Str::uuid(),
-                'actor_accesos_id' => $actor['id'],
-                'actor_nombre_snapshot' => $actor['nombre'],
-                'accion' => 'SOLICITUD_RESPUESTAS_EDITADAS',
-                'entidad' => 'SOLICITUD',
-                'entidad_id' => $bloqueada->id,
-                'datos_anteriores' => json_encode(['seccion' => $seccion->clave, 'respuestas' => $anteriores]),
-                'datos_nuevos' => json_encode(['seccion' => $seccion->clave, 'respuestas' => $nuevos]),
-                'ip' => $request->ip(),
-                'created_at' => now(),
-            ]);
+            Auditoria::registrar($request, 'SOLICITUD_RESPUESTAS_EDITADAS', 'SOLICITUD', $bloqueada->id, ['seccion' => $seccion->clave, 'respuestas' => $anteriores], ['seccion' => $seccion->clave, 'respuestas' => $nuevos]);
         });
 
         return redirect()->route('solicitudes.show', $solicitud)->with('success', 'Los datos de la sección se actualizaron correctamente.');
@@ -663,13 +720,7 @@ class SolicitudController extends Controller
                 $fichaAnterior->update(['es_vigente' => false]);
                 $version = ((int) SolicitudPagoFicha::query()->where('solicitud_pago_id', $pago->id)->max('version')) + 1;
                 $ficha = $this->guardarFichaPago($datos['ficha'], $datos['indicaciones'], $pago, $version, trim($datos['motivo_reemplazo']), $actor, $archivoGuardado);
-                DB::table('auditorias')->insert([
-                    'id' => (string) Str::uuid(), 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'],
-                    'accion' => 'SOLICITUD_FICHA_PAGO_REEMPLAZADA', 'entidad' => 'SOLICITUD_PAGO_FICHA', 'entidad_id' => $ficha->id,
-                    'datos_anteriores' => json_encode(['ficha_id' => $fichaAnterior->id, 'version' => $fichaAnterior->version]),
-                    'datos_nuevos' => json_encode(['ficha_id' => $ficha->id, 'version' => $ficha->version, 'motivo_reemplazo' => $ficha->motivo_reemplazo]),
-                    'ip' => $request->ip(), 'created_at' => now(),
-                ]);
+                Auditoria::registrar($request, 'SOLICITUD_FICHA_PAGO_REEMPLAZADA', 'SOLICITUD_PAGO_FICHA', $ficha->id, ['ficha_id' => $fichaAnterior->id, 'version' => $fichaAnterior->version], ['ficha_id' => $ficha->id, 'version' => $ficha->version, 'motivo_reemplazo' => $ficha->motivo_reemplazo]);
                 $notificacionId = $this->notificacionPendiente($bloqueada, 'SOLICITUD_FICHA_PAGO_REEMPLAZADA', 'Ficha de pago actualizada · Folio '.$bloqueada->folio);
 
                 return [$ficha, $notificacionId];
@@ -787,8 +838,9 @@ class SolicitudController extends Controller
         $datos = $request->validate(['comentario' => ['required', 'string', 'max:5000']]);
         $actor = $this->actor($request);
         $texto = trim($datos['comentario']);
-        $notificacionId = DB::transaction(function () use ($solicitud, $actor, $texto) {
+        $notificacionId = DB::transaction(function () use ($request, $solicitud, $actor, $texto) {
             DB::table('solicitud_observaciones')->insert(['id' => (string) Str::uuid(), 'solicitud_id' => $solicitud->id, 'texto' => $texto, 'tipo' => 'COMENTARIO', 'visible_ciudadano' => true, 'actor_tipo' => 'SERVIDOR_PUBLICO', 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'], 'created_at' => now(), 'updated_at' => now()]);
+            Auditoria::registrar($request, 'SOLICITUD_COMENTARIO_ENVIADO', 'SOLICITUD', $solicitud->id, null, ['comentario' => $texto]);
 
             return $this->notificacionPendiente($solicitud, 'SOLICITUD_COMENTARIO', 'Actualización de tu trámite · Folio '.$solicitud->folio);
         });
@@ -858,13 +910,7 @@ class SolicitudController extends Controller
                 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'],
                 'actor_departamento_snapshot' => $actor['departamento'], 'fecha' => now(),
             ]);
-            DB::table('auditorias')->insert([
-                'id' => (string) Str::uuid(), 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'],
-                'accion' => 'SOLICITUD_CORRECCION_SOLICITADA', 'entidad' => 'SOLICITUD', 'entidad_id' => $solicitudBloqueada->id,
-                'datos_anteriores' => json_encode(['solicitud_estado_id' => $estadoAnterior]),
-                'datos_nuevos' => json_encode(['solicitud_estado_id' => $estadoCorreccionId, 'campos_ids' => $archivos->pluck('campo_id')->all()]),
-                'ip' => $request->ip(), 'created_at' => now(),
-            ]);
+            Auditoria::registrar($request, 'SOLICITUD_CORRECCION_SOLICITADA', 'SOLICITUD', $solicitudBloqueada->id, ['solicitud_estado_id' => $estadoAnterior], ['solicitud_estado_id' => $estadoCorreccionId, 'campos_ids' => $archivos->pluck('campo_id')->all()]);
             $notificacionId = (string) Str::uuid();
             DB::table('notificacion_emails')->insert([
                 'id' => $notificacionId, 'solicitud_id' => $solicitudBloqueada->id, 'notificacion_estado_id' => $pendienteId,
@@ -953,13 +999,7 @@ class SolicitudController extends Controller
                     'actor_tipo' => 'SERVIDOR_PUBLICO', 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'],
                     'actor_departamento_snapshot' => $actor['departamento'], 'fecha' => now(),
                 ]);
-                DB::table('auditorias')->insert([
-                    'id' => (string) Str::uuid(), 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'],
-                    'accion' => 'SOLICITUD_APROBADA', 'entidad' => 'SOLICITUD', 'entidad_id' => $solicitudBloqueada->id,
-                    'datos_anteriores' => json_encode(['solicitud_estado_id' => $estadoAnterior]),
-                    'datos_nuevos' => json_encode(['solicitud_estado_id' => $aprobadaId, 'documento_emitido_id' => $documentoEmitido?->id, 'instrucciones' => $instrucciones]),
-                    'ip' => $request->ip(), 'created_at' => now(),
-                ]);
+                Auditoria::registrar($request, 'SOLICITUD_APROBADA', 'SOLICITUD', $solicitudBloqueada->id, ['solicitud_estado_id' => $estadoAnterior], ['solicitud_estado_id' => $aprobadaId, 'documento_emitido_id' => $documentoEmitido?->id, 'instrucciones' => $instrucciones]);
                 $notificacionId = (string) Str::uuid();
                 DB::table('notificacion_emails')->insert(['id' => $notificacionId, 'solicitud_id' => $solicitudBloqueada->id, 'notificacion_estado_id' => $pendienteId, 'destinatario' => $solicitudBloqueada->email_contacto, 'tipo' => 'SOLICITUD_APROBADA', 'asunto' => 'Solicitud aprobada · Folio '.$solicitudBloqueada->folio, 'intentos' => 0, 'created_at' => now(), 'updated_at' => now()]);
 
@@ -1013,14 +1053,7 @@ class SolicitudController extends Controller
                 'actor_nombre_snapshot' => $actor['nombre'], 'actor_departamento_snapshot' => $actor['departamento'],
                 'fecha' => now(),
             ]);
-            DB::table('auditorias')->insert([
-                'id' => (string) Str::uuid(), 'actor_accesos_id' => $actor['id'],
-                'actor_nombre_snapshot' => $actor['nombre'], 'accion' => 'SOLICITUD_RECHAZADA',
-                'entidad' => 'SOLICITUD', 'entidad_id' => $solicitudBloqueada->id,
-                'datos_anteriores' => json_encode(['solicitud_estado_id' => $estadoAnterior]),
-                'datos_nuevos' => json_encode(['solicitud_estado_id' => $rechazadaId, 'motivo' => $motivo]),
-                'ip' => $request->ip(), 'created_at' => now(),
-            ]);
+            Auditoria::registrar($request, 'SOLICITUD_RECHAZADA', 'SOLICITUD', $solicitudBloqueada->id, ['solicitud_estado_id' => $estadoAnterior], ['solicitud_estado_id' => $rechazadaId, 'motivo' => $motivo]);
 
             $notificacionId = (string) Str::uuid();
             DB::table('notificacion_emails')->insert([
@@ -1176,7 +1209,7 @@ class SolicitudController extends Controller
     private function registrarMovimiento(Solicitud $solicitud, int $anterior, int $nuevo, string $comentario, array $actor, string $accion, Request $request): void
     {
         DB::table('solicitud_historial_estados')->insert(['id' => (string) Str::uuid(), 'solicitud_id' => $solicitud->id, 'estado_anterior_id' => $anterior, 'estado_nuevo_id' => $nuevo, 'comentario' => $comentario, 'actor_tipo' => 'SERVIDOR_PUBLICO', 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'], 'actor_departamento_snapshot' => $actor['departamento'], 'fecha' => now()]);
-        DB::table('auditorias')->insert(['id' => (string) Str::uuid(), 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'], 'accion' => $accion, 'entidad' => 'SOLICITUD', 'entidad_id' => $solicitud->id, 'datos_anteriores' => json_encode(['solicitud_estado_id' => $anterior]), 'datos_nuevos' => json_encode(['solicitud_estado_id' => $nuevo, 'comentario' => $comentario]), 'ip' => $request->ip(), 'created_at' => now()]);
+        Auditoria::registrar($request, $accion, 'SOLICITUD', $solicitud->id, ['solicitud_estado_id' => $anterior], ['solicitud_estado_id' => $nuevo, 'comentario' => $comentario]);
     }
 
     private function notificacionPendiente(Solicitud $solicitud, string $tipo, string $asunto): string

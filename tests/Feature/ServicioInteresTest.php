@@ -29,6 +29,7 @@ class ServicioInteresTest extends TestCase
             $table->uuid('id')->primary();
             $table->string('actor_accesos_id')->nullable();
             $table->string('actor_nombre_snapshot')->nullable();
+            $table->string('actor_departamento_snapshot')->nullable();
             $table->string('accion');
             $table->string('entidad');
             $table->uuid('entidad_id')->nullable();
@@ -39,18 +40,16 @@ class ServicioInteresTest extends TestCase
         });
     }
 
-    public function test_service_routes_are_available_without_accesos_identity(): void
+    public function test_service_routes_require_an_accesos_identity(): void
     {
-        $this->get(route('servicios-interes.index'))->assertOk();
-        $this->get(route('servicios-interes.create'))->assertOk();
-        $this->post(route('servicios-interes.store'), $this->datos())
-            ->assertRedirect(route('servicios-interes.index'));
-        $this->assertDatabaseHas('auditorias', ['accion' => 'SERVICIO_INTERES_CREADO', 'actor_accesos_id' => null]);
+        $this->get(route('servicios-interes.index'))->assertRedirect(route('accesos.login'));
+        $this->get(route('servicios-interes.create'))->assertRedirect(route('accesos.login'));
+        $this->post(route('servicios-interes.store'), $this->datos())->assertRedirect(route('accesos.login'));
     }
 
     public function test_service_can_be_created_shown_updated_and_removed(): void
     {
-        $this->withSession(['accesos' => ['id' => 'funcionario-1', 'nombre' => 'Prueba']]);
+        $this->withSession(['accesos' => ['id' => 'funcionario-1', 'nombre' => 'Prueba', 'roles' => ['superadmin']]]);
 
         $this->post(route('servicios-interes.store'), $this->datos())
             ->assertRedirect(route('servicios-interes.index'));
@@ -80,7 +79,7 @@ class ServicioInteresTest extends TestCase
 
     public function test_rejects_unsafe_link_and_non_image_logo(): void
     {
-        $this->withSession(['accesos' => ['id' => 'funcionario-1']]);
+        $this->withSession(['accesos' => ['id' => 'funcionario-1', 'roles' => ['superadmin']]]);
         $this->post(route('servicios-interes.store'), $this->datos([
             'enlace' => 'javascript:alert(1)',
             'logo' => UploadedFile::fake()->create('archivo.pdf', 10, 'application/pdf'),

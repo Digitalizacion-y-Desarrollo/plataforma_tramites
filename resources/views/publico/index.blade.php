@@ -4,7 +4,7 @@
 
 @section('content')
     <section id="inicio" class="relative isolate min-h-[430px] overflow-hidden bg-[#340c1b]">
-        <img src="{{ asset('images/neza-hero.jpg') }}" alt="Vista panorámica del Municipio de Nezahualcóyotl"
+        <img src="{{ $portada ? Storage::disk('public')->url($portada) : asset('images/neza-hero.jpg') }}" alt="Vista panorámica del Municipio de Nezahualcóyotl"
             class="absolute inset-0 -z-20 size-full object-cover">
         <div class="absolute inset-0 -z-10 bg-[#340c1b]/45 mix-blend-multiply"></div>
         <div class="mx-auto flex min-h-[430px] max-w-[1440px] items-center justify-center px-4 py-12 sm:px-6 lg:px-[72px]">
