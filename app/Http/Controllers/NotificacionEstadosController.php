@@ -10,6 +10,8 @@ use Illuminate\Support\Str;
 
 class NotificacionEstadosController extends Controller
 {
+    private const ESTADOS_SISTEMA = ['PENDIENTE', 'ENVIADO', 'ERROR'];
+
     public function index()
     {
         $estados = NotificacionEstado::query()->orderBy('orden')->orderBy('nombre')->paginate(10);
@@ -45,6 +47,10 @@ class NotificacionEstadosController extends Controller
 
     public function update(Request $request, NotificacionEstado $catalogo_estado_notificacion)
     {
+        if (in_array($catalogo_estado_notificacion->clave, self::ESTADOS_SISTEMA, true) && ! $request->boolean('activo')) {
+            return back()->withInput()->withErrors(['estado' => 'Este estado es parte del flujo del sistema y no puede desactivarse.']);
+        }
+
         $anteriores = $catalogo_estado_notificacion->only(['clave', 'nombre', 'orden', 'activo']);
         $catalogo_estado_notificacion->update([...$this->validar($request), 'activo' => $request->boolean('activo')]);
         Auditoria::registrar($request, 'ESTADO_NOTIFICACION_ACTUALIZADO', 'ESTADO_NOTIFICACION', (string) $catalogo_estado_notificacion->id, $anteriores, $catalogo_estado_notificacion->only(['clave', 'nombre', 'orden', 'activo']));
@@ -54,6 +60,10 @@ class NotificacionEstadosController extends Controller
 
     public function destroy(Request $request, NotificacionEstado $catalogo_estado_notificacion)
     {
+        if (in_array($catalogo_estado_notificacion->clave, self::ESTADOS_SISTEMA, true)) {
+            return redirect()->route('catalogo-estados-notificaciones.index')->withErrors(['estado' => 'Este estado es parte del flujo del sistema y no puede eliminarse.']);
+        }
+
         if (DB::table('notificacion_emails')->where('notificacion_estado_id', $catalogo_estado_notificacion->id)->exists()) {
             return redirect()->route('catalogo-estados-notificaciones.index')->withErrors(['estado' => 'No se puede eliminar un estado utilizado por notificaciones enviadas.']);
         }
@@ -69,6 +79,10 @@ class NotificacionEstadosController extends Controller
 
     public function cambiarEstado(Request $request, NotificacionEstado $catalogo_estado_notificacion)
     {
+        if ($catalogo_estado_notificacion->activo && in_array($catalogo_estado_notificacion->clave, self::ESTADOS_SISTEMA, true)) {
+            return redirect()->route('catalogo-estados-notificaciones.index')->withErrors(['estado' => 'Este estado es parte del flujo del sistema y no puede desactivarse.']);
+        }
+
         $anterior = $catalogo_estado_notificacion->activo;
         $catalogo_estado_notificacion->update(['activo' => ! $catalogo_estado_notificacion->activo]);
         Auditoria::registrar($request, $catalogo_estado_notificacion->activo ? 'ESTADO_NOTIFICACION_ACTIVADO' : 'ESTADO_NOTIFICACION_DESACTIVADO', 'ESTADO_NOTIFICACION', (string) $catalogo_estado_notificacion->id, ['activo' => $anterior], ['activo' => $catalogo_estado_notificacion->activo]);

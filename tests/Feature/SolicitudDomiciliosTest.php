@@ -15,6 +15,8 @@ class SolicitudDomiciliosTest extends TestCase
 {
     private const CURP = 'GARC900101HMCXXX01';
 
+    private ?string $versionId = null;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -67,6 +69,7 @@ class SolicitudDomiciliosTest extends TestCase
         $this->assertDatabaseHas('solicitud_respuestas', ['campo_id' => $campoId]);
         $valor = DB::table('solicitud_respuestas')->where('campo_id', $campoId)->value('valor');
         $this->assertSame($domicilio, json_decode($valor, true));
+        $this->assertNotNull(DB::table('solicitudes')->value('aviso_privacidad_aceptado_at'));
     }
 
     public function test_solicitud_rechaza_un_codigo_postal_que_no_tiene_cinco_digitos(): void
@@ -243,15 +246,54 @@ class SolicitudDomiciliosTest extends TestCase
         $this->assertDatabaseCount('solicitud_respuestas', 0);
     }
 
+    public function test_solicitud_rechaza_una_version_de_formulario_que_ya_no_esta_vigente(): void
+    {
+        [$tramite, , $campoId] = $this->crearFormulario();
+        $datos = $this->datosSolicitud($campoId, [
+            'colonia' => 'Centro',
+            'codigo_postal' => '06000',
+            'municipio' => 'Cuauhtémoc',
+            'calle' => 'Avenida Juárez',
+            'numero' => '123',
+        ]);
+        $datos['formulario_version_id'] = (string) Str::uuid();
+
+        $this->post(route('portal.tramites.solicitudes.store', $tramite), $datos)
+            ->assertSessionHasErrors('formulario_version_id');
+
+        $this->assertDatabaseCount('solicitudes', 0);
+        $this->assertDatabaseCount('solicitud_respuestas', 0);
+    }
+
+    public function test_solicitud_exige_aceptar_el_aviso_de_privacidad(): void
+    {
+        [$tramite, , $campoId] = $this->crearFormulario();
+        $datos = $this->datosSolicitud($campoId, [
+            'colonia' => 'Centro',
+            'codigo_postal' => '06000',
+            'municipio' => 'Cuauhtémoc',
+            'calle' => 'Avenida Juárez',
+            'numero' => '123',
+        ]);
+        unset($datos['acepto_aviso_privacidad']);
+
+        $this->post(route('portal.tramites.solicitudes.store', $tramite), $datos)
+            ->assertSessionHasErrors('acepto_aviso_privacidad');
+
+        $this->assertDatabaseCount('solicitudes', 0);
+    }
+
     private function datosSolicitud(string $campoId, array $domicilio): array
     {
         return [
+            'formulario_version_id' => $this->versionId,
             'nombres_solicitante' => 'Ana',
             'apellido_paterno_solicitante' => 'García',
             'apellido_materno_solicitante' => 'López',
             'curp_consulta' => self::CURP,
             'email_contacto' => 'ana@example.test',
             'telefono_contacto' => '5512345678',
+            'acepto_aviso_privacidad' => '1',
             'respuestas' => [$campoId => $domicilio],
         ];
     }
@@ -265,6 +307,7 @@ class SolicitudDomiciliosTest extends TestCase
         $versionId = (string) Str::uuid();
         $seccionId = (string) Str::uuid();
         $campoId = (string) Str::uuid();
+        $this->versionId = $versionId;
 
         DB::table('formularios')->insert([
             'id' => $formularioId,
@@ -276,7 +319,7 @@ class SolicitudDomiciliosTest extends TestCase
         DB::table('formulario_versiones')->insert([
             'id' => $versionId,
             'formulario_id' => $formularioId,
-            'formulario_estado_id' => 1,
+            'formulario_estado_id' => 2,
             'numero_version' => 1,
             'created_at' => now(),
             'updated_at' => now(),
@@ -478,6 +521,7 @@ class SolicitudDomiciliosTest extends TestCase
             $table->unsignedSmallInteger('pago_vigencia_dias')->nullable();
             $table->timestamp('fecha_envio')->nullable();
             $table->timestamp('fecha_terminacion')->nullable();
+            $table->timestamp('aviso_privacidad_aceptado_at')->nullable();
             $table->timestamps();
         });
         Schema::create('solicitud_respuestas', function (Blueprint $table): void {
@@ -524,12 +568,8 @@ class SolicitudDomiciliosTest extends TestCase
             'updated_at' => now(),
         ]);
         DB::table('formulario_estados')->insert([
-            'id' => 1,
-            'clave' => 'BORRADOR',
-            'nombre' => 'Borrador',
-            'activo' => true,
-            'created_at' => now(),
-            'updated_at' => now(),
+            ['id' => 1, 'clave' => 'BORRADOR', 'nombre' => 'Borrador', 'activo' => true, 'created_at' => now(), 'updated_at' => now()],
+            ['id' => 2, 'clave' => 'PUBLICADO', 'nombre' => 'Publicado', 'activo' => true, 'created_at' => now(), 'updated_at' => now()],
         ]);
         DB::table('solicitud_estados')->insert([
             'id' => 1,

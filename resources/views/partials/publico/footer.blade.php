@@ -39,6 +39,7 @@
                     <li><a href="{{ route('portal.tramites.index') }}" class="transition hover:text-white">Trámites</a></li>
                     <li><a href="{{ request()->routeIs('portal.publico') ? '#servicios' : route('portal.publico').'#servicios' }}" class="transition hover:text-white">Servicios</a></li>
                     <li><a href="{{ route('portal.publico') }}#consulta" class="transition hover:text-white">Consulta de solicitudes</a></li>
+                    <li><a href="{{ route('portal.aviso-privacidad') }}" class="transition hover:text-white">Aviso de privacidad</a></li>
                     <li>
                         <button type="button" data-accessibility-open aria-haspopup="dialog" aria-controls="accessibility-dialog" class="text-left text-white/70 transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white">Accesibilidad</button>
                     </li>

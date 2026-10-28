@@ -22,6 +22,7 @@ class DatabaseSeeder extends Seeder
             TramiteEstadoSeeder::class,
             TramiteSeeder::class,
             ConstanciaIdentidadSeeder::class,
+            ConstanciaResidenciaSeeder::class,
         ]);
     }
 }

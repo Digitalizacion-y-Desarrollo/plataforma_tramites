@@ -26,7 +26,7 @@ class AppServiceProvider extends ServiceProvider
         // Compatible con servidores MySQL/MariaDB que limitan los índices a 1000 bytes.
         Schema::defaultStringLength(191);
 
-        View::composer(['publico.index', 'partials.publico.footer'], function ($view): void {
+        View::composer(['publico.index', 'publico.aviso-privacidad', 'partials.publico.footer'], function ($view): void {
             $canalesAyuda = Schema::hasTable('canales_ayuda') ? CanalAyuda::query()->first() : null;
             $portada = Schema::hasTable('configuraciones_generales') ? ConfiguracionGeneral::query()->value('portada_storage_key') : null;
             $view->with(compact('canalesAyuda', 'portada'));

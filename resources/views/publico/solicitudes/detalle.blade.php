@@ -26,6 +26,12 @@
                     <div class="mt-2 flex flex-wrap items-center gap-3"><h2 id="estado-actual" class="text-xl font-bold text-neza-ink">{{ $tituloEstado }}</h2>@include('partials.publico.solicitud-estado', ['estado' => $solicitud->estado])</div>
                     <p class="mt-2 text-sm leading-relaxed text-neza-ink">{{ $siguientePaso }}</p>
                 </section>
+                @if (filled($instruccionesAprobacion))
+                    <section aria-labelledby="instrucciones-aprobacion" class="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-5">
+                        <h2 id="instrucciones-aprobacion" class="text-base font-bold text-emerald-900">Instrucciones para concluir tu trámite</h2>
+                        <p class="mt-2 whitespace-pre-line text-sm leading-relaxed text-emerald-900">{{ $instruccionesAprobacion }}</p>
+                    </section>
+                @endif
                 <section aria-labelledby="progreso-titulo" class="mt-5">
                     <h2 id="progreso-titulo" class="text-base font-bold">Progreso de tu solicitud</h2>
                     <div class="mt-3 rounded-2xl border border-neza-line bg-white p-5">@include('partials.publico.solicitud-progreso', ['estado' => $solicitud->estado, 'flujoPago' => $solicitud->flujo_pago])</div>
@@ -44,9 +50,13 @@
                 @if ($solicitud->estado->clave === 'EN_ESPERA_DE_PAGO' && $pago)
                     <div class="mt-6 border-t border-neza-line pt-5">
                         <p class="text-sm font-semibold text-neza-ink">Tu ficha de pago está lista.</p>
-                        <p class="mt-1 text-sm text-neza-muted">Realiza el pago antes del {{ $pago->fecha_vencimiento->format('d/m/Y') }} para continuar con tu trámite.</p>
+                        @if (! $pago->vencido())
+                            <p class="mt-1 text-sm text-neza-muted">Realiza el pago antes del {{ $pago->fecha_vencimiento->format('d/m/Y') }} para continuar con tu trámite.</p>
+                        @endif
                         @if (filled($pago->fichaVigente?->indicaciones))<div class="mt-4 rounded-xl border border-neza-line bg-neza-canvas p-4"><p class="text-sm font-bold text-neza-ink">Indicaciones de pago</p><p class="mt-2 whitespace-pre-line text-sm text-neza-ink">{{ $pago->fichaVigente->indicaciones }}</p></div>@endif
-                        <a href="{{ route('consulta.pagos.referencia.descargar', $pago) }}" class="mt-4 inline-flex items-center gap-2 rounded-xl bg-neza-wine px-5 py-3 text-sm font-bold text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5v-9m0 9-3.75-3.75M12 16.5l3.75-3.75M3.75 17.25v1.5A2.25 2.25 0 0 0 6 21h12a2.25 2.25 0 0 0 2.25-2.25v-1.5" /></svg>Descargar ficha de pago</a>
+                        @if (! $pago->vencido())
+                            <a href="{{ route('consulta.pagos.referencia.descargar', $pago) }}" class="mt-4 inline-flex items-center gap-2 rounded-xl bg-neza-wine px-5 py-3 text-sm font-bold text-white hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5v-9m0 9-3.75-3.75M12 16.5l3.75-3.75M3.75 17.25v1.5A2.25 2.25 0 0 0 6 21h12a2.25 2.25 0 0 0 2.25-2.25v-1.5" /></svg>Descargar ficha de pago</a>
+                        @endif
 
                         @if (session('success'))
                             <p role="status" class="mt-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-semibold text-emerald-800">{{ session('success') }}</p>

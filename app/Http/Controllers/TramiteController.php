@@ -11,6 +11,7 @@ use App\Models\TramiteEstado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class TramiteController extends Controller
 {
@@ -27,6 +28,12 @@ class TramiteController extends Controller
         $totalTramites = Tramite::count();
         $tramitesActivos = Tramite::where('activo', true)->count();
         $tramitesInactivos = $totalTramites - $tramitesActivos;
+        $tramitesPublicados = Tramite::whereHas('estado', fn ($estado) => $estado->where('clave', 'PUBLICADO'))->count();
+        $tramitesBorrador = Tramite::where(function ($consulta): void {
+            $consulta->whereNull('tramite_estado_id')
+                ->orWhereHas('estado', fn ($estado) => $estado->where('clave', 'BORRADOR'));
+        })->count();
+        $tramitesArchivados = Tramite::whereHas('estado', fn ($estado) => $estado->where('clave', 'ARCHIVADO'))->count();
 
         try {
             $departamentos = collect($accesos->departamentosActivos())
@@ -49,7 +56,7 @@ class TramiteController extends Controller
                 || ! DB::table('tramite_formulario')->where('formulario_version_id', $version->id)->where('activo', true)->exists())
             ->values();
 
-        return view('tramites.index', compact('tramites', 'totalTramites', 'tramitesActivos', 'tramitesInactivos', 'departamentos', 'formularios'));
+        return view('tramites.index', compact('tramites', 'totalTramites', 'tramitesActivos', 'tramitesInactivos', 'tramitesPublicados', 'tramitesBorrador', 'tramitesArchivados', 'departamentos', 'formularios'));
     }
 
     /**
@@ -97,6 +104,7 @@ class TramiteController extends Controller
                 'clave' => $this->generarClave(), 'nombre' => $datos['nombre'], 'descripcion' => $datos['descripcion'] ?? null,
                 'departamento_accesos_id' => $departamento['id'], 'departamento_nombre_snapshot' => $departamento['nombre'],
                 ...$this->datosPublicos($datos), 'activo' => $request->boolean('activo'),
+                'tramite_estado_id' => $this->estadoId('BORRADOR'),
             ]);
             $this->sincronizarFormulario($tramite, $datos['formulario_version_id'] ?? null, $departamento['id']);
             Auditoria::registrar($request, 'TRAMITE_CREADO', 'TRAMITE', $tramite->id, null, $this->datosAuditoria($tramite->refresh()));
@@ -196,8 +204,22 @@ class TramiteController extends Controller
     public function publicar(Request $request, Tramite $catalogo_tramite)
     {
         $catalogo_tramite->load('estado');
-        if ($catalogo_tramite->estado?->clave !== 'BORRADOR') {
+        $estadoActual = $catalogo_tramite->estado?->clave ?? 'BORRADOR';
+
+        if ($estadoActual !== 'BORRADOR') {
             return back()->withErrors(['estado' => 'Solo los trámites en borrador pueden publicarse.']);
+        }
+
+        $formularioEnBorrador = DB::table('tramite_formulario as vinculo')
+            ->join('formulario_versiones as version', 'version.id', '=', 'vinculo.formulario_version_id')
+            ->join('formulario_estados as estado', 'estado.id', '=', 'version.formulario_estado_id')
+            ->where('vinculo.tramite_id', $catalogo_tramite->id)
+            ->where('vinculo.activo', true)
+            ->where('estado.clave', 'BORRADOR')
+            ->exists();
+
+        if ($formularioEnBorrador) {
+            return back()->withErrors(['estado' => 'El formulario activo todavía está en borrador. Publica primero la versión del formulario.']);
         }
 
         $anterior = $catalogo_tramite->tramite_estado_id;
@@ -298,11 +320,58 @@ class TramiteController extends Controller
             return;
         }
 
-        $version = FormularioVersion::query()->with(['formulario', 'estado'])->lockForUpdate()->findOrFail($versionId);
-        abort_unless(in_array($version->estado?->clave, ['BORRADOR', 'PUBLICADO'], true)
-            && $version->formulario?->departamento_accesos_id === $departamentoId, 422, 'El formulario debe pertenecer al departamento seleccionado.');
-        abort_if(DB::table('tramite_formulario')->where('formulario_version_id', $version->id)->where('activo', true)->exists(), 422, 'El formulario ya está asignado a otro trámite.');
+        $version = FormularioVersion::query()->with(['formulario', 'estado'])->lockForUpdate()->find($versionId);
 
-        DB::table('tramite_formulario')->insert(['id' => (string) Str::uuid(), 'tramite_id' => $tramite->id, 'formulario_version_id' => $version->id, 'fecha_inicio_vigencia' => now(), 'activo' => true, 'created_at' => now(), 'updated_at' => now()]);
+        if (! $version || $version->estado?->clave === 'ARCHIVADO') {
+            throw ValidationException::withMessages([
+                'formulario_version_id' => 'La versión del formulario ya no está disponible. Selecciona otra.',
+            ]);
+        }
+
+        if ($version->formulario?->departamento_accesos_id !== $departamentoId) {
+            throw ValidationException::withMessages([
+                'formulario_version_id' => 'El formulario debe pertenecer al departamento seleccionado.',
+            ]);
+        }
+
+        $tramite->loadMissing('estado');
+
+        if ($tramite->estado?->clave === 'PUBLICADO' && $version->estado?->clave !== 'PUBLICADO') {
+            throw ValidationException::withMessages([
+                'formulario_version_id' => 'Un trámite publicado solo puede usar una versión publicada del formulario. Publica primero la nueva versión.',
+            ]);
+        }
+
+        if (DB::table('tramite_formulario')->where('formulario_version_id', $version->id)->where('activo', true)->where('tramite_id', '!=', $tramite->id)->exists()) {
+            throw ValidationException::withMessages([
+                'formulario_version_id' => 'El formulario ya está asignado a otro trámite.',
+            ]);
+        }
+
+        $vinculoHistorico = DB::table('tramite_formulario')
+            ->where('tramite_id', $tramite->id)
+            ->where('formulario_version_id', $version->id)
+            ->first();
+
+        if ($vinculoHistorico) {
+            DB::table('tramite_formulario')->where('id', $vinculoHistorico->id)->update([
+                'fecha_inicio_vigencia' => now(),
+                'fecha_fin_vigencia' => null,
+                'activo' => true,
+                'updated_at' => now(),
+            ]);
+
+            return;
+        }
+
+        DB::table('tramite_formulario')->insert([
+            'id' => (string) Str::uuid(),
+            'tramite_id' => $tramite->id,
+            'formulario_version_id' => $version->id,
+            'fecha_inicio_vigencia' => now(),
+            'activo' => true,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
     }
 }

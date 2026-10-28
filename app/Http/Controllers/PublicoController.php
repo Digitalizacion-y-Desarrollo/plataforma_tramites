@@ -43,6 +43,11 @@ class PublicoController extends Controller
         return view('publico.index', compact('tramites', 'servicios', 'consultaPendiente'));
     }
 
+    public function avisoPrivacidad(): View
+    {
+        return view('publico.aviso-privacidad');
+    }
+
     public function tramites(Request $request): View
     {
         $filtros = $request->validate([
@@ -116,7 +121,7 @@ class PublicoController extends Controller
 
     public function detalle(Tramite $tramite): View
     {
-        abort_unless($tramite->activo, 404);
+        abort_unless($this->esTramitePublicado($tramite), 404);
 
         $formularioVersion = $this->formularioActivo($tramite);
 
@@ -125,7 +130,7 @@ class PublicoController extends Controller
 
     public function iniciar(Tramite $tramite): View
     {
-        abort_unless($tramite->activo, 404);
+        abort_unless($this->esTramitePublicado($tramite), 404);
 
         $formularioVersion = $this->formularioActivo($tramite);
         abort_unless($formularioVersion, 404);
@@ -135,17 +140,25 @@ class PublicoController extends Controller
 
     public function storeSolicitud(Request $request, Tramite $tramite)
     {
-        abort_unless($tramite->activo, 404);
+        abort_unless($this->esTramitePublicado($tramite), 404);
         $formularioVersion = $this->formularioActivo($tramite);
         abort_unless($formularioVersion, 404);
         $base = $request->validate([
+            'formulario_version_id' => ['required', 'uuid'],
             'nombres_solicitante' => ['required', 'string', 'min:2', 'max:100'],
             'apellido_paterno_solicitante' => ['required', 'string', 'min:2', 'max:100'],
             'apellido_materno_solicitante' => ['required', 'string', 'min:2', 'max:100'],
             'curp_consulta' => ['required', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'],
             'email_contacto' => ['required', 'email', 'max:200'],
             'telefono_contacto' => ['required', 'string', 'regex:/^[0-9+()\-\s]{7,30}$/'],
+            'acepto_aviso_privacidad' => ['accepted'],
         ]);
+
+        if ($base['formulario_version_id'] !== $formularioVersion->id) {
+            return back()
+                ->withInput()
+                ->withErrors(['formulario_version_id' => 'El formulario cambió mientras lo llenabas. Recarga la página para continuar con la versión vigente.']);
+        }
 
         $solicitudActiva = Solicitud::query()
             ->where('tramite_id', $tramite->id)
@@ -241,7 +254,7 @@ class PublicoController extends Controller
             $nombres = trim($base['nombres_solicitante']);
             $paterno = trim($base['apellido_paterno_solicitante']);
             $materno = trim($base['apellido_materno_solicitante']);
-            DB::table('solicitudes')->insert(['id' => $id, 'folio' => $folio, 'tramite_id' => $tramite->id, 'departamento_accesos_id_snapshot' => $tramite->departamento_accesos_id, 'departamento_nombre_snapshot' => $tramite->departamento_nombre_snapshot, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => Str::upper($base['curp_consulta']), 'email_contacto' => Str::lower(trim($base['email_contacto'])), 'telefono_contacto' => trim($base['telefono_contacto']), 'nombre_solicitante_snapshot' => implode(' ', [$nombres, $paterno, $materno]), 'nombres_solicitante' => $nombres, 'apellido_paterno_solicitante' => $paterno, 'apellido_materno_solicitante' => $materno, 'flujo_pago' => $tramite->flujo_pago ?? 'SIN_PAGO', 'importe_pago' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->costo_pago, 'pago_vigencia_dias' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->pago_vigencia_dias, 'fecha_envio' => now(), 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('solicitudes')->insert(['id' => $id, 'folio' => $folio, 'tramite_id' => $tramite->id, 'departamento_accesos_id_snapshot' => $tramite->departamento_accesos_id, 'departamento_nombre_snapshot' => $tramite->departamento_nombre_snapshot, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => Str::upper($base['curp_consulta']), 'email_contacto' => Str::lower(trim($base['email_contacto'])), 'telefono_contacto' => trim($base['telefono_contacto']), 'nombre_solicitante_snapshot' => implode(' ', [$nombres, $paterno, $materno]), 'nombres_solicitante' => $nombres, 'apellido_paterno_solicitante' => $paterno, 'apellido_materno_solicitante' => $materno, 'flujo_pago' => $tramite->flujo_pago ?? 'SIN_PAGO', 'importe_pago' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->costo_pago, 'pago_vigencia_dias' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->pago_vigencia_dias, 'fecha_envio' => now(), 'aviso_privacidad_aceptado_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
             foreach ($campos as $campo) {
                 $valor = $respuestas[$campo->id] ?? null;
                 if ($campo->tipo === 'FILE' && request()->hasFile('respuestas.'.$campo->id)) {
@@ -362,17 +375,40 @@ class PublicoController extends Controller
 
     public function verificarToken(Request $request)
     {
-        $datos = $request->validate(['token' => ['required', 'digits:6']]);
+        $datos = $request->validate([
+            'token' => ['required', 'digits:6'],
+            'curp' => ['nullable', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i', 'required_with:email_contacto'],
+            'email_contacto' => ['nullable', 'email', 'max:200', 'required_with:curp'],
+        ]);
+
         $pendiente = $request->session()->get('consulta_pendiente');
+        $identidadProporcionada = filled($datos['curp'] ?? null) && filled($datos['email_contacto'] ?? null);
+
+        if ($identidadProporcionada) {
+            $pendiente = [
+                'curp' => Str::upper(trim($datos['curp'])),
+                'email' => Str::lower(trim($datos['email_contacto'])),
+                'expira' => now()->addMinutes(30)->timestamp,
+            ];
+        }
+
         if (! is_array($pendiente) || ! isset($pendiente['curp'], $pendiente['email'], $pendiente['expira']) || now()->timestamp >= $pendiente['expira']) {
-            if (is_array($pendiente) && isset($pendiente['curp'], $pendiente['email'])) {
-                DB::table('token_consultas')->where('curp', $pendiente['curp'])->where('email_destino', $pendiente['email'])
-                    ->where('utilizado', false)->update(['utilizado' => true, 'updated_at' => now()]);
+            if (! $identidadProporcionada && is_array($pendiente) && isset($pendiente['curp'], $pendiente['email'])) {
+                DB::table('token_consultas')
+                    ->where('curp', $pendiente['curp'])
+                    ->where('email_destino', $pendiente['email'])
+                    ->where('utilizado', false)
+                    ->update(['utilizado' => true, 'updated_at' => now()]);
             }
+
             $request->session()->forget('consulta_pendiente');
 
-            return redirect(route('portal.publico').'#consulta')->with('consulta_aviso', 'El código venció. Inicia una nueva consulta.');
+            if (! $identidadProporcionada) {
+                return redirect(route('portal.publico').'#consulta')
+                    ->with('consulta_aviso', 'El código venció. Ingresa tus datos y solicita uno nuevo, o usa otro código vigente en este dispositivo.');
+            }
         }
+
         $valido = DB::transaction(function () use ($pendiente, $datos) {
             $registro = DB::table('token_consultas')->where('curp', $pendiente['curp'])
                 ->where('email_destino', $pendiente['email'])->where('utilizado', false)
@@ -390,8 +426,11 @@ class PublicoController extends Controller
 
             return true;
         });
+
         if (! $valido) {
-            return redirect(route('portal.publico').'#consulta')->withErrors(['token' => 'El código es inválido, venció o alcanzó el límite de intentos.']);
+            return redirect(route('portal.publico').'#consulta')
+                ->withInput()
+                ->withErrors(['token' => 'El código es inválido, venció o alcanzó el límite de intentos.']);
         }
 
         $request->session()->regenerate();
@@ -470,8 +509,11 @@ class PublicoController extends Controller
             ->orderByDesc('observacion.created_at')
             ->first(['observacion.id']);
         $puedeResponderComentario = $comentarioPendiente !== null;
+        $instruccionesAprobacion = Schema::hasTable('solicitud_aprobaciones')
+            ? DB::table('solicitud_aprobaciones')->where('solicitud_id', $solicitud->id)->value('instrucciones')
+            : null;
 
-        return view('publico.solicitudes.detalle', compact('solicitud', 'historial', 'observaciones', 'pago', 'puedeResponderComentario'));
+        return view('publico.solicitudes.detalle', compact('solicitud', 'historial', 'observaciones', 'pago', 'puedeResponderComentario', 'instruccionesAprobacion'));
     }
 
     public function responderComentario(Request $request, Solicitud $solicitud): RedirectResponse
@@ -569,6 +611,10 @@ class PublicoController extends Controller
 
         abort_unless($acceso['curp'] === $pago->solicitud->curp_consulta && $acceso['email'] === Str::lower($pago->solicitud->email_contacto), 404);
         abort_unless($pago->solicitud->estado?->clave === 'EN_ESPERA_DE_PAGO', 404);
+        if ($pago->vencido()) {
+            return redirect()->route('consulta.solicitudes.detalle', $pago->solicitud)
+                ->withErrors(['pago' => 'La referencia de pago venció. Solicita al área responsable una nueva referencia para continuar.']);
+        }
         $ficha = $pago->relationLoaded('fichaVigente') ? $pago->getRelation('fichaVigente') : null;
         $storageKey = $ficha?->storage_key ?? $pago->pdf_storage_key;
         $nombreOriginal = $ficha?->nombre_original ?? $pago->pdf_nombre_original;
@@ -750,9 +796,15 @@ class PublicoController extends Controller
 
     private function formularioActivo(Tramite $tramite)
     {
-        return $tramite->formulariosVersiones()
+        $consulta = $tramite->formulariosVersiones()
             ->wherePivot('activo', true)
-            ->whereHas('formulario')
+            ->whereHas('formulario');
+
+        if (Schema::hasTable('formulario_estados') && DB::table('formulario_estados')->where('clave', 'PUBLICADO')->exists()) {
+            $consulta->whereHas('estado', fn ($estado) => $estado->where('clave', 'PUBLICADO'));
+        }
+
+        return $consulta
             ->with(['formulario', 'secciones.campos.opciones', 'secciones.campos.gruposCampos.condicionesDestino.campoOrigen.opciones', 'secciones.campos.condicionesDestino.campoOrigen.opciones'])
             ->orderByDesc('numero_version')
             ->first();
@@ -764,10 +816,30 @@ class PublicoController extends Controller
             return collect();
         }
 
-        return Tramite::query()
+        $consulta = Tramite::query()
             ->where('activo', true)
-            ->orderBy('nombre')
-            ->get();
+            ->orderBy('nombre');
+
+        if (DB::table('tramite_estados')->where('clave', 'PUBLICADO')->exists()) {
+            $consulta->whereHas('estado', fn ($estado) => $estado->where('clave', 'PUBLICADO'));
+        }
+
+        return $consulta->get();
+    }
+
+    private function esTramitePublicado(Tramite $tramite): bool
+    {
+        if (! $tramite->activo) {
+            return false;
+        }
+
+        if (! Schema::hasTable('tramite_estados') || ! DB::table('tramite_estados')->where('clave', 'PUBLICADO')->exists()) {
+            return true;
+        }
+
+        $tramite->loadMissing('estado');
+
+        return $tramite->estado?->clave === 'PUBLICADO';
     }
 
     private function esRequerido($campo, array $respuestas): bool

@@ -30,26 +30,62 @@
         </section>
 
         <form
-            class="grid gap-3 rounded-xl border border-neza-line bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,2fr)_repeat(4,minmax(0,1fr))_auto]"
+            class="grid gap-3 rounded-xl border border-neza-line bg-white p-4 shadow-sm lg:grid-cols-[minmax(0,2fr)_repeat(3,minmax(0,1fr))_auto] lg:items-end"
             action="{{ route('formulario.index') }}" method="GET">
-            <label class="block"><span class="sr-only">Buscar formularios</span><span class="relative block"><span
-                        class="pointer-events-none absolute inset-y-0 left-3 flex items-center"><svg
-                            class="size-5 text-neza-muted" aria-hidden="true" fill="none" viewBox="0 0 24 24"
+            @if (($filtros['filtro'] ?? null) === 'RECIENTES')
+                <input type="hidden" name="filtro" value="RECIENTES">
+            @endif
+            <div>
+                <label for="formulario-buscar" class="mb-1 block text-xs font-medium text-neza-muted">Buscar</label>
+                <div class="relative">
+                    <span class="pointer-events-none absolute inset-y-0 left-3 flex items-center">
+                        <svg class="size-5 text-neza-muted" aria-hidden="true" fill="none" viewBox="0 0 24 24"
                             stroke-width="1.5" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round"
                                 d="m21 21-4.35-4.35m2.1-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
-                        </svg></span><input type="search" name="buscar"
-                        placeholder="Buscar por nombre, trámite o departamento"
-                        class="w-full rounded-lg border border-neza-line bg-neza-canvas py-2.5 pl-10 pr-3 text-sm text-neza-ink placeholder:text-neza-muted focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft"></span></label>
-            @foreach (['Estado' => 'Todos', 'Trámite' => 'Todos', 'Departamento' => 'Todos', 'Tipo' => 'Todos'] as $etiqueta => $valor)
-                <label class="block text-xs font-medium text-neza-muted">{{ $etiqueta }}<select
-                        class="mt-1 w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm text-neza-ink focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft">
-                        <option>{{ $valor }}</option>
-                    </select></label>
-            @endforeach
-            <button type="reset"
-                class="self-end rounded-lg border border-neza-line px-4 py-2.5 text-sm font-semibold text-neza-muted transition hover:bg-neza-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Limpiar
-                filtros</button>
+                        </svg>
+                    </span>
+                    <input id="formulario-buscar" type="search" name="q" value="{{ $filtros['q'] ?? '' }}"
+                        placeholder="Nombre, trámite o departamento"
+                        class="w-full rounded-lg border border-neza-line bg-neza-canvas py-2.5 pl-10 pr-3 text-sm text-neza-ink placeholder:text-neza-muted focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft">
+                </div>
+            </div>
+            <div>
+                <label for="formulario-estado" class="mb-1 block text-xs font-medium text-neza-muted">Estado</label>
+                <select id="formulario-estado" name="estado"
+                    class="w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm text-neza-ink focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft">
+                    <option value="">Todos los estados</option>
+                    @foreach (['BORRADOR' => 'Borrador', 'PUBLICADO' => 'Publicado', 'ARCHIVADO' => 'Archivado'] as $clave => $etiqueta)
+                        <option value="{{ $clave }}" @selected(($filtros['estado'] ?? '') === $clave)>{{ $etiqueta }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="formulario-tramite" class="mb-1 block text-xs font-medium text-neza-muted">Trámite</label>
+                <select id="formulario-tramite" name="tramite_id"
+                    class="w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm text-neza-ink focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft">
+                    <option value="">Todos los trámites</option>
+                    @foreach ($tramitesDisponibles as $tramite)
+                        <option value="{{ $tramite->id }}" @selected((string) ($filtros['tramite_id'] ?? '') === (string) $tramite->id)>{{ $tramite->nombre }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label for="formulario-departamento" class="mb-1 block text-xs font-medium text-neza-muted">Departamento</label>
+                <select id="formulario-departamento" name="departamento"
+                    class="w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm text-neza-ink focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft">
+                    <option value="">Todos los departamentos</option>
+                    @foreach ($departamentosDisponibles as $departamento)
+                        <option value="{{ $departamento }}" @selected(($filtros['departamento'] ?? '') === $departamento)>{{ $departamento }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="flex gap-2">
+                <button type="submit"
+                    class="rounded-lg bg-neza-wine px-4 py-2.5 text-sm font-semibold text-white transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Filtrar</button>
+                <a href="{{ route('formulario.index') }}"
+                    class="inline-flex items-center rounded-lg border border-neza-line px-4 py-2.5 text-sm font-semibold text-neza-muted transition hover:bg-neza-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Limpiar</a>
+            </div>
         </form>
 
         <div class="grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
@@ -62,11 +98,14 @@
                     </div>
                 </div>
                 <div class="flex flex-wrap gap-2 border-b border-neza-line px-5 py-3">
-                    <a class="rounded-md px-3 py-1.5 text-xs font-semibold {{ $filtro === '' ? 'bg-neza-wine text-white' : 'bg-neza-wine-soft text-neza-wine hover:bg-neza-wine hover:text-white' }}"
-                        href="{{ route('formulario.index') }}">Todos <span
+                    @php
+                        $filtrosBase = request()->except(['filtro', 'page']);
+                    @endphp
+                    <a class="rounded-md px-3 py-1.5 text-xs font-semibold {{ ($filtros['filtro'] ?? null) === null ? 'bg-neza-wine text-white' : 'bg-neza-wine-soft text-neza-wine hover:bg-neza-wine hover:text-white' }}"
+                        href="{{ route('formulario.index', $filtrosBase) }}">Todos <span
                             class="ml-1 opacity-80">({{ $conteos['todos'] }})</span></a>
-                    <a class="rounded-md px-3 py-1.5 text-xs font-semibold {{ $filtro === 'RECIENTES' ? 'bg-rose-700 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100' }}"
-                        href="{{ route('formulario.index', ['filtro' => 'RECIENTES']) }}">Con cambios recientes <span class="ml-1 opacity-80">({{ $conteos['RECIENTES'] }})</span></a>
+                    <a class="rounded-md px-3 py-1.5 text-xs font-semibold {{ ($filtros['filtro'] ?? null) === 'RECIENTES' ? 'bg-rose-700 text-white' : 'bg-rose-50 text-rose-700 hover:bg-rose-100' }}"
+                        href="{{ route('formulario.index', array_merge($filtrosBase, ['filtro' => 'RECIENTES'])) }}">Con cambios recientes <span class="ml-1 opacity-80">({{ $conteos['RECIENTES'] }})</span></a>
                 </div>
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[780px] text-left text-sm">
@@ -94,12 +133,22 @@
                                             ->join(', ') ?:
                                         'Sin trámite')
                                         : 'Sin trámite';
+                                    $estadoClave = $version?->estado?->clave;
+                                    $estadoEstilo = match ($estadoClave) {
+                                        'PUBLICADO' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                                        'ARCHIVADO' => 'bg-slate-100 text-slate-600 ring-slate-200',
+                                        default => 'bg-amber-50 text-amber-800 ring-amber-200',
+                                    };
                                 @endphp
                                 <tr class="hover:bg-neza-canvas">
                                     <td class="px-5 py-4">
                                         <p class="font-semibold text-neza-ink">{{ $formulario->nombre }}</p>
-                                        <p class="mt-1 text-xs text-neza-muted">Versión
-                                            {{ $version?->numero_version ?? '—' }}</p>
+                                        <p class="mt-1 flex flex-wrap items-center gap-2 text-xs text-neza-muted">
+                                            <span>Versión {{ $version?->numero_version ?? '—' }}</span>
+                                            @if ($estadoClave)
+                                                <span class="inline-flex rounded-full px-2 py-0.5 font-semibold ring-1 ring-inset {{ $estadoEstilo }}">{{ $version->estado->nombre }}</span>
+                                            @endif
+                                        </p>
                                     </td>
                                     <td class="px-4 py-4 text-neza-muted">{{ $tramites }}</td>
                                     <td class="px-4 py-4 text-neza-muted">
@@ -124,7 +173,8 @@
                                                 </svg>
                                             </a>
                                             <a href="{{ route('formulario.duplicar', $formulario) }}"
-                                                title="Duplicar formulario"
+                                                title="Duplicar como nuevo formulario"
+                                                aria-label="Duplicar {{ $formulario->nombre }} como nuevo formulario"
                                                 class="text-sm font-semibold text-neza-muted hover:text-indigo-600">
                                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none"
                                                     viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
@@ -133,6 +183,21 @@
                                                         d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
                                                 </svg>
                                             </a>
+                                            @if ($version && $estadoClave !== 'BORRADOR')
+                                                <form action="{{ route('formulario.versiones.store', $formulario) }}"
+                                                    method="POST" class="inline-flex">
+                                                    @csrf
+                                                    <button type="submit" title="Crear nueva versión"
+                                                        aria-label="Crear nueva versión de {{ $formulario->nombre }}"
+                                                        class="text-sm font-semibold text-neza-muted hover:text-emerald-700">
+                                                        <svg class="size-6" aria-hidden="true" fill="none" viewBox="0 0 24 24"
+                                                            stroke-width="1.5" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round"
+                                                                d="M12 4.5v15m7.5-7.5h-15" />
+                                                        </svg>
+                                                    </button>
+                                                </form>
+                                            @endif
                                             <a href="{{ route('formulario.edit', $formulario) }}"
                                                 title="Editar formulario"
                                                 class="text-sm font-semibold text-neza-muted hover:text-neza-wine">
@@ -202,36 +267,90 @@
                     <section class="rounded-xl border border-neza-line bg-white p-5 shadow-sm">
                         <h2 class="text-base font-bold text-neza-ink">Resumen rápido</h2>
                         <dl class="mt-4 divide-y divide-neza-line">
-                            <div class="flex items-center justify-between py-3">
-                                <dt class="text-sm text-neza-muted">Publicados</dt>
-                                <dd class="text-lg font-bold text-emerald-700">0</dd>
+                            <div>
+                                <a href="{{ route('formulario.index', ['estado' => 'PUBLICADO']) }}"
+                                    class="flex items-center justify-between py-3 hover:text-neza-wine">
+                                    <dt class="text-sm text-neza-muted">Publicados</dt>
+                                    <dd class="text-lg font-bold text-emerald-700">{{ $conteos['PUBLICADO'] }}</dd>
+                                </a>
                             </div>
-                            <div class="flex items-center justify-between py-3">
-                                <dt class="text-sm text-neza-muted">Borradores</dt>
-                                <dd class="text-lg font-bold text-amber-700">0</dd>
+                            <div>
+                                <a href="{{ route('formulario.index', ['estado' => 'BORRADOR']) }}"
+                                    class="flex items-center justify-between py-3 hover:text-neza-wine">
+                                    <dt class="text-sm text-neza-muted">Borradores</dt>
+                                    <dd class="text-lg font-bold text-amber-700">{{ $conteos['BORRADOR'] }}</dd>
+                                </a>
                             </div>
-                            <div class="flex items-center justify-between py-3">
-                                <dt class="text-sm text-neza-muted">Archivados</dt>
-                                <dd class="text-lg font-bold text-slate-600">0</dd>
+                            <div>
+                                <a href="{{ route('formulario.index', ['estado' => 'ARCHIVADO']) }}"
+                                    class="flex items-center justify-between py-3 hover:text-neza-wine">
+                                    <dt class="text-sm text-neza-muted">Archivados</dt>
+                                    <dd class="text-lg font-bold text-slate-600">{{ $conteos['ARCHIVADO'] }}</dd>
+                                </a>
                             </div>
                             <div class="flex items-center justify-between py-3">
                                 <dt class="text-sm text-neza-muted">Asignados a trámites</dt>
-                                <dd class="text-lg font-bold text-neza-wine">0</dd>
+                                <dd class="text-lg font-bold text-neza-wine">{{ $conteos['ASIGNADOS'] }}</dd>
                             </div>
                         </dl>
                     </section>
                     <section class="rounded-xl border border-neza-line bg-white p-5 shadow-sm">
                         <div class="flex items-center justify-between gap-3">
-                            <h2 class="text-base font-bold text-neza-ink">Actividad reciente</h2><a href="#"
-                                class="text-xs font-semibold text-neza-wine hover:underline">Ver todo</a>
+                            <h2 class="text-base font-bold text-neza-ink">Actividad reciente</h2>
+                            <a href="{{ route('auditoria.index') }}"
+                                class="text-xs font-semibold text-neza-wine hover:underline">Ver auditoría</a>
                         </div>
-                        <p
-                            class="mt-5 rounded-lg border border-dashed border-neza-line px-4 py-6 text-center text-sm text-neza-muted">
-                            No hay actividad reciente.</p>
+                        @if ($actividadReciente->isEmpty())
+                            <p class="mt-5 rounded-lg border border-dashed border-neza-line px-4 py-6 text-center text-sm text-neza-muted">
+                                No hay actividad reciente.</p>
+                        @else
+                            <ul class="mt-4 space-y-3">
+                                @php
+                                    $etiquetasActividad = [
+                                        'FORMULARIO_CREADO' => 'Formulario creado',
+                                        'FORMULARIO_ACTUALIZADO' => 'Formulario actualizado',
+                                        'FORMULARIO_DUPLICADO' => 'Formulario duplicado',
+                                        'FORMULARIO_ELIMINADO' => 'Formulario eliminado',
+                                        'FORMULARIO_VERSION_CREADA' => 'Nueva versión creada',
+                                        'FORMULARIO_VERSION_PUBLICADA' => 'Versión publicada',
+                                        'FORMULARIO_VERSION_ARCHIVADA' => 'Versión archivada',
+                                    ];
+                                @endphp
+                                @foreach ($actividadReciente as $evento)
+                                    <li class="border-l-2 border-neza-wine-soft pl-3">
+                                        <p class="text-sm font-semibold text-neza-ink">{{ $etiquetasActividad[$evento->accion] ?? str_replace('_', ' ', $evento->accion) }}</p>
+                                        <p class="mt-1 text-xs text-neza-muted">
+                                            {{ $evento->actor_nombre_snapshot ?? 'Servidor público' }} ·
+                                            {{ $evento->created_at?->diffForHumans() }}
+                                        </p>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
                     </section>
                     <section class="rounded-xl border border-neza-line bg-white p-5 shadow-sm">
                         <h2 class="text-base font-bold text-neza-ink">Campos más usados</h2>
-                        <p class="mt-4 text-sm text-neza-muted">Aún no hay campos registrados.</p>
+                        @if ($camposMasUsados->isEmpty())
+                            <p class="mt-4 text-sm text-neza-muted">Aún no hay campos registrados.</p>
+                        @else
+                            <ul class="mt-3 space-y-2">
+                            @php
+                                $nombresTipoCampo = [
+                                    'TEXT' => 'Texto corto', 'TEXTAREA' => 'Texto largo', 'NUMBER' => 'Número',
+                                    'EMAIL' => 'Correo', 'PHONE' => 'Teléfono', 'DATE' => 'Fecha',
+                                    'SELECT' => 'Lista', 'MULTISELECT' => 'Lista múltiple', 'RADIO' => 'Opción única',
+                                    'CHECKBOX' => 'Casillas', 'CURP' => 'CURP', 'RFC' => 'RFC', 'CP' => 'Código postal',
+                                    'ADDRESS' => 'Domicilio', 'COORDINATES' => 'Coordenadas',
+                                ];
+                            @endphp
+                                @foreach ($camposMasUsados as $campo)
+                                    <li class="flex items-center justify-between gap-3 text-sm">
+                                        <span class="text-neza-muted">{{ $nombresTipoCampo[$campo->tipo] ?? $campo->tipo }}</span>
+                                        <span class="font-semibold text-neza-ink">{{ $campo->total }}</span>
+                                    </li>
+                                @endforeach
+                            </ul>
+                        @endif
                     </section>
                 </aside>
             </div>

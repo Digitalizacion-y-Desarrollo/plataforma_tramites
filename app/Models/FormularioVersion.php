@@ -9,8 +9,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class FormularioVersion extends Model
 {
-
     protected $table = 'formulario_versiones';
+
     public $incrementing = false;
 
     protected $keyType = 'string';
@@ -54,5 +54,10 @@ class FormularioVersion extends Model
     {
         return $this->belongsToMany(Tramite::class, 'tramite_formulario')
             ->withPivot(['activo', 'fecha_inicio_vigencia', 'fecha_fin_vigencia']);
+    }
+
+    public function solicitudes(): HasMany
+    {
+        return $this->hasMany(Solicitud::class);
     }
 }

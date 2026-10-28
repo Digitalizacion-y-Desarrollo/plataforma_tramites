@@ -10,6 +10,8 @@ use Illuminate\Support\Str;
 
 class FormularioEstadosController extends Controller
 {
+    private const ESTADOS_SISTEMA = ['BORRADOR', 'PUBLICADO', 'ARCHIVADO'];
+
     public function index()
     {
         $estados = FormularioEstado::query()->orderBy('orden')->orderBy('nombre')->paginate(10);
@@ -45,6 +47,10 @@ class FormularioEstadosController extends Controller
 
     public function update(Request $request, FormularioEstado $catalogo_estado_formulario)
     {
+        if (in_array($catalogo_estado_formulario->clave, self::ESTADOS_SISTEMA, true) && ! $request->boolean('activo')) {
+            return back()->withInput()->withErrors(['estado' => 'Este estado es parte del flujo del sistema y no puede desactivarse.']);
+        }
+
         $datos = $this->validar($request);
         $anteriores = $catalogo_estado_formulario->only(['clave', 'nombre', 'descripcion', 'orden', 'activo']);
         $catalogo_estado_formulario->update([...$datos, 'activo' => $request->boolean('activo')]);
@@ -55,6 +61,10 @@ class FormularioEstadosController extends Controller
 
     public function destroy(Request $request, FormularioEstado $catalogo_estado_formulario)
     {
+        if (in_array($catalogo_estado_formulario->clave, self::ESTADOS_SISTEMA, true)) {
+            return redirect()->route('catalogo-estados-formularios.index')->withErrors(['estado' => 'Este estado es parte del flujo del sistema y no puede eliminarse.']);
+        }
+
         if (DB::table('formulario_versiones')->where('formulario_estado_id', $catalogo_estado_formulario->id)->exists()) {
             return redirect()->route('catalogo-estados-formularios.index')->withErrors(['estado' => 'No se puede eliminar un estado utilizado por versiones de formularios.']);
         }
@@ -70,6 +80,10 @@ class FormularioEstadosController extends Controller
 
     public function cambiarEstado(Request $request, FormularioEstado $catalogo_estado_formulario)
     {
+        if ($catalogo_estado_formulario->activo && in_array($catalogo_estado_formulario->clave, self::ESTADOS_SISTEMA, true)) {
+            return redirect()->route('catalogo-estados-formularios.index')->withErrors(['estado' => 'Este estado es parte del flujo del sistema y no puede desactivarse.']);
+        }
+
         $anterior = $catalogo_estado_formulario->activo;
         $catalogo_estado_formulario->update(['activo' => ! $catalogo_estado_formulario->activo]);
         Auditoria::registrar($request, $catalogo_estado_formulario->activo ? 'ESTADO_FORMULARIO_ACTIVADO' : 'ESTADO_FORMULARIO_DESACTIVADO', 'ESTADO_FORMULARIO', (string) $catalogo_estado_formulario->id, ['activo' => $anterior], ['activo' => $catalogo_estado_formulario->activo]);

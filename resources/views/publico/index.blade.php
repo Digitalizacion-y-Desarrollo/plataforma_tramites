@@ -132,13 +132,22 @@
                 @if (session('consulta_aviso'))
                     <p role="status" class="mt-4 rounded-xl bg-neza-wine-soft p-3 text-sm text-neza-wine">{{ session('consulta_aviso') }}</p>
                 @endif
+                @if ($errors->any() && ! $consultaPendiente)
+                    <div role="alert" class="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-800">
+                        <ul class="list-inside list-disc space-y-1">
+                            @foreach ($errors->all() as $error)
+                                <li>{{ $error }}</li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
                 @if ($consultaPendiente)
                     <h3 class="mt-2 text-xl font-bold">Ingresa el código de verificación</h3>
                     <p class="mt-2 text-sm leading-relaxed text-neza-muted">Si tus datos coinciden con una solicitud, enviamos un código de seis dígitos a <strong class="text-neza-ink">{{ \Illuminate\Support\Str::mask($consultaPendiente['email'], '*', 2, max(0, strpos($consultaPendiente['email'], '@') - 2)) }}</strong>. Vence en 15 minutos.</p>
                     <form action="{{ route('consulta.token.verificar') }}" method="POST" class="mt-5">
                         @csrf
                         <label for="token-consulta" class="block text-sm font-bold">Código de verificación</label>
-                        <input id="token-consulta" name="token" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required aria-describedby="token-ayuda @error('token') token-error @enderror" class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm outline-none focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15 @error('token') border-rose-600 @enderror">
+                        <input id="token-consulta" name="token" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required value="{{ old('token') }}" aria-describedby="token-ayuda @error('token') token-error @enderror" class="mt-2 h-12 w-full rounded-xl border border-neza-line px-4 text-sm outline-none focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15 @error('token') border-rose-600 @enderror">
                         @error('token')<p id="token-error" class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
                         <p id="token-ayuda" class="mt-2 text-xs text-neza-muted">El código es de un solo uso. No lo compartas.</p>
                         <button type="submit" class="mt-5 min-h-11 w-full rounded-xl bg-neza-wine px-5 py-2.5 text-sm font-bold text-white hover:bg-neza-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine sm:w-auto">Entrar a mi portal</button>
@@ -173,6 +182,26 @@
                         </div>
                         <button type="submit" class="min-h-11 w-full rounded-xl bg-neza-wine px-5 py-2.5 text-sm font-bold text-white hover:bg-neza-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine sm:w-auto">Enviar código de acceso</button>
                     </form>
+                    <details class="mt-5 rounded-xl border border-neza-line bg-neza-canvas p-4">
+                        <summary class="cursor-pointer text-sm font-bold text-neza-wine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Ya tengo un código de otro dispositivo</summary>
+                        <p class="mt-3 text-xs leading-relaxed text-neza-muted">Si solicitaste el código en otro dispositivo, ingresa aquí tu CURP, correo y código para continuar sin solicitar uno nuevo.</p>
+                        <form action="{{ route('consulta.token.verificar') }}" method="POST" class="mt-4 space-y-3">
+                            @csrf
+                            <div>
+                                <label for="curp-codigo" class="text-sm font-bold">CURP</label>
+                                <input id="curp-codigo" name="curp" type="text" maxlength="18" autocomplete="off" required value="{{ old('curp') }}" class="mt-1 h-11 w-full rounded-lg border border-neza-line px-3 text-sm uppercase outline-none focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15">
+                            </div>
+                            <div>
+                                <label for="email-codigo" class="text-sm font-bold">Correo electrónico</label>
+                                <input id="email-codigo" name="email_contacto" type="email" autocomplete="email" required value="{{ old('email_contacto') }}" class="mt-1 h-11 w-full rounded-lg border border-neza-line px-3 text-sm outline-none focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15">
+                            </div>
+                            <div>
+                                <label for="token-codigo" class="text-sm font-bold">Código de verificación</label>
+                                <input id="token-codigo" name="token" type="text" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required value="{{ old('token') }}" class="mt-1 h-11 w-full rounded-lg border border-neza-line px-3 text-sm outline-none focus:border-neza-wine focus:ring-2 focus:ring-neza-wine/15">
+                            </div>
+                            <button type="submit" class="min-h-11 w-full rounded-xl border border-neza-wine bg-white px-5 py-2.5 text-sm font-bold text-neza-wine hover:bg-neza-wine-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine sm:w-auto">Verificar código</button>
+                        </form>
+                    </details>
                     <p class="mt-4 border-t border-neza-line pt-4 text-xs text-neza-muted">Por tu seguridad, el acceso dura 30 minutos y solo muestra las solicitudes vinculadas a ambos datos.</p>
                 @endif
             </div>

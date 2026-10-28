@@ -8,11 +8,22 @@
                     <svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5 3 12m0 0 7.5-7.5M3 12h18" /></svg>
                     Volver al listado
                 </a>
-                <p class="mt-5 text-sm font-semibold text-neza-wine">Vista previa ciudadana</p>
+                <p class="mt-5 text-sm font-semibold text-neza-wine">Vista previa ciudadana · Versión {{ $version->numero_version }}</p>
                 <h1 class="mt-1 text-3xl font-bold tracking-tight text-neza-ink">{{ $formulario->nombre }}</h1>
                 @if ($formulario->descripcion)<p class="mt-2 text-sm text-neza-muted">{{ $formulario->descripcion }}</p>@endif
             </div>
-            <a href="{{ route('formulario.edit', $formulario) }}" class="inline-flex w-fit rounded-lg border border-neza-line px-4 py-2.5 text-sm font-semibold text-neza-muted hover:bg-neza-canvas">Editar formulario</a>
+            <div class="flex flex-wrap gap-2">
+                @if (isset($esVersionActual) && ! $esVersionActual)
+                    <form action="{{ route('formulario.versiones.restaurar', [$formulario, $version]) }}" method="POST"
+                        data-confirm-action data-confirm-title="¿Usar esta versión como base?"
+                        data-confirm-text="Se creará una nueva versión en borrador. La versión histórica no se modificará."
+                        data-confirm-button="Sí, crear borrador">
+                        @csrf
+                        <button type="submit" class="inline-flex w-fit rounded-lg bg-neza-wine px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">Usar como nueva versión</button>
+                    </form>
+                @endif
+                <a href="{{ route('formulario.edit', $formulario) }}" class="inline-flex w-fit rounded-lg border border-neza-line px-4 py-2.5 text-sm font-semibold text-neza-muted hover:bg-neza-canvas">Volver al editor</a>
+            </div>
         </div>
 
         <div class="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Esta es una vista previa administrativa de la versión {{ $version->numero_version }}. La disponibilidad ciudadana depende del estado del trámite.</div>

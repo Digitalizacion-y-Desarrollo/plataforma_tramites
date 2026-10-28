@@ -37,6 +37,7 @@
 
                 <form action="{{ route('portal.tramites.solicitudes.store', $tramite) }}" method="POST" enctype="multipart/form-data" class="mt-8 space-y-8" aria-label="Formulario de {{ $tramite->nombre }}" data-formulario-preview>
                     @csrf
+                    <input type="hidden" name="formulario_version_id" value="{{ $formularioVersion->id }}">
                     <fieldset id="seccion-0" class="space-y-5 border-b border-neza-line pb-6">
                         <legend class="flex flex-wrap items-center gap-3 text-lg font-bold">Datos para seguimiento <span class="rounded-full bg-neza-wine-soft px-3 py-1 text-xs font-bold text-neza-wine">Sección 1 de {{ $totalSecciones + 1 }}</span></legend>
                         <div class="grid gap-5 sm:grid-cols-2"><div class="sm:col-span-2"><label for="nombres_solicitante" class="block text-sm font-semibold">Nombre(s) <span class="text-rose-700">*</span></label><input id="nombres_solicitante" name="nombres_solicitante" value="{{ old('nombres_solicitante') }}" maxlength="100" autocomplete="given-name" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('nombres_solicitante') border-rose-600 @enderror">@error('nombres_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div><div><label for="apellido_paterno_solicitante" class="block text-sm font-semibold">Apellido paterno <span class="text-rose-700">*</span></label><input id="apellido_paterno_solicitante" name="apellido_paterno_solicitante" value="{{ old('apellido_paterno_solicitante') }}" maxlength="100" autocomplete="family-name" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('apellido_paterno_solicitante') border-rose-600 @enderror">@error('apellido_paterno_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div><div><label for="apellido_materno_solicitante" class="block text-sm font-semibold">Apellido materno <span class="text-rose-700">*</span></label><input id="apellido_materno_solicitante" name="apellido_materno_solicitante" value="{{ old('apellido_materno_solicitante') }}" maxlength="100" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('apellido_materno_solicitante') border-rose-600 @enderror">@error('apellido_materno_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div></div>
@@ -118,6 +119,17 @@
                     @empty
                         <p class="rounded-xl border border-dashed border-neza-line p-5 text-sm text-neza-muted">El formulario todavía no contiene campos configurados.</p>
                     @endforelse
+                    @if ($errors->has('formulario_version_id'))
+                        <p class="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-800">{{ $errors->first('formulario_version_id') }}</p>
+                    @endif
+                    <fieldset class="rounded-xl border border-neza-line bg-neza-canvas p-5">
+                        <legend class="px-2 text-sm font-bold text-neza-ink">Aviso de privacidad</legend>
+                        <label class="flex items-start gap-3 text-sm leading-relaxed text-neza-muted">
+                            <input type="checkbox" name="acepto_aviso_privacidad" value="1" required @checked(old('acepto_aviso_privacidad')) class="mt-1 size-4 shrink-0 rounded border-neza-line text-neza-wine focus:ring-neza-wine">
+                            <span>Acepto el <a href="{{ route('portal.aviso-privacidad') }}" target="_blank" rel="noopener" class="font-semibold text-neza-wine underline underline-offset-2">aviso de privacidad</a> y el tratamiento de mis datos personales para atender este trámite.</span>
+                        </label>
+                        @error('acepto_aviso_privacidad')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                    </fieldset>
                     <button type="submit" class="h-12 rounded-xl bg-neza-wine px-6 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Enviar solicitud</button>
                 </form>
             </div>

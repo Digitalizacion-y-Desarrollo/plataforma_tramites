@@ -19,6 +19,7 @@ use App\Http\Controllers\TramiteController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [PublicoController::class, 'index'])->name('portal.publico');
+Route::get('/aviso-privacidad', [PublicoController::class, 'avisoPrivacidad'])->name('portal.aviso-privacidad');
 Route::get('/admin/login', [AccesosSesionController::class, 'create'])->name('accesos.login');
 Route::post('/admin/login', [AccesosSesionController::class, 'store'])->name('accesos.login.store');
 Route::prefix('tramites')->name('portal.tramites.')->controller(PublicoController::class)->group(function () {
@@ -95,6 +96,8 @@ Route::prefix('admin')->middleware('accesos.auth')->group(function () {
         Route::prefix('formulario/{formulario}')->controller(FormularioController::class)->group(function () {
             Route::get('duplicar', 'createDuplicado')->name('formulario.duplicar');
             Route::post('duplicar', 'storeDuplicado')->name('formulario.duplicar.store');
+            Route::get('versiones/{version}', 'showVersion')->name('formulario.versiones.show');
+            Route::post('versiones/{version}/restaurar', 'storeVersionDesde')->name('formulario.versiones.restaurar');
             Route::post('secciones', 'storeSeccion')->name('formulario.secciones.store');
             Route::patch('secciones/{seccion}', 'updateSeccion')->name('formulario.secciones.update');
             Route::delete('secciones/{seccion}', 'destroySeccion')->name('formulario.secciones.destroy');
@@ -106,12 +109,17 @@ Route::prefix('admin')->middleware('accesos.auth')->group(function () {
             Route::post('secciones/{seccion}/mover', 'moverSeccion')->name('formulario.secciones.mover');
             Route::post('secciones/{seccion}/campos/{campo}/condiciones', 'storeCondicion')->name('formulario.secciones.campos.condiciones.store');
             Route::delete('condiciones/{condicion}', 'destroyCondicion')->name('formulario.condiciones.destroy');
+            Route::post('versiones', 'storeVersion')->name('formulario.versiones.store');
+            Route::post('versiones/{version}/publicar', 'publicarVersion')->name('formulario.versiones.publicar');
+            Route::post('versiones/{version}/archivar', 'archivarVersion')->name('formulario.versiones.archivar');
             Route::post('grupos-campos', 'storeGrupoCampos')->name('formulario.grupos-campos.store');
             Route::delete('grupos-campos/{grupo}/campos/{campo}', 'destroyCampoGrupo')->name('formulario.grupos-campos.campos.destroy');
             Route::post('grupos-campos/{grupo}/condiciones', 'storeCondicionGrupo')->name('formulario.grupos-campos.condiciones.store');
         });
         Route::resource('catalogo-tramites', TramiteController::class);
         Route::patch('catalogo-tramites/{catalogo_tramite}/estado', [TramiteController::class, 'cambiarEstado'])->name('catalogo-tramites.estado');
+        Route::post('catalogo-tramites/{catalogo_tramite}/publicar', [TramiteController::class, 'publicar'])->name('catalogo-tramites.publicar');
+        Route::post('catalogo-tramites/{catalogo_tramite}/archivar', [TramiteController::class, 'archivar'])->name('catalogo-tramites.archivar');
         Route::get('configuracion/general', [ConfiguracionGeneralController::class, 'edit'])->name('configuracion-general.edit');
         Route::put('configuracion/general', [ConfiguracionGeneralController::class, 'update'])->name('configuracion-general.update');
         Route::resource('catalogo-estados', EstadoSolicitudesController::class);

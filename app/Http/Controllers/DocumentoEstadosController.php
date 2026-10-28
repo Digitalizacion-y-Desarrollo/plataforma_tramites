@@ -10,6 +10,8 @@ use Illuminate\Support\Str;
 
 class DocumentoEstadosController extends Controller
 {
+    private const ESTADOS_SISTEMA = ['PENDIENTE', 'VALIDO', 'RECHAZADO'];
+
     public function index()
     {
         $estados = DocumentoEstado::query()->orderBy('orden')->orderBy('nombre')->paginate(10);
@@ -45,6 +47,10 @@ class DocumentoEstadosController extends Controller
 
     public function update(Request $request, DocumentoEstado $catalogo_estado_documento)
     {
+        if (in_array($catalogo_estado_documento->clave, self::ESTADOS_SISTEMA, true) && ! $request->boolean('activo')) {
+            return back()->withInput()->withErrors(['estado' => 'Este estado es parte del flujo del sistema y no puede desactivarse.']);
+        }
+
         $anteriores = $catalogo_estado_documento->only(['clave', 'nombre', 'descripcion', 'orden', 'activo']);
         $catalogo_estado_documento->update([...$this->validar($request), 'activo' => $request->boolean('activo')]);
         Auditoria::registrar($request, 'ESTADO_DOCUMENTO_ACTUALIZADO', 'ESTADO_DOCUMENTO', (string) $catalogo_estado_documento->id, $anteriores, $catalogo_estado_documento->only(['clave', 'nombre', 'descripcion', 'orden', 'activo']));
@@ -54,6 +60,10 @@ class DocumentoEstadosController extends Controller
 
     public function destroy(Request $request, DocumentoEstado $catalogo_estado_documento)
     {
+        if (in_array($catalogo_estado_documento->clave, self::ESTADOS_SISTEMA, true)) {
+            return redirect()->route('catalogo-estados-documentos.index')->withErrors(['estado' => 'Este estado es parte del flujo del sistema y no puede eliminarse.']);
+        }
+
         if (DB::table('solicitud_documentos')->where('documento_estado_id', $catalogo_estado_documento->id)->exists()) {
             return redirect()->route('catalogo-estados-documentos.index')->withErrors(['estado' => 'No se puede eliminar un estado utilizado por documentos de solicitudes.']);
         }
@@ -69,6 +79,10 @@ class DocumentoEstadosController extends Controller
 
     public function cambiarEstado(Request $request, DocumentoEstado $catalogo_estado_documento)
     {
+        if ($catalogo_estado_documento->activo && in_array($catalogo_estado_documento->clave, self::ESTADOS_SISTEMA, true)) {
+            return redirect()->route('catalogo-estados-documentos.index')->withErrors(['estado' => 'Este estado es parte del flujo del sistema y no puede desactivarse.']);
+        }
+
         $anterior = $catalogo_estado_documento->activo;
         $catalogo_estado_documento->update(['activo' => ! $catalogo_estado_documento->activo]);
         Auditoria::registrar($request, $catalogo_estado_documento->activo ? 'ESTADO_DOCUMENTO_ACTIVADO' : 'ESTADO_DOCUMENTO_DESACTIVADO', 'ESTADO_DOCUMENTO', (string) $catalogo_estado_documento->id, ['activo' => $anterior], ['activo' => $catalogo_estado_documento->activo]);

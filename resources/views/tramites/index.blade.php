@@ -39,6 +39,14 @@
                         </thead>
                         <tbody class="divide-y divide-neza-line">
                             @forelse ($tramites as $tramite)
+                                @php
+                                    $estadoClave = $tramite->estado?->clave ?? 'BORRADOR';
+                                    $estadoEstilo = match ($estadoClave) {
+                                        'PUBLICADO' => 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+                                        'ARCHIVADO' => 'bg-slate-100 text-slate-600 ring-slate-200',
+                                        default => 'bg-amber-50 text-amber-800 ring-amber-200',
+                                    };
+                                @endphp
                                 <tr class="hover:bg-neza-canvas">
                                     <td class="px-5 py-4 font-mono text-xs font-semibold text-neza-wine">{{ $tramite->clave }}</td>
                                     <td class="px-4 py-4 font-semibold text-neza-ink">{{ $tramite->nombre }}</td>
@@ -46,19 +54,22 @@
                                     <td class="px-4 py-4 text-xs text-neza-muted"><span class="block">{{ $tramite->duracion ?: 'Sin duración' }}</span><span class="block">{{ $tramite->costo ?: 'Sin costo' }} · {{ $tramite->tiempo_estimado ?: 'Sin tiempo estimado' }}</span><span class="block">{{ collect($tramite->modalidades ?? [])->map(fn ($modalidad) => $modalidad === 'EN_LINEA' ? 'En línea' : 'Presencial')->join(' y ') ?: 'Sin modalidad' }}</span></td>
                                     @php($formularioActivo = $tramite->formularioActivo->first())
                                     <td class="px-4 py-4 text-xs text-neza-muted"><span class="block font-semibold text-neza-ink">{{ $tramite->departamento_nombre_snapshot ?: 'Sin departamento' }}</span><span class="block">{{ $formularioActivo?->formulario?->nombre ?: 'Sin formulario' }}</span></td>
-                                    <td class="px-5 py-4 text-right">
-                                        <span @class([
-                                            'rounded-full px-2.5 py-1 text-xs font-semibold',
-                                            'bg-emerald-50 text-emerald-700' => $tramite->activo,
-                                            'bg-slate-100 text-slate-700' => ! $tramite->activo,
-                                        ])>{{ $tramite->activo ? 'Activo' : 'Inactivo' }}</span>
+                                    <td class="px-5 py-4">
+                                        <div class="flex flex-col items-end gap-1.5">
+                                            <span class="rounded-full px-2.5 py-1 text-xs font-semibold ring-1 ring-inset {{ $estadoEstilo }}">{{ $tramite->estado?->nombre ?? 'Borrador' }}</span>
+                                            <span @class([
+                                                'text-xs font-medium',
+                                                'text-emerald-700' => $tramite->activo,
+                                                'text-slate-500' => ! $tramite->activo,
+                                            ])>{{ $tramite->activo ? 'Habilitado' : 'Deshabilitado' }}</span>
+                                        </div>
                                     </td>
                                     <td class="px-5 py-4">
                                         <div class="flex justify-end gap-3">
-                                            @if (false && $tramite->estado?->clave === 'BORRADOR')
-                                                <form action="{{ route('catalogo-tramites.publicar', $tramite) }}" method="POST" data-confirm-action data-confirm-title="¿Publicar trámite?" data-confirm-text="El trámite estará visible al público si también se encuentra activo." data-confirm-button="Sí, publicar" class="inline-flex">@csrf<button type="submit" title="Publicar trámite" aria-label="Publicar trámite" class="text-emerald-700 transition hover:text-emerald-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"><svg class="size-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg></button></form>
-                                            @elseif (false && $tramite->estado?->clave === 'PUBLICADO')
-                                                <form action="{{ route('catalogo-tramites.archivar', $tramite) }}" method="POST" data-confirm-action data-confirm-title="¿Archivar trámite?" data-confirm-text="El trámite dejará de aparecer en las vistas públicas." data-confirm-button="Sí, archivar" class="inline-flex">@csrf<button type="submit" title="Archivar trámite" aria-label="Archivar trámite" class="text-slate-700 transition hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"><svg class="size-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg></button></form>
+                                            @if ($estadoClave === 'BORRADOR')
+                                                <form action="{{ route('catalogo-tramites.publicar', $tramite) }}" method="POST" data-confirm-action data-confirm-title="¿Publicar trámite?" data-confirm-text="El trámite estará visible al público si también se encuentra habilitado y su formulario está publicado." data-confirm-button="Sí, publicar" class="inline-flex">@csrf<button type="submit" title="Publicar trámite" aria-label="Publicar trámite" class="text-emerald-700 transition hover:text-emerald-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-700"><svg class="size-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg></button></form>
+                                            @elseif ($estadoClave === 'PUBLICADO')
+                                                <form action="{{ route('catalogo-tramites.archivar', $tramite) }}" method="POST" data-confirm-action data-confirm-title="¿Archivar trámite?" data-confirm-text="El trámite dejará de aparecer en las vistas públicas. Las solicitudes existentes conservarán su historial." data-confirm-button="Sí, archivar" class="inline-flex">@csrf<button type="submit" title="Archivar trámite" aria-label="Archivar trámite" class="text-slate-700 transition hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-700"><svg class="size-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m20.25 7.5-.625 10.632a2.25 2.25 0 0 1-2.247 2.118H6.622a2.25 2.25 0 0 1-2.247-2.118L3.75 7.5m8.25 3v6.75m0 0-3-3m3 3 3-3M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125Z" /></svg></button></form>
                                             @endif
                                             <form action="{{ route('catalogo-tramites.estado', $tramite) }}" method="POST" data-confirm-action data-confirm-title="{{ $tramite->activo ? '¿Deshabilitar trámite?' : '¿Activar trámite?' }}" data-confirm-text="{{ $tramite->activo ? 'El trámite dejará de estar disponible para nuevas configuraciones.' : 'El trámite estará disponible nuevamente para nuevas configuraciones.' }}" data-confirm-button="Sí, continuar" class="inline-flex">
                                                 @csrf
@@ -86,7 +97,7 @@
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="6" class="px-5 py-16 text-center">
+                                    <td colspan="7" class="px-5 py-16 text-center">
                                         <div class="mx-auto flex max-w-sm flex-col items-center">
                                             <span class="grid size-12 place-items-center rounded-full bg-neza-wine-soft text-neza-wine">
                                                 <svg class="size-6" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5V6.75a3.375 3.375 0 0 0-3.375-3.375h-3.75A3.375 3.375 0 0 0 4.125 6.75v10.5a3.375 3.375 0 0 0 3.375 3.375H12" /><path stroke-linecap="round" stroke-linejoin="round" d="M16.5 14.25h3.75m0 0V18m0-3.75-4.5 4.5" /></svg>
@@ -125,9 +136,12 @@
                 <section class="rounded-xl border border-neza-line bg-white p-5 shadow-sm">
                     <h2 class="text-base font-bold text-neza-ink">Resumen rápido</h2>
                     <dl class="mt-4 divide-y divide-neza-line">
-                        <div class="flex items-center justify-between py-3"><dt class="text-sm text-neza-muted">Activos</dt><dd class="text-lg font-bold text-emerald-700">{{ $tramitesActivos }}</dd></div>
-                        <div class="flex items-center justify-between py-3"><dt class="text-sm text-neza-muted">Inactivos</dt><dd class="text-lg font-bold text-slate-600">{{ $tramitesInactivos }}</dd></div>
-                        <div class="flex items-center justify-between py-3"><dt class="text-sm text-neza-muted">Total</dt><dd class="text-lg font-bold text-neza-wine">{{ $totalTramites }}</dd></div>
+                        <div class="flex items-center justify-between py-3"><dt class="text-sm text-neza-muted">Publicados</dt><dd class="text-lg font-bold text-emerald-700">{{ $tramitesPublicados }}</dd></div>
+                        <div class="flex items-center justify-between py-3"><dt class="text-sm text-neza-muted">Borradores</dt><dd class="text-lg font-bold text-amber-700">{{ $tramitesBorrador }}</dd></div>
+                        <div class="flex items-center justify-between py-3"><dt class="text-sm text-neza-muted">Archivados</dt><dd class="text-lg font-bold text-slate-600">{{ $tramitesArchivados }}</dd></div>
+                        <div class="flex items-center justify-between py-3"><dt class="text-sm text-neza-muted">Habilitados</dt><dd class="text-lg font-bold text-neza-wine">{{ $tramitesActivos }}</dd></div>
+                        <div class="flex items-center justify-between py-3"><dt class="text-sm text-neza-muted">Deshabilitados</dt><dd class="text-lg font-bold text-slate-600">{{ $tramitesInactivos }}</dd></div>
+                        <div class="flex items-center justify-between py-3"><dt class="text-sm text-neza-muted">Total</dt><dd class="text-lg font-bold text-neza-ink">{{ $totalTramites }}</dd></div>
                     </dl>
                 </section>
             </aside>

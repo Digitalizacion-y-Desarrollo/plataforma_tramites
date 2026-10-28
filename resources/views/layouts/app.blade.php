@@ -6,7 +6,23 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="icon" type="image/png" sizes="512x512" href="{{ asset('images/logo/favicon-neza-2025-2027.png') }}">
     <link rel="apple-touch-icon" sizes="512x512" href="{{ asset('images/logo/favicon-neza-2025-2027.png') }}">
-    <title>{{ config('app.name', 'Portal de Trámites') }}</title>
+    @php
+        $tituloRuta = match (true) {
+            request()->routeIs('admin.dashboard') => 'Dashboard',
+            request()->routeIs('solicitudes.*') => 'Solicitudes',
+            request()->routeIs('formulario.*') => 'Formularios',
+            request()->routeIs('catalogo-tramites.*') => 'Catálogo de trámites',
+            request()->routeIs('catalogo-estados*') => 'Catálogos',
+            request()->routeIs('auditoria.*') => 'Auditoría',
+            request()->routeIs('configuracion-general.*') => 'Configuración general',
+            request()->routeIs('canales-ayuda.*') => 'Canales de ayuda',
+            request()->routeIs('portada.*') => 'Foto de portada',
+            request()->routeIs('servicios-interes.*') => 'Servicios de interés',
+            request()->routeIs('dependencias.*') => 'Dependencias',
+            default => 'Portal del Servidor Público',
+        };
+    @endphp
+    <title>@yield('title', $tituloRuta.' · '.config('app.name', 'Portal de Trámites'))</title>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -135,8 +151,20 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                         </svg>
                     </button>
-                    <div class="search"><span>⌕</span><span>Buscar solicitudes, trámites, ciudadanos...</span><span
-                            class="shortcut">⌘ K</span></div>
+                    <form action="{{ route('solicitudes.index') }}" method="GET" role="search" class="search">
+                        <svg class="size-5 shrink-0" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m2.1-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
+                        </svg>
+                        <label for="busqueda-global" class="sr-only">Buscar solicitudes por folio, CURP o correo</label>
+                        <input id="busqueda-global" type="search" name="q" value="{{ request()->routeIs('solicitudes.*') ? request('q') : '' }}"
+                            placeholder="Buscar por folio, CURP o correo"
+                            class="min-w-0 flex-1 bg-transparent text-sm text-neza-ink placeholder:text-neza-muted focus:outline-none">
+                        <button type="submit" class="inline-flex size-8 shrink-0 items-center justify-center rounded-lg text-neza-wine hover:bg-neza-wine-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine" aria-label="Buscar solicitudes">
+                            <svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m2.1-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
+                            </svg>
+                        </button>
+                    </form>
                 </div>
                 <div class="flex shrink-0 items-center gap-4">
                     <p class="whitespace-nowrap text-sm font-semibold text-neza-muted">Hola, <span class="font-bold text-neza-ink">{{ session('accesos.nombre') }}</span></p>

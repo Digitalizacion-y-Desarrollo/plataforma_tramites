@@ -10,6 +10,11 @@ use Illuminate\Support\Str;
 
 class EstadoSolicitudesController extends Controller
 {
+    private const ESTADOS_SISTEMA = [
+        'BORRADOR', 'ENVIADA', 'CORRECCION_SOLICITADA', 'VALIDADA_PARA_PAGO',
+        'EN_ESPERA_DE_PAGO', 'EN_REVISION_FINAL', 'APROBADA', 'RECHAZADA',
+    ];
+
     /**
      * Display a listing of the resource.
      */
@@ -70,6 +75,13 @@ class EstadoSolicitudesController extends Controller
      */
     public function update(Request $request, EstadoSolicitud $catalogo_estado)
     {
+        if (in_array($catalogo_estado->clave, self::ESTADOS_SISTEMA, true)
+            && (! $request->boolean('activo') || $request->boolean('es_final') !== (bool) $catalogo_estado->es_final)) {
+            return back()->withInput()->withErrors([
+                'estado' => 'Este estado es parte del flujo del sistema: no puedes desactivarlo ni cambiar si es final.',
+            ]);
+        }
+
         $datos = $this->validar($request);
 
         $anteriores = $catalogo_estado->only(['clave', 'nombre', 'descripcion', 'orden', 'activo', 'es_final']);
@@ -88,6 +100,12 @@ class EstadoSolicitudesController extends Controller
      */
     public function destroy(Request $request, EstadoSolicitud $catalogo_estado)
     {
+        if (in_array($catalogo_estado->clave, self::ESTADOS_SISTEMA, true)) {
+            return redirect()->route('catalogo-estados.index')->withErrors([
+                'estado' => 'Este estado es parte del flujo del sistema y no puede eliminarse.',
+            ]);
+        }
+
         $enUso = DB::table('solicitudes')->where('solicitud_estado_id', $catalogo_estado->id)->exists()
             || DB::table('solicitud_historial_estados')
                 ->where('estado_anterior_id', $catalogo_estado->id)
@@ -111,6 +129,12 @@ class EstadoSolicitudesController extends Controller
 
     public function cambiarEstado(Request $request, EstadoSolicitud $catalogo_estado)
     {
+        if ($catalogo_estado->activo && in_array($catalogo_estado->clave, self::ESTADOS_SISTEMA, true)) {
+            return redirect()->route('catalogo-estados.index')->withErrors([
+                'estado' => 'Este estado es parte del flujo del sistema y no puede desactivarse.',
+            ]);
+        }
+
         $anterior = $catalogo_estado->activo;
         $catalogo_estado->update(['activo' => ! $catalogo_estado->activo]);
         Auditoria::registrar($request, $catalogo_estado->activo ? 'ESTADO_SOLICITUD_ACTIVADO' : 'ESTADO_SOLICITUD_DESACTIVADO', 'ESTADO_SOLICITUD', (string) $catalogo_estado->id, ['activo' => $anterior], ['activo' => $catalogo_estado->activo]);

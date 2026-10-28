@@ -14,11 +14,11 @@ class Solicitud extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['folio', 'tramite_id', 'departamento_accesos_id_snapshot', 'departamento_nombre_snapshot', 'formulario_version_id', 'solicitud_estado_id', 'curp_consulta', 'email_contacto', 'telefono_contacto', 'nombre_solicitante_snapshot', 'nombres_solicitante', 'apellido_paterno_solicitante', 'apellido_materno_solicitante', 'flujo_pago', 'importe_pago', 'pago_vigencia_dias', 'fecha_envio', 'fecha_terminacion'];
+    protected $fillable = ['folio', 'tramite_id', 'departamento_accesos_id_snapshot', 'departamento_nombre_snapshot', 'formulario_version_id', 'solicitud_estado_id', 'curp_consulta', 'email_contacto', 'telefono_contacto', 'nombre_solicitante_snapshot', 'nombres_solicitante', 'apellido_paterno_solicitante', 'apellido_materno_solicitante', 'flujo_pago', 'importe_pago', 'pago_vigencia_dias', 'fecha_envio', 'fecha_terminacion', 'aviso_privacidad_aceptado_at'];
 
     protected function casts(): array
     {
-        return ['fecha_envio' => 'datetime', 'fecha_terminacion' => 'datetime', 'importe_pago' => 'decimal:2', 'pago_vigencia_dias' => 'integer'];
+        return ['fecha_envio' => 'datetime', 'fecha_terminacion' => 'datetime', 'aviso_privacidad_aceptado_at' => 'datetime', 'importe_pago' => 'decimal:2', 'pago_vigencia_dias' => 'integer'];
     }
 
     public function tramite(): BelongsTo
