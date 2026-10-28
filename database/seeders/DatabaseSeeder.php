@@ -20,7 +20,6 @@ class DatabaseSeeder extends Seeder
             DocumentoEstadoSeeder::class,
             NotificacionEstadoSeeder::class,
             TramiteEstadoSeeder::class,
-            TramiteSeeder::class,
             ConstanciaIdentidadSeeder::class,
             ConstanciaResidenciaSeeder::class,
         ]);

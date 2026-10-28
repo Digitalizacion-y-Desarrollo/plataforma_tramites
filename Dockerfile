@@ -44,6 +44,12 @@ RUN apt-get update \
         libonig-dev \
         libpng-dev \
         libzip-dev \
+    && apt-get install -y --no-install-recommends \
+        libfreetype6 \
+        libjpeg62-turbo \
+        libonig5 \
+        libpng16-16 \
+        libzip4 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY docker/php/php.ini-production /usr/local/etc/php/conf.d/99-production.ini
