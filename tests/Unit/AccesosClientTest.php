@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Integrations\AccesosClient;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Tests\TestCase;
 
@@ -10,6 +11,7 @@ class AccesosClientTest extends TestCase
 {
     public function test_it_reads_all_pages_and_keeps_only_active_departments(): void
     {
+        Cache::forget('accesos.departamentos_activos');
         config()->set('services.accesos.departamentos_url', 'https://accesos.example.test/api/departamentos');
         config()->set('services.accesos.ca_bundle', null);
 
@@ -33,6 +35,26 @@ class AccesosClientTest extends TestCase
         $this->assertSame('Desarrollo Urbano', $departamentos[0]['nombre']);
         $this->assertSame('1', $departamentos[1]['parent_id']);
         Http::assertSentCount(2);
+    }
+
+    public function test_it_caches_active_departments_for_five_minutes(): void
+    {
+        Cache::forget('accesos.departamentos_activos');
+        config()->set('services.accesos.departamentos_url', 'https://accesos.example.test/api/departamentos');
+        config()->set('services.accesos.ca_bundle', null);
+
+        Http::fake([
+            'accesos.example.test/api/departamentos?page=1' => Http::response([
+                'data' => [['id' => 1, 'nombre' => 'Desarrollo Urbano', 'activo' => true, 'parent_id' => null]],
+                'meta' => ['last_page' => 1],
+            ]),
+        ]);
+
+        $client = app(AccesosClient::class);
+        $client->departamentosActivos();
+        $client->departamentosActivos();
+
+        Http::assertSentCount(1);
     }
 
     public function test_it_authenticates_reads_profile_and_revokes_the_token(): void
