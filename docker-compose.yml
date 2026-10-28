@@ -1,0 +1,56 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: app
+    image: portal-tramites-app:latest
+    restart: unless-stopped
+    working_dir: /var/www
+    env_file:
+      - .env.production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - portal_tramites_storage:/var/www/storage
+    networks:
+      - portal-tramites
+
+  nginx:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: nginx
+    image: portal-tramites-nginx:latest
+    restart: unless-stopped
+    ports:
+      - "${PORTAL_HTTP_PORT:-8086}:80"
+    depends_on:
+      - app
+    volumes:
+      - portal_tramites_storage:/var/www/storage:ro
+    networks:
+      - portal-tramites
+
+  worker:
+    image: portal-tramites-app:latest
+    restart: unless-stopped
+    working_dir: /var/www
+    command: php artisan queue:work database --sleep=3 --tries=3 --timeout=90 --max-time=3600
+    depends_on:
+      - app
+    env_file:
+      - .env.production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - portal_tramites_storage:/var/www/storage
+    networks:
+      - portal-tramites
+
+volumes:
+  portal_tramites_storage:
+
+networks:
+  portal-tramites:
+    driver: bridge
