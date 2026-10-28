@@ -34,21 +34,22 @@
         $accesosRoles = collect(session('accesos.roles', session('accesos.role', [])))->flatten()->map(fn ($role) => mb_strtolower(trim((string) $role)));
         $isSuperuser = $accesosRoles->contains('superuser');
         $isSuperadmin = $accesosRoles->contains('superadmin');
+        $isColaborador = ! $isSuperuser && ! $isSuperadmin && $accesosRoles->contains('colaborador');
+        $rutaBusquedaSolicitudes = $isColaborador && filled(session('accesos.departamento_accesos_id'))
+            ? route('areas.solicitudes.index', session('accesos.departamento_accesos_id'))
+            : route('solicitudes.index');
     @endphp
     <div class="shell">
         <div class="fixed inset-0 z-40 hidden bg-neza-ink/40 min-[901px]:hidden" data-admin-menu-overlay></div>
-        <aside id="admin-sidebar" class="sidebar" aria-label="Menú de administración">
-            <div class="brand flex flex-col">
-                <span class="">
-                    <img src="{{ asset('images/logo/logo-sin-fondo.png') }}" alt="Logo Institucional"
-                        class="w-24 h-auto"> </span>
-                <span class="text-sm text-neza-muted">
-                    Portal de Trámites
-                </span>
-                Portal del Servidor Público
+        <aside id="admin-sidebar" class="sidebar min-h-screen max-h-screen overflow-y-auto" aria-label="Menú de administración">
+            <div class="flex flex-col items-center gap-1 px-2 text-center">
+                <img src="{{ asset('images/logo/logo-sin-fondo.png') }}" alt="Logo Institucional" class="h-auto w-24">
+                <span class="text-sm font-bold leading-tight text-neza-ink">Portal de Trámites</span>
+                <span class="text-xs font-medium leading-tight text-neza-muted">Portal del Servidor Público</span>
             </div>
             <nav class="nav" aria-label="Navegación principal">
                 <span class="side-label">Principal</span>
+                @if (! $isColaborador)
                 <a @class(['active' => request()->routeIs('admin.dashboard')]) href="{{ route('admin.dashboard') }}"><svg class="nav-icon" aria-hidden="true" fill="none"
                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round"
@@ -59,17 +60,25 @@
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M15.75 3.75H18a2.25 2.25 0 0 1 2.25 2.25v12A2.25 2.25 0 0 1 18 20.25H6A2.25 2.25 0 0 1 3.75 18V6A2.25 2.25 0 0 1 6 3.75h2.25m0 0A2.25 2.25 0 0 0 10.5 6h3a2.25 2.25 0 0 0 2.25-2.25m-7.5 0A2.25 2.25 0 0 1 10.5 1.5h3a2.25 2.25 0 0 1 2.25 2.25m-7.5 9h7.5m-7.5 3h7.5m-7.5-6h7.5" />
                     </svg>Solicitudes</a>
+                @elseif (filled(session('accesos.departamento_accesos_id')))
+                <details class="group" open>
+                    <summary class="flex min-w-0 cursor-pointer list-none items-center gap-[11px] rounded-[10px] py-[11px] pl-3 pr-5 text-[13px] font-medium text-[#667085] hover:bg-neza-wine-soft hover:text-neza-wine [&::-webkit-details-marker]:hidden{{ request()->routeIs('areas.*') ? ' active' : '' }}"><span class="min-w-0 flex-1 truncate text-left" title="{{ session('accesos.departamento') }}">{{ session('accesos.departamento') }}</span><svg class="size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></summary>
+                    <div class="mt-1 grid gap-1 border-l border-neza-line pl-3 pr-3"><a href="{{ route('areas.resumen', session('accesos.departamento_accesos_id')) }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('areas.resumen')])>Resumen</a><a href="{{ route('areas.solicitudes.index', session('accesos.departamento_accesos_id')) }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('areas.solicitudes.*')])>Solicitudes</a></div>
+                </details>
+                @endif
                 @if ($isSuperuser)
                 <details class="group" @if(request()->routeIs('dependencias.*') && request()->route('dependencia') === 'desarrollo-urbano') open @endif>
-                    <summary class="flex cursor-pointer list-none items-center gap-[11px] rounded-[10px] px-3 py-[11px] text-[13px] font-medium text-[#667085] hover:bg-neza-wine-soft hover:text-neza-wine [&::-webkit-details-marker]:hidden{{ request()->routeIs('dependencias.*') && request()->route('dependencia') === 'desarrollo-urbano' ? ' active' : '' }}"><span>Desarrollo Urbano</span><svg class="ml-auto size-4 transition-transform group-open:rotate-180" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></summary>
+                    <summary class="flex min-w-0 cursor-pointer list-none items-center gap-[11px] rounded-[10px] py-[11px] pl-3 pr-5 text-[13px] font-medium text-[#667085] hover:bg-neza-wine-soft hover:text-neza-wine [&::-webkit-details-marker]:hidden{{ request()->routeIs('dependencias.*') && request()->route('dependencia') === 'desarrollo-urbano' ? ' active' : '' }}"><span class="min-w-0 flex-1 truncate text-left" title="Desarrollo Urbano">Desarrollo Urbano</span><svg class="size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></summary>
                     <div class="mt-1 grid gap-1 border-l border-neza-line pl-3"><a href="{{ route('dependencias.resumen', 'desarrollo-urbano') }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('dependencias.resumen') && request()->route('dependencia') === 'desarrollo-urbano'])>Resumen</a><a href="{{ route('dependencias.solicitudes.index', 'desarrollo-urbano') }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('dependencias.solicitudes.*') && request()->route('dependencia') === 'desarrollo-urbano'])>Solicitudes</a></div>
                 </details>
                 <details class="group" @if(request()->routeIs('dependencias.*') && request()->route('dependencia') === 'secretaria-del-ayuntamiento') open @endif>
-                    <summary class="flex cursor-pointer list-none items-center gap-[11px] rounded-[10px] px-3 py-[11px] text-[13px] font-medium text-[#667085] hover:bg-neza-wine-soft hover:text-neza-wine [&::-webkit-details-marker]:hidden{{ request()->routeIs('dependencias.*') && request()->route('dependencia') === 'secretaria-del-ayuntamiento' ? ' active' : '' }}"><span>Secretaría del Ayuntamiento</span><svg class="ml-auto size-4 transition-transform group-open:rotate-180" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></summary>
+                    <summary class="flex min-w-0 cursor-pointer list-none items-center gap-[11px] rounded-[10px] py-[11px] pl-3 pr-5 text-[13px] font-medium text-[#667085] hover:bg-neza-wine-soft hover:text-neza-wine [&::-webkit-details-marker]:hidden{{ request()->routeIs('dependencias.*') && request()->route('dependencia') === 'secretaria-del-ayuntamiento' ? ' active' : '' }}"><span class="min-w-0 flex-1 truncate text-left" title="Secretaría del Ayuntamiento">Secretaría del Ayuntamiento</span><svg class="size-4 shrink-0 transition-transform group-open:rotate-180" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg></summary>
                     <div class="mt-1 grid gap-1 border-l border-neza-line pl-3"><a href="{{ route('dependencias.resumen', 'secretaria-del-ayuntamiento') }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('dependencias.resumen') && request()->route('dependencia') === 'secretaria-del-ayuntamiento'])>Resumen</a><a href="{{ route('dependencias.solicitudes.index', 'secretaria-del-ayuntamiento') }}" @class(['!py-2 !text-xs', 'active' => request()->routeIs('dependencias.solicitudes.*') && request()->route('dependencia') === 'secretaria-del-ayuntamiento'])>Solicitudes</a></div>
                 </details>
                 @endif
+                @if ($isSuperadmin || $isSuperuser)
                 <span class="side-label" style="margin-top:16px">Administración</span>
+                @endif
                 @if ($isSuperuser)
                 <a href="{{ route('formulario.index') }}" @class(['active' => request()->routeIs('formulario.*')])><svg class="nav-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24"
                         stroke-width="1.5" stroke="currentColor">
@@ -151,7 +160,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                         </svg>
                     </button>
-                    <form action="{{ route('solicitudes.index') }}" method="GET" role="search" class="search">
+                    <form action="{{ $rutaBusquedaSolicitudes }}" method="GET" role="search" class="search">
                         <svg class="size-5 shrink-0" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m2.1-5.4a7.5 7.5 0 1 1-15 0 7.5 7.5 0 0 1 15 0Z" />
                         </svg>

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureSolicitudAreaAccess;
+use App\Http\Middleware\EnsureAreaOperativaAccess;
 use App\Http\Middleware\RequireAccesosIdentity;
 use App\Http\Middleware\RequireAccesosRole;
 use Illuminate\Foundation\Application;
@@ -17,6 +18,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         $middleware->alias([
+            'accesos.area-operativa' => EnsureAreaOperativaAccess::class,
             'accesos.auth' => RequireAccesosIdentity::class,
             'accesos.role' => RequireAccesosRole::class,
             'accesos.solicitud-area' => EnsureSolicitudAreaAccess::class,

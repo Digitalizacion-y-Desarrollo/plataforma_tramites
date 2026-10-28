@@ -16,6 +16,11 @@ class AccesosSesionController extends Controller
         return session()->has('accesos.id') ? redirect()->route('admin.dashboard') : view('accesos.login');
     }
 
+    public function confirmarCierre(): View
+    {
+        return view('accesos.cerrar-sesion');
+    }
+
     public function store(Request $request, AccesosClient $accesos): RedirectResponse
     {
         $datos = $request->validate(['email' => ['required', 'email', 'max:191'], 'password' => ['required', 'string', 'max:255']]);

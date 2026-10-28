@@ -22,6 +22,7 @@ Route::get('/', [PublicoController::class, 'index'])->name('portal.publico');
 Route::get('/aviso-privacidad', [PublicoController::class, 'avisoPrivacidad'])->name('portal.aviso-privacidad');
 Route::get('/admin/login', [AccesosSesionController::class, 'create'])->name('accesos.login');
 Route::post('/admin/login', [AccesosSesionController::class, 'store'])->name('accesos.login.store');
+Route::get('/admin/cerrar-sesion', [AccesosSesionController::class, 'confirmarCierre'])->name('accesos.logout.confirm');
 Route::prefix('tramites')->name('portal.tramites.')->controller(PublicoController::class)->group(function () {
     Route::get('/', 'tramites')->name('index');
     Route::get('/{tramite}/iniciar', 'iniciar')->name('iniciar');
@@ -49,6 +50,13 @@ Route::prefix('correcciones')->name('correcciones.')->controller(CorreccionDocum
 Route::prefix('admin')->middleware('accesos.auth')->group(function () {
     Route::post('/logout', [AccesosSesionController::class, 'destroy'])->name('accesos.logout');
     Route::get('/', [SolicitudController::class, 'dashboard'])->middleware('accesos.role:Colaborador,superadmin,superuser')->name('admin.dashboard');
+    Route::prefix('areas/{departamento}')
+        ->name('areas.')
+        ->middleware(['accesos.role:Colaborador,superadmin,superuser', 'accesos.area-operativa'])
+        ->group(function () {
+            Route::get('/resumen', [SolicitudController::class, 'resumenArea'])->name('resumen');
+            Route::get('/solicitudes', [SolicitudController::class, 'indexArea'])->name('solicitudes.index');
+        });
     Route::prefix('solicitudes')->name('solicitudes.')->middleware('accesos.role:Colaborador,superadmin,superuser')->group(function () {
         Route::get('/', [SolicitudController::class, 'index'])->name('index');
         Route::get('/areas', [AreaOperativaController::class, 'index'])->middleware('accesos.role:superadmin,superuser')->name('areas.index');

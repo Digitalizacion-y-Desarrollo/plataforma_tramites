@@ -30,16 +30,25 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
+use Illuminate\Http\RedirectResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SolicitudController extends Controller
 {
     private const ESTADOS_EDITABLES = ['BORRADOR', 'ENVIADA', 'CORRECCION_SOLICITADA', 'VALIDADA_PARA_PAGO', 'EN_ESPERA_DE_PAGO', 'EN_REVISION_FINAL'];
 
-    public function index(Request $request): View
+    public function index(Request $request): View|RedirectResponse
     {
+        $areaOperativa = $request->attributes->get('area_operativa');
+        if ($this->esColaborador($request) && ! $areaOperativa) {
+            return redirect()->route('areas.solicitudes.index', (string) $request->session()->get('accesos.departamento_accesos_id'));
+        }
+
         $dependencia = $request->attributes->get('dependencia');
         $nombreDependencia = $dependencia['nombre'] ?? null;
+        if ($areaOperativa instanceof AreaOperativa) {
+            $dependencia = ['etiqueta' => $areaOperativa->nombre_snapshot];
+        }
         $filtros = $request->validate([
             'q' => ['nullable', 'string', 'max:200'],
             'estado_id' => ['nullable', 'integer', 'exists:solicitud_estados,id'],
@@ -53,6 +62,7 @@ class SolicitudController extends Controller
 
         $consulta = $this->consultaPorActor($request)
             ->with(['estado:id,clave,nombre', 'tramite:id,clave,nombre,modalidades,descarga_expira_dias'])
+            ->when($areaOperativa instanceof AreaOperativa, fn ($consulta) => $consulta->where('departamento_accesos_id_snapshot', $areaOperativa->accesos_departamento_id))
             ->when($nombreDependencia, fn ($consulta, string $nombre) => $consulta->where('departamento_nombre_snapshot', $nombre))
             ->when($filtros['q'] ?? null, function ($consulta, string $busqueda): void {
                 $consulta->where(function ($consulta) use ($busqueda): void {
@@ -67,7 +77,12 @@ class SolicitudController extends Controller
             ->when($filtros['fecha_hasta'] ?? null, fn ($consulta, string $fecha) => $consulta->whereDate('fecha_envio', '<=', $fecha));
 
         $filtroEstadisticas = $this->filtroEstadisticas($filtros);
-        $metricas = $this->aplicarFiltroEstadisticas($this->consultaPorActor($request)->when($nombreDependencia, fn ($consulta, string $nombre) => $consulta->where('departamento_nombre_snapshot', $nombre)), $filtroEstadisticas);
+        $metricas = $this->aplicarFiltroEstadisticas(
+            $this->consultaPorActor($request)
+                ->when($areaOperativa instanceof AreaOperativa, fn ($consulta) => $consulta->where('departamento_accesos_id_snapshot', $areaOperativa->accesos_departamento_id))
+                ->when($nombreDependencia, fn ($consulta, string $nombre) => $consulta->where('departamento_nombre_snapshot', $nombre)),
+            $filtroEstadisticas
+        );
         $totalSolicitudes = (clone $metricas)->count();
         $solicitudesEnviadas = (clone $metricas)->whereHas('estado', fn ($consulta) => $consulta->where('clave', 'ENVIADA'))->count();
         $solicitudesAprobadas = (clone $metricas)->whereHas('estado', fn ($consulta) => $consulta->where('clave', 'APROBADA'))->count();
@@ -88,13 +103,20 @@ class SolicitudController extends Controller
         $estados = EstadoSolicitud::query()->where('activo', true)->orderBy('orden')->get(['id', 'clave', 'nombre']);
         $tramites = Tramite::query()
             ->when(! $this->esSuperuser($request), fn ($consulta) => $consulta->whereIn('departamento_accesos_id', $this->areasPermitidas($request)))
+            ->when($areaOperativa instanceof AreaOperativa, fn ($consulta) => $consulta->where('departamento_accesos_id', $areaOperativa->accesos_departamento_id))
             ->when($nombreDependencia, fn ($consulta, string $nombre) => $consulta->where('departamento_nombre_snapshot', $nombre))
             ->orderBy('nombre')
             ->get(['id', 'nombre']);
 
-        $rutaEstadisticas = $dependencia ? route('dependencias.solicitudes.index', $dependencia['slug']) : route('solicitudes.index');
+        $rutaListado = $areaOperativa instanceof AreaOperativa
+            ? route('areas.solicitudes.index', $areaOperativa->accesos_departamento_id)
+            : ($nombreDependencia ? route('dependencias.solicitudes.index', $request->attributes->get('dependencia')['slug']) : route('solicitudes.index'));
+        $rutaResumen = $areaOperativa instanceof AreaOperativa
+            ? route('areas.resumen', $areaOperativa->accesos_departamento_id)
+            : ($nombreDependencia ? route('dependencias.resumen', $request->attributes->get('dependencia')['slug']) : null);
+        $rutaEstadisticas = $rutaListado;
 
-        return view('solicitudes.index', compact('solicitudes', 'estados', 'tramites', 'totalSolicitudes', 'solicitudesEnviadas', 'solicitudesAprobadas', 'solicitudesRechazadas', 'dependencia', 'filtroEstadisticas', 'rutaEstadisticas'));
+        return view('solicitudes.index', compact('solicitudes', 'estados', 'tramites', 'totalSolicitudes', 'solicitudesEnviadas', 'solicitudesAprobadas', 'solicitudesRechazadas', 'dependencia', 'filtroEstadisticas', 'rutaEstadisticas', 'rutaListado', 'rutaResumen'));
     }
 
     public function indexDependencia(Request $request, string $dependencia): View
@@ -104,8 +126,17 @@ class SolicitudController extends Controller
         return $this->index($request);
     }
 
-    public function dashboard(Request $request): View
+    public function indexArea(Request $request, string $departamento): View|RedirectResponse
     {
+        return $this->index($request);
+    }
+
+    public function dashboard(Request $request): View|RedirectResponse
+    {
+        if ($this->esColaborador($request)) {
+            return redirect()->route('areas.resumen', (string) $request->session()->get('accesos.departamento_accesos_id'));
+        }
+
         $consulta = $this->aplicarFiltroEstadisticas($this->consultaPorActor($request), $this->filtroEstadisticas([]));
 
         return view('solicitudes.resumen-dependencia', [
@@ -116,6 +147,7 @@ class SolicitudController extends Controller
             'solicitudesRechazadas' => (clone $consulta)->whereHas('estado', fn ($query) => $query->where('clave', 'RECHAZADA'))->count(),
             'filtroEstadisticas' => $this->filtroEstadisticas([]),
             'rutaEstadisticas' => route('admin.dashboard'),
+            'rutaSolicitudes' => route('solicitudes.index'),
         ]);
     }
 
@@ -138,6 +170,35 @@ class SolicitudController extends Controller
             'solicitudesRechazadas' => (clone $consulta)->whereHas('estado', fn ($query) => $query->where('clave', 'RECHAZADA'))->count(),
             'filtroEstadisticas' => $filtroEstadisticas,
             'rutaEstadisticas' => route('dependencias.resumen', $dependencia['slug']),
+            'rutaSolicitudes' => route('dependencias.solicitudes.index', $dependencia['slug']),
+        ]);
+    }
+
+    public function resumenArea(Request $request, string $departamento): View
+    {
+        $areaOperativa = $request->attributes->get('area_operativa');
+        abort_unless($areaOperativa instanceof AreaOperativa, 404);
+
+        $datos = $request->validate([
+            'estadistica_periodo' => ['nullable', 'in:DIA,SEMANA,MES,RANGO'],
+            'estadistica_fecha_desde' => ['nullable', 'date', 'required_if:estadistica_periodo,RANGO'],
+            'estadistica_fecha_hasta' => ['nullable', 'date', 'required_if:estadistica_periodo,RANGO', 'after_or_equal:estadistica_fecha_desde'],
+        ]);
+        $filtroEstadisticas = $this->filtroEstadisticas($datos);
+        $consulta = $this->aplicarFiltroEstadisticas(
+            Solicitud::query()->where('departamento_accesos_id_snapshot', $areaOperativa->accesos_departamento_id),
+            $filtroEstadisticas
+        );
+
+        return view('solicitudes.resumen-dependencia', [
+            'dependencia' => ['etiqueta' => $areaOperativa->nombre_snapshot],
+            'totalSolicitudes' => (clone $consulta)->count(),
+            'solicitudesEnviadas' => (clone $consulta)->whereHas('estado', fn ($query) => $query->where('clave', 'ENVIADA'))->count(),
+            'solicitudesAprobadas' => (clone $consulta)->whereHas('estado', fn ($query) => $query->where('clave', 'APROBADA'))->count(),
+            'solicitudesRechazadas' => (clone $consulta)->whereHas('estado', fn ($query) => $query->where('clave', 'RECHAZADA'))->count(),
+            'filtroEstadisticas' => $filtroEstadisticas,
+            'rutaEstadisticas' => route('areas.resumen', $areaOperativa->accesos_departamento_id),
+            'rutaSolicitudes' => route('areas.solicitudes.index', $areaOperativa->accesos_departamento_id),
         ]);
     }
 
@@ -204,6 +265,11 @@ class SolicitudController extends Controller
     private function esSuperadmin(Request $request): bool
     {
         return $this->roles($request)->contains('superadmin');
+    }
+
+    private function esColaborador(Request $request): bool
+    {
+        return ! $this->esSuperuser($request) && ! $this->esSuperadmin($request) && $this->roles($request)->contains('colaborador');
     }
 
     private function roles(Request $request)
