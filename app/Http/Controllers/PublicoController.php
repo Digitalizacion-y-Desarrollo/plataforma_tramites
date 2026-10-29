@@ -132,6 +132,11 @@ class PublicoController extends Controller
     {
         abort_unless($this->esTramitePublicado($tramite), 404);
 
+        $confirmacion = session('solicitud_enviada');
+        if ($confirmacion && (string) $confirmacion['tramite_id'] === (string) $tramite->id) {
+            return view('publico.tramites.solicitud-enviada', ['folio' => $confirmacion['folio']]);
+        }
+
         $formularioVersion = $this->formularioActivo($tramite);
         abort_unless($formularioVersion, 404);
 
@@ -284,7 +289,10 @@ class PublicoController extends Controller
         $solicitud = Solicitud::query()->with('tramite')->findOrFail($solicitudId);
         $this->enviarConfirmacionSolicitud($solicitud, $notificacionId);
 
-        return redirect()->route('portal.tramites.iniciar', $tramite)->with('success', 'Tu solicitud fue enviada. Folio: '.$solicitud->folio);
+        return redirect()->route('portal.tramites.iniciar', $tramite)->with('solicitud_enviada', [
+            'tramite_id' => $tramite->id,
+            'folio' => $solicitud->folio,
+        ]);
     }
 
     public function solicitarToken(Request $request)

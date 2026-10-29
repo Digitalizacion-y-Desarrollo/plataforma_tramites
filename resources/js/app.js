@@ -152,6 +152,9 @@ document.querySelectorAll('input[type="file"][data-file-input]').forEach((input)
     const renderizar = () => {
         contenedor.replaceChildren();
         const archivo = input.files?.[0];
+        const limite = Number(input.dataset.maxBytes || 0);
+        const excedeLimite = archivo && limite > 0 && archivo.size > limite;
+        input.setCustomValidity(excedeLimite ? `El archivo no debe superar ${formatoTamano(limite)}.` : '');
 
         if (!archivo) {
             contenedor.classList.add('hidden');
@@ -201,6 +204,13 @@ document.querySelectorAll('input[type="file"][data-file-input]').forEach((input)
 
         fila.append(descripcion, acciones);
         contenedor.append(fila);
+        if (excedeLimite) {
+            const error = document.createElement('p');
+            error.className = 'mt-2 text-sm text-rose-700';
+            error.setAttribute('role', 'alert');
+            error.textContent = input.validationMessage;
+            contenedor.append(error);
+        }
     };
 
     input.addEventListener('change', renderizar);

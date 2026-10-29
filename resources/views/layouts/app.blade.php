@@ -41,13 +41,13 @@
     @endphp
     <div class="shell">
         <div class="fixed inset-0 z-40 hidden bg-neza-ink/40 min-[901px]:hidden" data-admin-menu-overlay></div>
-        <aside id="admin-sidebar" class="sidebar min-h-screen max-h-screen overflow-y-auto" aria-label="Menú de administración">
+        <aside id="admin-sidebar" class="sidebar sticky top-0 h-dvh overflow-x-hidden overflow-y-auto" aria-label="Menú de administración">
             <div class="flex flex-col items-center gap-1 px-2 text-center">
                 <img src="{{ asset('images/logo/logo-sin-fondo.png') }}" alt="Logo Institucional" class="h-auto w-24">
                 <span class="text-sm font-bold leading-tight text-neza-ink">Portal de Trámites</span>
                 <span class="text-xs font-medium leading-tight text-neza-muted">Portal del Servidor Público</span>
             </div>
-            <nav class="nav" aria-label="Navegación principal">
+            <nav class="nav min-w-0 grid-cols-[minmax(0,1fr)] [&_details]:min-w-0 [&_details_div]:min-w-0 [&_details_div]:grid-cols-[minmax(0,1fr)] [&_details_div_a]:block [&_details_div_a]:min-w-0 [&_details_div_a]:truncate" aria-label="Navegación principal">
                 <span class="side-label">Principal</span>
                 @if (! $isColaborador)
                 <a @class(['active' => request()->routeIs('admin.dashboard')]) href="{{ route('admin.dashboard') }}"><svg class="nav-icon" aria-hidden="true" fill="none"
@@ -149,7 +149,7 @@
                     </svg>Auditoría</a>
                 @endif
             </nav>
-            <div class="side-footer">Municipio de Nezahualcóyotl</div>
+            <div class="side-footer truncate" title="Municipio de Nezahualcóyotl">Municipio de Nezahualcóyotl</div>
         </aside>
         <div class="workspace">
             <header class="topbar">

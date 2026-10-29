@@ -5,9 +5,11 @@ namespace Tests\Feature;
 use App\Models\Formulario;
 use App\Models\Tramite;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -52,6 +54,31 @@ class SolicitudDomiciliosTest extends TestCase
             ->assertDontSee('data-domicilio');
     }
 
+    public function test_documento_de_diez_megabytes_es_aceptado(): void
+    {
+        Storage::fake('local');
+        [$tramite, , $campoId] = $this->crearFormulario('FILE', 'Documento');
+        $datos = $this->datosSolicitud($campoId, []);
+        $datos['respuestas'][$campoId] = UploadedFile::fake()->create('documento.pdf', 10240, 'application/pdf');
+
+        $this->post(route('portal.tramites.solicitudes.store', $tramite), $datos)
+            ->assertSessionHasNoErrors();
+
+        $this->assertDatabaseCount('solicitudes', 1);
+    }
+
+    public function test_documento_mayor_a_diez_megabytes_es_rechazado(): void
+    {
+        [$tramite, , $campoId] = $this->crearFormulario('FILE', 'Documento');
+        $datos = $this->datosSolicitud($campoId, []);
+        $datos['respuestas'][$campoId] = UploadedFile::fake()->create('documento.pdf', 10241, 'application/pdf');
+
+        $this->post(route('portal.tramites.solicitudes.store', $tramite), $datos)
+            ->assertSessionHasErrors('respuestas.'.$campoId);
+
+        $this->assertDatabaseCount('solicitudes', 0);
+    }
+
     public function test_solicitud_acepta_un_domicilio_fuera_de_nezahualcoyotl_valido(): void
     {
         [$tramite, , $campoId] = $this->crearFormulario();
@@ -67,6 +94,14 @@ class SolicitudDomiciliosTest extends TestCase
             ->assertRedirect(route('portal.tramites.iniciar', $tramite));
 
         $this->assertDatabaseHas('solicitud_respuestas', ['campo_id' => $campoId]);
+        $folio = DB::table('solicitudes')->value('folio');
+        $this->get(route('portal.tramites.iniciar', $tramite))
+            ->assertOk()
+            ->assertSee('Solicitud enviada')
+            ->assertSee($folio)
+            ->assertSee('Regresar al portal de trámites')
+            ->assertSee(route('portal.publico'))
+            ->assertDontSee('Completa tu solicitud');
         $valor = DB::table('solicitud_respuestas')->where('campo_id', $campoId)->value('valor');
         $this->assertSame($domicilio, json_decode($valor, true));
         $this->assertNotNull(DB::table('solicitudes')->value('aviso_privacidad_aceptado_at'));
