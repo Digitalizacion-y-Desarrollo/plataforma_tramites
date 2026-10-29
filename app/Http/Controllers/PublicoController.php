@@ -223,6 +223,10 @@ class PublicoController extends Controller
             if ($validacion->fails()) {
                 $errores['respuestas.'.$campo->id] = $validacion->errors()->first('valor');
             }
+            if (in_array($campo->tipo, ['DOMICILIO', 'DOMICILIO_FUERA_NEZA'], true) && is_array($valor) && filled(trim((string) ($valor['numero'] ?? '')))
+                && ! preg_match('/^[0-9]{1,50}$/', trim((string) $valor['numero']))) {
+                $errores['respuestas.'.$campo->id] = 'El número exterior debe contener solo dígitos.';
+            }
             if ($campo->tipo === 'DOMICILIO' && is_array($valor) && ! $this->domicilioValido($valor)) {
                 $errores['respuestas.'.$campo->id] = 'Selecciona una colonia y una calle válidas de la lista disponible.';
             }

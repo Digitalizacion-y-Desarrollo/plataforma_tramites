@@ -79,6 +79,34 @@ class SolicitudDomiciliosTest extends TestCase
         $this->assertDatabaseCount('solicitudes', 0);
     }
 
+    public function test_formulario_muestra_patron_numerico_en_codigo_postal_y_numero(): void
+    {
+        [$tramite, , $campoId] = $this->crearFormulario('DOMICILIO_FUERA_NEZA');
+
+        $this->get(route('portal.tramites.iniciar', $tramite))
+            ->assertOk()
+            ->assertSee('inputmode="numeric"', false)
+            ->assertSee('pattern="[0-9]{5}"', false)
+            ->assertSee('pattern="[0-9]{1,50}"', false);
+    }
+
+    public function test_solicitud_rechaza_un_numero_con_letras(): void
+    {
+        [$tramite, , $campoId] = $this->crearFormulario('DOMICILIO_FUERA_NEZA', 'Domicilio fuera de Nezahualcóyotl');
+        $domicilio = [
+            'colonia' => 'Centro',
+            'codigo_postal' => '06000',
+            'municipio' => 'Cuauhtémoc',
+            'calle' => 'Avenida Juárez',
+            'numero' => '12 bis',
+        ];
+
+        $this->post(route('portal.tramites.solicitudes.store', $tramite), $this->datosSolicitud($campoId, $domicilio))
+            ->assertSessionHasErrors('respuestas.'.$campoId);
+
+        $this->assertDatabaseCount('solicitudes', 0);
+    }
+
     public function test_solicitud_acepta_un_domicilio_fuera_de_nezahualcoyotl_valido(): void
     {
         [$tramite, , $campoId] = $this->crearFormulario();

@@ -20,24 +20,24 @@ return [
     ],
     'campos_domicilio' => [
         'colonia' => ['etiqueta' => 'Colonia', 'tipo' => 'text', 'autocomplete' => 'address-line3'],
-        'codigo_postal' => ['etiqueta' => 'Código postal', 'tipo' => 'text', 'autocomplete' => 'postal-code'],
+        'codigo_postal' => ['etiqueta' => 'Código postal', 'tipo' => 'text', 'autocomplete' => 'postal-code', 'inputmode' => 'numeric', 'pattern' => '[0-9]{5}'],
         'municipio' => ['etiqueta' => 'Municipio', 'tipo' => 'text', 'autocomplete' => 'address-level2', 'valor' => 'Nezahualcóyotl', 'disabled' => true],
         'calle' => ['etiqueta' => 'Calle', 'tipo' => 'text', 'autocomplete' => 'street-address'],
-        'numero' => ['etiqueta' => 'Número', 'tipo' => 'text', 'autocomplete' => 'address-line2'],
+        'numero' => ['etiqueta' => 'Número', 'tipo' => 'text', 'autocomplete' => 'address-line2', 'inputmode' => 'numeric', 'pattern' => '[0-9]{1,50}'],
     ],
     'campos_domicilio_fuera_neza' => [
         'colonia' => ['etiqueta' => 'Colonia', 'tipo' => 'text', 'maxlength' => 100, 'autocomplete' => 'off'],
         'codigo_postal' => ['etiqueta' => 'Código postal', 'tipo' => 'text', 'maxlength' => 5, 'inputmode' => 'numeric', 'pattern' => '[0-9]{5}', 'autocomplete' => 'off'],
         'municipio' => ['etiqueta' => 'Municipio', 'tipo' => 'text', 'maxlength' => 100, 'autocomplete' => 'off'],
         'calle' => ['etiqueta' => 'Calle', 'tipo' => 'text', 'maxlength' => 100, 'autocomplete' => 'off'],
-        'numero' => ['etiqueta' => 'Número', 'tipo' => 'text', 'maxlength' => 50, 'autocomplete' => 'off'],
+        'numero' => ['etiqueta' => 'Número', 'tipo' => 'text', 'maxlength' => 50, 'inputmode' => 'numeric', 'pattern' => '[0-9]{1,50}', 'autocomplete' => 'off'],
     ],
     'campos_domicilio_usa' => [
         'calle' => ['etiqueta' => 'Dirección (calle y número)', 'tipo' => 'text', 'maxlength' => 150, 'autocomplete' => 'off'],
         'numero' => ['etiqueta' => 'Apartamento, suite o unidad (opcional)', 'tipo' => 'text', 'maxlength' => 50, 'autocomplete' => 'off', 'requerido' => false],
         'ciudad' => ['etiqueta' => 'Ciudad', 'tipo' => 'text', 'maxlength' => 100, 'autocomplete' => 'off'],
         'estado' => ['etiqueta' => 'Estado', 'tipo' => 'select', 'autocomplete' => 'off'],
-        'codigo_postal' => ['etiqueta' => 'Código postal (ZIP)', 'tipo' => 'text', 'maxlength' => 10, 'pattern' => '[0-9]{5}(-[0-9]{4})?', 'autocomplete' => 'off'],
+        'codigo_postal' => ['etiqueta' => 'Código postal (ZIP)', 'tipo' => 'text', 'maxlength' => 10, 'inputmode' => 'numeric', 'pattern' => '[0-9]{5}(-[0-9]{4})?', 'autocomplete' => 'off'],
     ],
     'estados_usa' => [
         'AL' => 'Alabama',
