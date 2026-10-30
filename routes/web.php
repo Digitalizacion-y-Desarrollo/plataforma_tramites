@@ -75,6 +75,7 @@ Route::prefix('admin')->middleware('accesos.auth')->group(function () {
     Route::prefix('solicitudes/{solicitud}')->middleware(['accesos.role:superadmin,superuser', 'accesos.solicitud-area'])->group(function () {
         Route::put('/datos-personales', [SolicitudController::class, 'actualizarDatosPersonales'])->name('solicitudes.datos-personales.actualizar');
         Route::put('/secciones/{seccion}/respuestas', [SolicitudController::class, 'actualizarRespuestas'])->name('solicitudes.respuestas.actualizar');
+        Route::put('/capturas-administrativas/{captura}', [SolicitudController::class, 'guardarCapturaAdministrativa'])->name('solicitudes.capturas-administrativas.guardar');
         Route::post('/aprobar', [SolicitudController::class, 'aprobar'])->name('solicitudes.aprobar');
         Route::post('/rechazar', [SolicitudController::class, 'rechazar'])->name('solicitudes.rechazar');
         Route::post('/correcciones', [SolicitudController::class, 'solicitarCorreccion'])->name('solicitudes.correcciones.solicitar');

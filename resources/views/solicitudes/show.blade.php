@@ -23,6 +23,7 @@
             'Teléfono' => $solicitud->telefono_contacto,
         ])->filter(fn ($valor) => filled($valor));
         $tieneDatosProporcionados = $datosPersonales->isNotEmpty() || $tieneRespuestas;
+        $capturasAdministrativasPendientes = $capturasAdministrativas->contains('incompleta', true);
     @endphp
 
     <div class="mx-auto max-w-[1200px] space-y-6">
@@ -68,7 +69,10 @@
         @php($modalidades = collect($solicitud->tramite?->modalidades ?? []))
         @php($puedeRechazar = in_array($solicitud->estado?->clave, ['ENVIADA', 'CORRECCION_SOLICITADA', 'VALIDADA_PARA_PAGO', 'EN_ESPERA_DE_PAGO', 'EN_REVISION_FINAL'], true))
         @php($puedeSolicitarCorreccion = $solicitud->estado?->clave === 'ENVIADA' && $archivosCorregibles->isNotEmpty())
-        @php($puedeAprobar = (($solicitud->flujo_pago === 'SIN_PAGO' && $solicitud->estado?->clave === 'ENVIADA') || ($solicitud->flujo_pago !== 'SIN_PAGO' && $solicitud->estado?->clave === 'EN_REVISION_FINAL')) && ($modalidades->contains('EN_LINEA') || $modalidades->contains('PRESENCIAL')))
+        @php($puedeAprobar = (($solicitud->flujo_pago === 'SIN_PAGO' && $solicitud->estado?->clave === 'ENVIADA') || ($solicitud->flujo_pago !== 'SIN_PAGO' && $solicitud->estado?->clave === 'EN_REVISION_FINAL')) && ($modalidades->contains('EN_LINEA') || $modalidades->contains('PRESENCIAL')) && ! $capturasAdministrativasPendientes)
+        @if ($capturasAdministrativasPendientes)
+            <section class="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p class="font-bold">Falta información administrativa obligatoria.</p><p class="mt-1">Completa la captura de datos verificados antes de aprobar esta solicitud.</p></section>
+        @endif
         @if ($solicitud->flujo_pago !== 'SIN_PAGO')
             <section class="flex flex-wrap justify-end gap-3">
                 @if ($solicitud->flujo_pago === 'PAGO_POST_VALIDACION' && $solicitud->estado?->clave === 'ENVIADA')<form action="{{ route('solicitudes.validar', $solicitud) }}" method="POST" data-confirm-action data-confirm-title="¿Validar información?" data-confirm-text="Este cambio no podrá revertirse." data-confirm-button="Sí, validar">@csrf<button class="rounded-lg bg-emerald-700 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-800">Validar información</button></form>@endif
@@ -323,6 +327,8 @@
             @endif
             <section id="documentos-enviados" class="scroll-mt-6 overflow-hidden rounded-xl border border-neza-line bg-white shadow-sm" aria-labelledby="documentos-enviados-titulo"><div class="flex flex-col gap-2 border-b border-neza-line px-5 py-5 sm:flex-row sm:items-center sm:justify-between sm:px-6"><div><h2 id="documentos-enviados-titulo" class="text-lg font-bold text-neza-ink">Documentos enviados</h2><p class="mt-1 text-sm text-neza-muted">Previsualiza y revisa los archivos del expediente antes de resolver.</p></div><span class="w-fit rounded-full bg-neza-wine-soft px-3 py-1 text-xs font-bold text-neza-wine">{{ $documentos->count() }} {{ $documentos->count() === 1 ? 'archivo' : 'archivos' }}</span></div><div class="divide-y divide-neza-line">@foreach ($documentos as $documento)<article class="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6"><div class="flex min-w-0 items-start gap-3"><span class="grid size-10 shrink-0 place-items-center rounded-lg bg-neza-wine-soft text-neza-wine" aria-hidden="true"><svg class="size-5" fill="none" viewBox="0 0 24 24" stroke-width="1.7" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m-3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg></span><div class="min-w-0"><p class="font-semibold text-neza-ink">{{ $documento->requisito_nombre }}</p><p class="mt-1 truncate text-sm text-neza-muted">{{ $documento->nombre_original }} · {{ number_format($documento->tamano_bytes / 1024, 1) }} KB</p>@if ($documento->observaciones)<p class="mt-2 text-sm text-neza-muted">{{ $documento->observaciones }}</p>@endif</div></div><div class="flex flex-wrap items-center gap-2"><span class="order-last w-fit rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 sm:order-none">{{ $documento->estado_nombre }}</span><button type="button" data-document-preview data-document-name="{{ $documento->nombre_original }}" data-preview-url="{{ $documento->origen === 'DOCUMENTO' ? route('solicitudes.documentos.previsualizar', [$solicitud, $documento->id]) : route('solicitudes.archivos.previsualizar', [$solicitud, $documento->id]) }}" class="inline-flex items-center gap-2 rounded-lg border border-neza-line px-3 py-2 text-xs font-semibold text-neza-ink hover:bg-neza-canvas focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Previsualizar</button><a href="{{ $documento->origen === 'DOCUMENTO' ? route('solicitudes.documentos.descargar', [$solicitud, $documento->id]) : route('solicitudes.archivos.descargar', [$solicitud, $documento->id]) }}" class="inline-flex items-center gap-2 rounded-lg border border-neza-wine px-3 py-2 text-xs font-semibold text-neza-wine hover:bg-neza-wine-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Descargar</a></div></article>@endforeach</div></section>
         @endif
+
+        @include('solicitudes.partials.capturas-administrativas')
 
         <section id="trazabilidad" class="scroll-mt-6 rounded-xl border border-neza-line bg-white p-6 shadow-sm">
             <div class="border-b border-neza-line pb-5">

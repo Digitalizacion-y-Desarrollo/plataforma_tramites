@@ -143,6 +143,9 @@
 document.addEventListener('DOMContentLoaded', function () {
     const form = document.querySelector('[aria-label^="Formulario"]');
     if (!form) return;
+    if (form.dataset.asistenteSeccionesInicializado === 'true') return;
+    form.dataset.asistenteSeccionesInicializado = 'true';
+
     ['nombres_solicitante', 'apellido_paterno_solicitante', 'apellido_materno_solicitante'].forEach((name) => { form.elements[name].minLength = 2; });
     form.elements.curp_consulta.pattern = '[A-Za-z]{4}[0-9]{6}[A-Za-z]{6}[A-Za-z0-9][0-9]';
     form.elements.telefono_contacto.pattern = '[0-9+()\\-\\s]{7,30}';
@@ -213,10 +216,25 @@ document.addEventListener('DOMContentLoaded', function () {
         const mensaje = input.parentElement.querySelector('[data-error-validacion]');
         if (mensaje && input.validity.valid) { mensaje.remove(); input.removeAttribute('aria-invalid'); }
     });
-    siguiente.addEventListener('click', () => {
-        const invalido = [...secciones[actual].querySelectorAll('input, select, textarea')].find((input) => input.willValidate && !input.checkValidity());
-        if (invalido) { mostrarError(invalido); invalido.focus(); return; }
-        mostrar(actual + 1);
+    let avanzandoSeccion = false;
+    siguiente.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (avanzandoSeccion) return;
+
+        avanzandoSeccion = true;
+        const seccionActual = actual;
+        const invalido = [...secciones[seccionActual].querySelectorAll('input, select, textarea')].find((input) => input.willValidate && !input.checkValidity());
+        if (invalido) {
+            mostrarError(invalido);
+            invalido.focus();
+            avanzandoSeccion = false;
+
+            return;
+        }
+
+        mostrar(seccionActual + 1);
+        window.requestAnimationFrame(() => { avanzandoSeccion = false; });
     });
     anterior.addEventListener('click', () => mostrar(actual - 1));
     form.addEventListener('invalid', (event) => {

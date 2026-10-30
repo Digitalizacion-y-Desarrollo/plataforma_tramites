@@ -19,6 +19,7 @@ use App\Models\SolicitudPago;
 use App\Models\SolicitudPagoFicha;
 use App\Models\Tramite;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\View\View;
-use Illuminate\Http\RedirectResponse;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class SolicitudController extends Controller
@@ -405,9 +405,78 @@ class SolicitudController extends Controller
                 return $movimiento;
             });
 
+        $capturasAdministrativas = $this->capturasAdministrativas($solicitud);
+
         $origenFichaPago = $this->origenFichaPago();
 
-        return view('solicitudes.show', compact('solicitud', 'respuestasPorSeccion', 'seccionesFormulario', 'valoresRespuestas', 'puedeEditarRespuestas', 'documentos', 'archivosCorregibles', 'comentarios', 'historialEstados', 'origenFichaPago'));
+        return view('solicitudes.show', compact('solicitud', 'respuestasPorSeccion', 'seccionesFormulario', 'valoresRespuestas', 'puedeEditarRespuestas', 'documentos', 'archivosCorregibles', 'comentarios', 'historialEstados', 'capturasAdministrativas', 'origenFichaPago'));
+    }
+
+    public function guardarCapturaAdministrativa(Request $request, Solicitud $solicitud, string $captura)
+    {
+        abort_unless(in_array($solicitud->estado?->clave, self::ESTADOS_EDITABLES, true), 422, 'La solicitud ya no permite capturas administrativas.');
+
+        $configuracion = DB::table('formulario_capturas_administrativas')
+            ->where('id', $captura)
+            ->where('formulario_version_id', $solicitud->formulario_version_id)
+            ->where('activo', true)
+            ->first();
+        abort_unless($configuracion, 404);
+
+        $campos = DB::table('formulario_captura_administrativa_campos')
+            ->where('captura_administrativa_id', $configuracion->id)
+            ->where('activo', true)
+            ->orderBy('orden')
+            ->get();
+        $reglas = [];
+        foreach ($campos as $campo) {
+            $base = $campo->requerido ? ['required'] : ['nullable'];
+            if ($campo->tipo === 'DOMICILIO') {
+                $reglas['respuestas.'.$campo->id] = [...$base, 'array'];
+                foreach (config('formulario.campos_domicilio') as $clave => $subcampo) {
+                    if (($subcampo['disabled'] ?? false) || $clave === 'codigo_postal') {
+                        continue;
+                    }
+                    $reglas['respuestas.'.$campo->id.'.'.$clave] = [
+                        $campo->requerido ? 'required' : 'nullable', 'string', 'max:'.($subcampo['maxlength'] ?? 150),
+                    ];
+                }
+            } else {
+                $reglas['respuestas.'.$campo->id] = [...$base, 'string', 'max:500'];
+            }
+        }
+        $datos = $request->validate($reglas);
+        $respuestas = $datos['respuestas'] ?? [];
+        $actor = $this->actor($request);
+
+        DB::transaction(function () use ($solicitud, $configuracion, $campos, $respuestas, $actor, $request): void {
+            $bloqueada = Solicitud::query()->with('estado:id,clave')->lockForUpdate()->findOrFail($solicitud->id);
+            abort_unless(in_array($bloqueada->estado?->clave, self::ESTADOS_EDITABLES, true), 422, 'La solicitud ya no permite capturas administrativas.');
+            $anteriores = DB::table('solicitud_captura_administrativa_respuestas')
+                ->where('solicitud_id', $bloqueada->id)
+                ->whereIn('campo_captura_administrativa_id', $campos->pluck('id'))
+                ->get(['campo_captura_administrativa_id', 'valor'])
+                ->mapWithKeys(fn ($respuesta) => [$respuesta->campo_captura_administrativa_id => json_decode($respuesta->valor, true)])
+                ->all();
+            $nuevos = [];
+            foreach ($campos as $campo) {
+                $valor = $respuestas[$campo->id] ?? null;
+                $nuevos[$campo->id] = $valor;
+                $existente = DB::table('solicitud_captura_administrativa_respuestas')
+                    ->where('solicitud_id', $bloqueada->id)
+                    ->where('campo_captura_administrativa_id', $campo->id)
+                    ->first();
+                $atributos = ['valor' => json_encode($valor), 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'], 'actor_departamento_snapshot' => $actor['departamento'], 'updated_at' => now()];
+                if ($existente) {
+                    DB::table('solicitud_captura_administrativa_respuestas')->where('id', $existente->id)->update($atributos);
+                } else {
+                    DB::table('solicitud_captura_administrativa_respuestas')->insert($atributos + ['id' => (string) Str::uuid(), 'solicitud_id' => $bloqueada->id, 'campo_captura_administrativa_id' => $campo->id, 'created_at' => now()]);
+                }
+            }
+            Auditoria::registrar($request, 'SOLICITUD_CAPTURA_ADMINISTRATIVA_GUARDADA', 'SOLICITUD', $bloqueada->id, $anteriores, ['captura_id' => $configuracion->id, 'respuestas' => $nuevos]);
+        });
+
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'Los datos verificados fueron guardados correctamente.');
     }
 
     public function actualizarDatosPersonales(Request $request, Solicitud $solicitud)
@@ -997,6 +1066,7 @@ class SolicitudController extends Controller
     public function aprobar(Request $request, Solicitud $solicitud)
     {
         $solicitud->load('tramite', 'estado');
+        abort_if($this->hayCapturasAdministrativasIncompletas($solicitud), 422, 'Completa los datos administrativos obligatorios antes de aprobar la solicitud.');
         $estadoAprobable = $solicitud->flujo_pago === 'SIN_PAGO' ? 'ENVIADA' : 'EN_REVISION_FINAL';
         abort_unless($solicitud->estado?->clave === $estadoAprobable, 422, 'La solicitud no está lista para aprobarse.');
 
@@ -1023,6 +1093,7 @@ class SolicitudController extends Controller
         try {
             [$notificacionId, $documentoEmitido, $instrucciones] = DB::transaction(function () use ($solicitud, $esEnLinea, $datos, $actor, &$archivoGuardado, $request) {
                 $solicitudBloqueada = Solicitud::query()->lockForUpdate()->findOrFail($solicitud->id);
+                abort_if($this->hayCapturasAdministrativasIncompletas($solicitudBloqueada), 422, 'Completa los datos administrativos obligatorios antes de aprobar la solicitud.');
                 $estadoAnterior = $solicitudBloqueada->solicitud_estado_id;
                 $estadoAprobableId = EstadoSolicitud::query()->where('clave', $solicitud->flujo_pago === 'SIN_PAGO' ? 'ENVIADA' : 'EN_REVISION_FINAL')->value('id');
                 abort_unless($estadoAnterior === $estadoAprobableId, 422, 'La solicitud ya fue atendida.');
@@ -1136,6 +1207,45 @@ class SolicitudController extends Controller
         $this->enviarRechazo($solicitud, $notificacionId, $motivo);
 
         return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La solicitud fue rechazada correctamente.');
+    }
+
+    private function capturasAdministrativas(Solicitud $solicitud)
+    {
+        if (! Schema::hasTable('formulario_capturas_administrativas')) {
+            return collect();
+        }
+
+        $capturas = DB::table('formulario_capturas_administrativas')
+            ->where('formulario_version_id', $solicitud->formulario_version_id)
+            ->where('activo', true)
+            ->orderBy('orden')
+            ->get();
+        $campos = DB::table('formulario_captura_administrativa_campos')
+            ->whereIn('captura_administrativa_id', $capturas->pluck('id'))
+            ->where('activo', true)
+            ->orderBy('orden')
+            ->get();
+        $respuestas = DB::table('solicitud_captura_administrativa_respuestas')
+            ->where('solicitud_id', $solicitud->id)
+            ->whereIn('campo_captura_administrativa_id', $campos->pluck('id'))
+            ->get(['campo_captura_administrativa_id', 'valor'])
+            ->mapWithKeys(fn ($respuesta) => [$respuesta->campo_captura_administrativa_id => json_decode($respuesta->valor, true)]);
+
+        return $capturas->map(function ($captura) use ($campos, $respuestas) {
+            $captura->campos = $campos->where('captura_administrativa_id', $captura->id)->values()->map(function ($campo) use ($respuestas) {
+                $campo->valor = $respuestas->get($campo->id);
+
+                return $campo;
+            });
+            $captura->incompleta = $captura->campos->contains(fn ($campo) => $campo->requerido && blank($campo->valor));
+
+            return $captura;
+        });
+    }
+
+    private function hayCapturasAdministrativasIncompletas(Solicitud $solicitud): bool
+    {
+        return $this->capturasAdministrativas($solicitud)->contains('incompleta', true);
     }
 
     private function origenFichaPago(): string
