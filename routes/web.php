@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\AccesosSesionController;
+use App\Http\Controllers\ActaNacimientoOcrController;
 use App\Http\Controllers\AreaOperativaController;
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\CanalAyudaController;
@@ -85,6 +86,7 @@ Route::prefix('admin')->middleware('accesos.auth')->group(function () {
         Route::post('/referencia-pago', [SolicitudController::class, 'generarReferenciaPago'])->name('solicitudes.pagos.generar');
         Route::post('/validar-pago', [SolicitudController::class, 'validarPago'])->name('solicitudes.pagos.validar');
         Route::post('/comentarios', [SolicitudController::class, 'comentar'])->name('solicitudes.comentarios.store');
+        Route::post('/acta-nacimiento/ocr', ActaNacimientoOcrController::class)->middleware('throttle:6,1')->name('solicitudes.acta-ocr');
     });
     Route::middleware('accesos.role:superadmin,superuser')->group(function () {
         Route::resource('servicios-interes', ServicioInteresController::class)->except('show')->parameters(['servicios-interes' => 'servicio_interes']);

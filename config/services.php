@@ -48,4 +48,11 @@ return [
         'system_key' => env('ACCESOS_SYSTEM_KEY'),
     ],
 
+    'openai' => [
+        'api_key' => env('OPENAI_API_KEY'),
+        'model' => env('OPENAI_ACTA_MODEL', 'gpt-4o'),
+        'url' => env('OPENAI_URL', 'https://api.openai.com/v1/responses'),
+        'timeout' => (int) env('OPENAI_TIMEOUT', 90),
+    ],
+
 ];

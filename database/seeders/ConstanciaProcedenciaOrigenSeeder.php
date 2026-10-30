@@ -45,7 +45,7 @@ class ConstanciaProcedenciaOrigenSeeder extends Seeder
             'departamento_accesos_id' => self::DEPARTAMENTO_ID,
             'departamento_nombre_snapshot' => self::DEPARTAMENTO_NOMBRE,
             'duracion' => 'Máximo 24 horas hábiles', 'costo' => '$117.31 MXN', 'costo_pago' => 117.31,
-            'flujo_pago' => 'SIN_PAGO', 'pago_vigencia_dias' => null, 'modalidades' => ['PRESENCIAL'],
+            'flujo_pago' => 'PAGO_DIRECTO', 'pago_vigencia_dias' => 30, 'modalidades' => ['PRESENCIAL'],
             'requisitos' => [
                 'Acta de nacimiento actualizada y en buen estado del (la) solicitante, donde demuestre ser originario o registrado en el Municipio de Nezahualcóyotl.',
                 'Comprobante de domicilio reciente no mayor a tres meses de antigüedad: recibo de luz, teléfono, pago de predio, pago de agua, aforo o correspondencia bancaria a nombre del (la) solicitante o que coincida con los datos de la credencial para votar de sus testigos. Los comprobantes digitales deben imprimirse con firma, sello digital y código QR. No se aceptan impresiones de Totalplay ni de izzi. Si la dirección está oculta en la credencial, presentar comprobante de domicilio a su nombre.',
@@ -55,7 +55,14 @@ class ConstanciaProcedenciaOrigenSeeder extends Seeder
                 'Si el (la) solicitante ha sido residente del Municipio de Nezahualcóyotl y esta sea su última procedencia, presentar documentos que lo acrediten, por ejemplo: credenciales para votar, acta de matrimonio del Municipio de Nezahualcóyotl, actas de nacimiento de hijos registrados en el Municipio de Nezahualcóyotl, entre otros.',
                 'El trámite de Constancia de Procedencia u Origen es sólo para los originarios o residentes del Municipio de Nezahualcóyotl que así lo acrediten.',
             ],
-            'proceso' => ['Captura la solicitud en línea y adjunta los documentos requeridos.', 'El área responsable revisa la información y documentación.', 'Acude a la Secretaría del H. Ayuntamiento con los originales y copias cuando te sea indicado.', 'La entrega de la constancia es en un máximo de 24 horas hábiles después de haber realizado su trámite.'],
+            'proceso' => [
+                'Captura tu solicitud en línea y adjunta los documentos requeridos.',
+                'Recibe por correo tu referencia de pago y acude a pagar el importe de $117.31 MXN antes de la fecha de vencimiento.',
+                'Sube tu comprobante de pago en la consulta de tu trámite para que el área responsable lo valide.',
+                'El área responsable revisa y valida tu información y documentos.',
+                'Una vez validado el pago, acude a la Secretaría del H. Ayuntamiento con los originales y copias.',
+                'La entrega de la constancia es en un máximo de 24 horas hábiles después de validar el pago.',
+            ],
             'preguntas_frecuentes' => [['pregunta' => '¿Cuál es la vigencia de la constancia?', 'respuesta' => 'La vigencia de la constancia es de 90 días corrientes.'], ['pregunta' => '¿Cuál es el horario de atención?', 'respuesta' => 'De lunes a viernes de 9:00 a 16:00 horas; la documentación se recibe antes de las 15:30 horas.']],
             'activo' => true, 'tramite_estado_id' => TramiteEstado::query()->where('clave', 'PUBLICADO')->where('activo', true)->value('id'),
         ]);
@@ -216,13 +223,13 @@ class ConstanciaProcedenciaOrigenSeeder extends Seeder
     {
         $letras = ['no_acta_letra', 'no_oficialia_letra', 'no_libro_letra', 'dia_nacimiento_letra', 'ano_nacimiento_letra', 'dia_certificacion_letra', 'ano_certificacion_letra'];
         $campos = [
-            'lugar_nacimiento' => 'Lugar de nacimiento', 'lugar_registro' => 'Lugar de registro', 'numero_acta' => 'Número de acta', 'no_acta_letra' => 'No. acta letra', 'no_oficialia' => 'No. oficialía', 'no_oficialia_letra' => 'No. oficialía letra', 'no_libro' => 'No. libro', 'no_libro_letra' => 'No. libro letra', 'dia_nacimiento' => 'Día de nacimiento', 'dia_nacimiento_letra' => 'Día nacimiento letra', 'mes_nacimiento' => 'Mes de nacimiento', 'ano_nacimiento' => 'Año de nacimiento', 'ano_nacimiento_letra' => 'Año nacimiento letra', 'nombre_padre' => 'Nombre del padre', 'nombre_madre' => 'Nombre de madre', 'tiempo_residencia' => 'Tiempo de residencia', 'domicilio_residencia' => 'Domicilio de residencia', 'nombre_certifica' => 'Nombre de quien certifica', 'cargo' => 'Cargo', 'dia_certificacion' => 'Día de certificación', 'dia_certificacion_letra' => 'Día certificación letra', 'mes_certificacion' => 'Mes de certificación', 'ano_certificacion' => 'Año certificación', 'ano_certificacion_letra' => 'Año certificación letra',
+            'lugar_nacimiento' => 'Lugar de nacimiento', 'lugar_registro' => 'Lugar de registro', 'numero_acta' => 'Número de acta', 'no_acta_letra' => 'No. acta letra', 'no_oficialia' => 'No. oficialía', 'no_oficialia_letra' => 'No. oficialía letra', 'no_libro' => 'No. libro', 'no_libro_letra' => 'No. libro letra', 'dia_nacimiento' => 'Día de nacimiento', 'dia_nacimiento_letra' => 'Día nacimiento letra', 'mes_nacimiento' => 'Mes de nacimiento', 'ano_nacimiento' => 'Año de nacimiento', 'ano_nacimiento_letra' => 'Año nacimiento letra', 'nombre_padre' => 'Nombre del padre', 'nombre_madre' => 'Nombre de madre', 'nombre_certifica' => 'Nombre de quien certifica', 'cargo' => 'Cargo', 'dia_certificacion' => 'Día de certificación', 'dia_certificacion_letra' => 'Día certificación letra', 'mes_certificacion' => 'Mes de certificación', 'ano_certificacion' => 'Año certificación', 'ano_certificacion_letra' => 'Año certificación letra',
         ];
 
         return collect($campos)->map(fn (string $etiqueta, string $clave) => [
             'clave' => $clave,
             'etiqueta' => $etiqueta,
-            'tipo' => $clave === 'domicilio_residencia' ? 'DOMICILIO' : 'TEXT',
+            'tipo' => 'TEXT',
             'requerido' => ! in_array($clave, $letras, true),
         ])->values()->all();
     }

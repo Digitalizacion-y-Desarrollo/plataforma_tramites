@@ -503,24 +503,70 @@ document.querySelectorAll('[data-modal-close]').forEach((boton) => {
 const modalDocumento = document.querySelector('#documento-previsualizador');
 const marcoDocumento = document.querySelector('#documento-previsualizador-marco');
 const tituloDocumento = document.querySelector('#documento-previsualizador-titulo');
+const imagenDocumento = document.querySelector('#documento-previsualizador-imagen');
+const areaImagenDocumento = modalDocumento?.querySelector('[data-image-preview-stage]');
+const controlesImagenDocumento = modalDocumento?.querySelector('[data-image-preview-controls]');
+const valorZoomImagen = modalDocumento?.querySelector('[data-image-zoom-value]');
 
 if (modalDocumento && marcoDocumento && tituloDocumento) {
+    const escalasImagen = [100, 125, 150, 175, 200, 250];
+    const clasesEscala = ['max-h-[calc(72vh-2rem)]', 'w-auto', 'max-w-full', 'h-auto', 'max-h-none', 'w-[125%]', 'w-[150%]', 'w-[175%]', 'w-[200%]', 'w-[250%]'];
+    let indiceEscalaImagen = 0;
+    const aplicarZoomImagen = () => {
+        if (!imagenDocumento) return;
+        imagenDocumento.classList.remove(...clasesEscala);
+        if (indiceEscalaImagen === 0) {
+            imagenDocumento.classList.add('max-h-[calc(72vh-2rem)]', 'w-auto', 'max-w-full');
+        } else {
+            imagenDocumento.classList.add('h-auto', 'max-h-none', `w-[${escalasImagen[indiceEscalaImagen]}%]`);
+        }
+        if (valorZoomImagen) valorZoomImagen.value = indiceEscalaImagen === 0 ? 'Ajustar' : `${escalasImagen[indiceEscalaImagen]}%`;
+    };
+    const restablecerZoomImagen = () => {
+        indiceEscalaImagen = 0;
+        aplicarZoomImagen();
+        areaImagenDocumento?.scrollTo({ top: 0, left: 0 });
+    };
+
     document.querySelectorAll('[data-document-preview]').forEach((boton) => {
         boton.addEventListener('click', () => {
             tituloDocumento.textContent = boton.dataset.documentName || 'Previsualización del documento';
-            marcoDocumento.src = boton.dataset.previewUrl || 'about:blank';
+            const esImagen = boton.dataset.documentIsImage === 'true';
+            marcoDocumento.hidden = esImagen;
+            areaImagenDocumento?.toggleAttribute('hidden', !esImagen);
+            controlesImagenDocumento?.toggleAttribute('hidden', !esImagen);
+            if (esImagen && imagenDocumento) {
+                marcoDocumento.src = 'about:blank';
+                imagenDocumento.src = boton.dataset.previewUrl || '';
+                restablecerZoomImagen();
+            } else {
+                imagenDocumento?.removeAttribute('src');
+                marcoDocumento.src = boton.dataset.previewUrl || 'about:blank';
+            }
             modalDocumento.showModal();
         });
     });
 
+    modalDocumento.querySelector('[data-image-zoom-in]')?.addEventListener('click', () => {
+        indiceEscalaImagen = Math.min(indiceEscalaImagen + 1, escalasImagen.length - 1);
+        aplicarZoomImagen();
+    });
+    modalDocumento.querySelector('[data-image-zoom-out]')?.addEventListener('click', () => {
+        indiceEscalaImagen = Math.max(indiceEscalaImagen - 1, 0);
+        aplicarZoomImagen();
+    });
+    modalDocumento.querySelector('[data-image-zoom-reset]')?.addEventListener('click', restablecerZoomImagen);
+
     const cerrarPrevisualizador = () => {
         marcoDocumento.src = 'about:blank';
+        imagenDocumento?.removeAttribute('src');
         modalDocumento.close();
     };
 
     modalDocumento.querySelector('[data-document-preview-close]')?.addEventListener('click', cerrarPrevisualizador);
     modalDocumento.addEventListener('cancel', () => {
         marcoDocumento.src = 'about:blank';
+        imagenDocumento?.removeAttribute('src');
     });
 }
 
@@ -853,4 +899,125 @@ document.querySelectorAll('[data-reenviar-en]').forEach((boton) => {
         if (segundos > 0) window.setTimeout(actualizar, 1000);
     };
     actualizar();
+});
+
+document.querySelectorAll('[data-acta-ocr]').forEach((panel) => {
+    const url = panel.dataset.actaOcrUrl;
+    const token = panel.dataset.actaOcrToken;
+    const boton = panel.querySelector('[data-acta-ocr-btn]');
+    const etiqueta = panel.querySelector('[data-acta-ocr-label]');
+    const contenedorCampos = document.getElementById(boton?.dataset.actaOcrPanel ?? '');
+    const formulario = boton?.closest('form');
+
+    if (!url || !token || !boton || !etiqueta || !formulario) return;
+
+    const textoOriginal = etiqueta.textContent;
+    const ocupar = () => {
+        boton.disabled = true;
+        etiqueta.textContent = 'Extrayendo datos…';
+    };
+    const liberar = () => {
+        boton.disabled = false;
+        etiqueta.textContent = textoOriginal;
+    };
+
+    const resaltadoOcr = ['ring-2', 'ring-amber-400', 'ring-offset-2'];
+
+    const resaltar = (input) => {
+        input.classList.add(...resaltadoOcr);
+        window.setTimeout(() => input.classList.remove(...resaltadoOcr), 6000);
+    };
+
+    const establecer = (campoId, clave, valor) => {
+        const sufijo = clave ? `[${clave}]` : '';
+        const input = formulario.querySelector(`input[name="respuestas[${campoId}]${sufijo}"]`);
+
+        if (!input) return null;
+
+        input.value = valor ?? '';
+        resaltar(input);
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+
+        return input;
+    };
+
+    boton.addEventListener('click', async () => {
+        ocupar();
+
+        try {
+            const respuesta = await fetch(url, {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'X-CSRF-TOKEN': token },
+            });
+            const datos = await respuesta.json().catch(() => ({}));
+
+            if (!respuesta.ok) {
+                Swal.fire({
+                    icon: 'error',
+                    title: 'No fue posible extraer los datos',
+                    text: datos.message || 'Intenta de nuevo más tarde o captura los datos manualmente.',
+                    confirmButtonColor: '#7f1d3f',
+                });
+                return;
+            }
+
+            if (!datos.es_acta_nacimiento) {
+                Swal.fire({
+                    icon: 'warning',
+                    title: 'No parece un acta de nacimiento',
+                    text: datos.motivo || 'Revisa el documento adjunto por el ciudadano y captura los datos manualmente.',
+                    confirmButtonColor: '#7f1d3f',
+                });
+                return;
+            }
+
+            let rellenados = 0;
+            let primerRellenado = null;
+            Object.entries(datos.datos || {}).forEach(([campoId, valor]) => {
+                if (valor !== null && typeof valor === 'object') {
+                    Object.entries(valor).forEach(([clave, subvalor]) => {
+                        const control = establecer(campoId, clave, subvalor);
+                        if (control) {
+                            rellenados++;
+                            primerRellenado ??= control;
+                        }
+                    });
+                } else {
+                    const control = establecer(campoId, '', valor);
+                    if (control) {
+                        rellenados++;
+                        primerRellenado ??= control;
+                    }
+                }
+            });
+
+            if (rellenados === 0) {
+                Swal.fire({
+                    icon: 'info',
+                    title: 'Sin datos para prellenar',
+                    text: 'No se detectaron datos capturables en el acta. Captúralos manualmente.',
+                    confirmButtonColor: '#7f1d3f',
+                });
+                return;
+            }
+
+            primerRellenado?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+            Swal.fire({
+                icon: 'success',
+                title: 'Datos prellenados',
+                text: `Se extrajeron ${rellenados} entradas de la captura (resaltadas en amarillo). Verifica cada campo contra el acta antes de guardar.`,
+                confirmButtonColor: '#7f1d3f',
+            });
+        } catch {
+            Swal.fire({
+                icon: 'error',
+                title: 'No fue posible extraer los datos',
+                text: 'Ocurrió un problema de conexión. Intenta de nuevo o captura los datos manualmente.',
+                confirmButtonColor: '#7f1d3f',
+            });
+        } finally {
+            liberar();
+        }
+    });
 });
