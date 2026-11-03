@@ -328,6 +328,7 @@ class SolicitudController extends Controller
                     return null;
                 }
 
+                $respuesta->valor_original = $valor;
                 $respuesta->valor = $this->formatearValor(
                     $valor,
                     $respuesta->campo_tipo,
@@ -640,6 +641,11 @@ class SolicitudController extends Controller
             case 'DATE':
                 $reglas[$clave] = [...$base, 'date'];
                 break;
+            case 'MAPA':
+                $reglas[$clave] = [...$base, 'array'];
+                $reglas[$clave.'.latitud'] = [$requerido ? 'required' : 'nullable', 'numeric', 'between:-90,90'];
+                $reglas[$clave.'.longitud'] = [$requerido ? 'required' : 'nullable', 'numeric', 'between:-180,180'];
+                break;
             case 'CURP':
                 $reglas[$clave] = [...$base, 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'];
                 break;
@@ -732,6 +738,13 @@ class SolicitudController extends Controller
                 ->all();
 
             return $valores === [] ? null : $valores;
+        }
+
+        if ($campo->tipo === 'MAPA') {
+            return is_array($valor) ? [
+                'latitud' => filled($valor['latitud'] ?? null) ? (string) $valor['latitud'] : null,
+                'longitud' => filled($valor['longitud'] ?? null) ? (string) $valor['longitud'] : null,
+            ] : null;
         }
 
         if (in_array($campo->tipo, ['DOMICILIO', 'DOMICILIO_FUERA_NEZA', 'DOMICILIO_USA'], true)) {

@@ -9,6 +9,18 @@ document.querySelectorAll('[data-dismiss-public-notice]').forEach((button) => {
     });
 });
 
+document.querySelectorAll('[data-mapa-lectura]').forEach((lienzo) => {
+    if (!window.L) return;
+    const latitud = Number(lienzo.dataset.latitud);
+    const longitud = Number(lienzo.dataset.longitud);
+    if (!Number.isFinite(latitud) || !Number.isFinite(longitud)) return;
+    const mapa = window.L.map(lienzo, { scrollWheelZoom: true, dragging: true, zoomControl: true }).setView([latitud, longitud], 18);
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(mapa);
+    window.L.marker([latitud, longitud]).addTo(mapa);
+});
+
 const cuerpo = document.body;
 
 document.querySelectorAll('[data-referencia-pago-preview]').forEach((dialogo) => {
@@ -770,17 +782,23 @@ document.querySelectorAll('[data-orden-campos]').forEach((constructor) => {
 });
 
 document.querySelectorAll('[data-formulario-preview]').forEach((vista) => {
+    vista.closest('form')?.addEventListener('keydown', (evento) => {
+        if (evento.key === 'Enter' && !evento.isComposing) evento.preventDefault();
+    });
 document.querySelectorAll('[data-domicilio]').forEach((domicilio) => {
     const codigoPostal = domicilio.querySelector('[data-domicilio-campo="codigo_postal"]');
     const colonia = domicilio.querySelector('[data-domicilio-campo="colonia"]');
     const calle = domicilio.querySelector('[data-domicilio-campo="calle"]');
+    const numero = domicilio.querySelector('[data-domicilio-campo="numero"]');
     const colonias = domicilio.querySelector('[data-domicilio-colonias]');
     const calles = domicilio.querySelector('[data-domicilio-calles]');
     const latitud = domicilio.querySelector('[data-domicilio-latitud]');
     const longitud = domicilio.querySelector('[data-domicilio-longitud]');
     const url = domicilio.dataset.indiceUrl;
+    const coordenadasUrl = domicilio.dataset.coordenadasUrl;
     let indice;
     let cargaIndice;
+    let cargaCoordenadas;
 
     if (!codigoPostal || !colonia || !calle || !colonias || !calles || !latitud || !longitud || !url) return;
 
@@ -809,10 +827,68 @@ document.querySelectorAll('[data-domicilio]').forEach((domicilio) => {
             codigoPostal.value = ''; limpiarDerivados();
         }
     };
+    const cargarCoordenadas = async () => {
+        if (!coordenadasUrl) return [];
+        if (!cargaCoordenadas) {
+            cargaCoordenadas = fetch(coordenadasUrl, { headers: { Accept: 'application/json' } })
+                .then((respuesta) => { if (!respuesta.ok) throw new Error(); return respuesta.json(); })
+                .then((datos) => datos.features ?? []);
+        }
+        return cargaCoordenadas;
+    };
+    const actualizarCoordenadas = async () => {
+        if (!calle.value || !numero?.value || !codigoPostal.value) return;
+        try {
+            const normalizarCoordenada = (valor) => String(valor ?? '').trim().toLocaleUpperCase();
+            const punto = (await cargarCoordenadas()).find(({ properties }) =>
+                normalizarCoordenada(properties.NOMVIAL) === normalizarCoordenada(calle.value)
+                && normalizarCoordenada(properties.NUMEXT) === normalizarCoordenada(numero.value)
+                && normalizarCoordenada(properties.CP) === normalizarCoordenada(codigoPostal.value));
+            latitud.value = punto ? String(punto.properties.latitud ?? punto.geometry?.coordinates?.[1] ?? '') : '';
+            longitud.value = punto ? String(punto.properties.longitud ?? punto.geometry?.coordinates?.[0] ?? '') : '';
+        } catch { latitud.value = ''; longitud.value = ''; }
+    };
 
     cargarIndice().then((coloniasDisponibles) => opciones(colonias, Object.keys(coloniasDisponibles))).catch(() => {});
     colonia.addEventListener('input', actualizarColonia);
+    calle.addEventListener('input', actualizarCoordenadas);
+    numero?.addEventListener('input', actualizarCoordenadas);
     if (colonia.value) actualizarColonia();
+});
+
+document.querySelectorAll('[data-mapa-ubicacion]').forEach((contenedor) => {
+    if (!window.L) return;
+    const lienzo = contenedor.querySelector('[data-mapa-lienzo]');
+    const latitud = contenedor.querySelector('[name$="[latitud]"]');
+    const longitud = contenedor.querySelector('[name$="[longitud]"]');
+    const mensaje = contenedor.querySelector('[data-mapa-mensaje]');
+    const domicilioId = contenedor.dataset.domicilioOrigen;
+    if (!lienzo || !latitud || !longitud || !domicilioId) return;
+
+    const mapa = window.L.map(lienzo).setView([19.4869, -99.1854], 13);
+    window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '&copy; OpenStreetMap contributors',
+    }).addTo(mapa);
+    let marcador;
+    const fijar = (lat, lng) => {
+        const punto = [Number(lat), Number(lng)];
+        if (!marcador) marcador = window.L.marker(punto, { draggable: true }).addTo(mapa);
+        else marcador.setLatLng(punto);
+        marcador.on('dragend', () => fijar(marcador.getLatLng().lat, marcador.getLatLng().lng));
+        latitud.value = punto[0].toFixed(7);
+        longitud.value = punto[1].toFixed(7);
+    };
+    if (latitud.value && longitud.value) fijar(latitud.value, longitud.value);
+    mapa.on('click', (evento) => fijar(evento.latlng.lat, evento.latlng.lng));
+    contenedor.querySelector('[data-mapa-ubicar]')?.addEventListener('click', async () => {
+        const origen = document.querySelector(`[data-campo-destino="${domicilioId}"]`);
+        const latitudDomicilio = origen?.querySelector('[data-domicilio-latitud]')?.value;
+        const longitudDomicilio = origen?.querySelector('[data-domicilio-longitud]')?.value;
+        if (!latitudDomicilio || !longitudDomicilio) { mensaje.textContent = 'Completa calle, número y código postal con un domicilio localizado en la capa para ubicar el croquis.'; return; }
+        fijar(latitudDomicilio, longitudDomicilio);
+        mapa.setView([latitudDomicilio, longitudDomicilio], 18);
+        mensaje.textContent = 'Ubicación obtenida del domicilio. Puedes ajustar el marcador.';
+    });
 });
     const obtenerValor = (campoId) => {
         const controles = [...vista.querySelectorAll(`[data-campo-control="${campoId}"]`)];

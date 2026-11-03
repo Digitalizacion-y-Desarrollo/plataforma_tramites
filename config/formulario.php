@@ -17,6 +17,7 @@ return [
         'DOMICILIO' => 'Domicilio',
         'DOMICILIO_FUERA_NEZA' => 'Domicilio fuera de Ciudad Nezahualcóyotl',
         'DOMICILIO_USA' => 'Domicilio en Estados Unidos',
+        'MAPA' => 'Mapa de ubicación',
     ],
     'campos_domicilio' => [
         'colonia' => ['etiqueta' => 'Colonia', 'tipo' => 'text', 'autocomplete' => 'address-line3'],

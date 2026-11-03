@@ -182,6 +182,9 @@ class PublicoController extends Controller
         $campos = $formularioVersion->secciones->where('activo', true)->flatMap(fn ($seccion) => $seccion->campos->where('activo', true))->keyBy('id');
         $respuestas = $request->input('respuestas', []);
         foreach ($campos as $campo) {
+            if ($campo->tipo === 'DATE' && data_get($campo->configuracion, 'fecha_actual_bloqueada')) {
+                $respuestas[$campo->id] = now()->toDateString();
+            }
             if (! array_key_exists($campo->id, $respuestas) && $request->has($campo->clave)) {
                 $respuestas[$campo->id] = $request->input($campo->clave);
             }
@@ -208,6 +211,14 @@ class PublicoController extends Controller
             }
             if ($campo->tipo === 'DATE') {
                 $reglas[] = 'date';
+            }
+            if ($campo->tipo === 'MAPA') {
+                $reglas = [$requerido ? 'required' : 'nullable', 'array'];
+                $reglasValor = [
+                    'valor' => $reglas,
+                    'valor.latitud' => [$requerido ? 'required' : 'nullable', 'numeric', 'between:-90,90'],
+                    'valor.longitud' => [$requerido ? 'required' : 'nullable', 'numeric', 'between:-180,180'],
+                ];
             }
             if ($campo->tipo === 'CURP') {
                 $reglas[] = 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i';

@@ -23,6 +23,9 @@ class DatabaseSeeder extends Seeder
             ConstanciaIdentidadSeeder::class,
             ConstanciaResidenciaSeeder::class,
             ConstanciaProcedenciaOrigenSeeder::class,
+            LicenciaUsoSueloSeeder::class,
+            LicenciaUnicaConstruccionSeeder::class,
+            ConstanciaMunicipalIdentificacionUsoPredioSeeder::class,
         ]);
     }
 }

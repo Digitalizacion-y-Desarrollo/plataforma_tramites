@@ -17,6 +17,7 @@ class FormularioConfigTest extends TestCase
         $this->assertArrayHasKey('DOMICILIO_FUERA_NEZA', $tiposCampo);
         $this->assertSame('Domicilio fuera de Ciudad Nezahualcóyotl', $tiposCampo['DOMICILIO_FUERA_NEZA']);
         $this->assertArrayHasKey('DOMICILIO_USA', $tiposCampo);
+        $this->assertArrayHasKey('MAPA', $tiposCampo);
         $this->assertSame(
             ['colonia', 'codigo_postal', 'municipio', 'calle', 'numero'],
             array_keys(config('formulario.campos_domicilio')),

@@ -2,6 +2,13 @@
 
 @section('title', 'Iniciar '.$tramite->nombre)
 
+@if ($formularioVersion->secciones->flatMap->campos->contains('tipo', 'MAPA'))
+    @push('head')
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
+    @endpush
+@endif
+
 @php($secciones = $formularioVersion->secciones->sortBy('orden'))
 @php($totalSecciones = $secciones->count())
 
@@ -53,11 +60,16 @@
                                 @php($condiciones = $campo->condicionesDestino->map(fn ($condicion) => ['origen' => $condicion->campo_origen_id, 'operador' => $condicion->operador, 'valor' => data_get($condicion->valor_comparacion, 'valor'), 'accion' => $condicion->accion]))
                                 @php($condicionesGrupo = $campo->gruposCampos->flatMap->condicionesDestino->map(fn ($condicion) => ['origen' => $condicion->campo_origen_id, 'operador' => $condicion->operador, 'valor' => data_get($condicion->valor_comparacion, 'valor'), 'accion' => $condicion->accion]))
                                 <div data-campo-destino="{{ $campo->id }}" data-requerido-inicial="{{ $campo->requerido ? 'true' : 'false' }}" data-condiciones='@json(array_values(array_merge($condiciones->all(), $condicionesGrupo->all())))'>
+                                    @foreach ($campo->condicionesDestino as $condicion)
+                                        <span hidden data-condicion data-origen="{{ $condicion->campo_origen_id }}" data-operador="{{ $condicion->operador }}" data-valor="{{ data_get($condicion->valor_comparacion, 'valor') }}" data-accion="{{ $condicion->accion }}"></span>
+                                    @endforeach
                                     <label for="campo-{{ $campo->id }}" class="block text-sm font-semibold text-neza-ink">{{ $campo->etiqueta }} @if($campo->requerido)<span class="text-rose-700">*</span>@endif</label>
+                                    @if (in_array($campo->tipo, ['RADIO', 'CHECKBOX'], true)) @error('respuestas.'.$campo->id)<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror @endif
+                                    @if (data_get($campo->configuracion, 'texto_legal'))<p class="mt-2 text-sm leading-relaxed text-neza-muted">{{ data_get($campo->configuracion, 'texto_legal') }}</p>@endif
                                     @if (in_array($campo->tipo, ['TEXTAREA'], true))
                                         <textarea id="campo-{{ $campo->id }}" data-campo-control="{{ $campo->id }}" name="respuestas[{{ $campo->id }}]" rows="4" @required($campo->requerido) @error('respuestas.'.$campo->id) aria-invalid="true" @enderror class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('respuestas.'.$campo->id) border-rose-600 @enderror">{{ old('respuestas.'.$campo->id) }}</textarea>
                                     @elseif ($campo->tipo === 'DOMICILIO')
-                                        <div class="mt-2" data-domicilio data-indice-url="{{ asset('data/capa.json') }}">
+                                        <div class="mt-2" data-domicilio data-indice-url="{{ asset('data/capa.json') }}" data-coordenadas-url="{{ asset('data/coordenadas.json') }}">
                                         <div class="grid gap-3 sm:grid-cols-2">
                                             @foreach (config('formulario.campos_domicilio') as $clave => $subcampo)
                                                 <div @class(['sm:col-span-2' => $clave === 'calle'])>
@@ -109,10 +121,18 @@
                                     @elseif ($campo->tipo === 'FILE')
                                         <input id="campo-{{ $campo->id }}" data-campo-control="{{ $campo->id }}" data-file-input data-max-bytes="10485760" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" name="respuestas[{{ $campo->id }}]" type="file" @required($campo->requerido) @error('respuestas.'.$campo->id) aria-invalid="true" @enderror class="mt-2 block w-full rounded-lg border border-neza-line bg-white px-3 py-2 text-sm text-neza-muted file:mr-4 file:rounded-md file:border-0 file:bg-neza-wine-soft file:px-3 file:py-2 file:text-xs file:font-bold file:text-neza-wine @error('respuestas.'.$campo->id) border-rose-600 @enderror">
                                         <p class="mt-2 text-xs text-neza-muted">PDF, imágenes o documentos permitidos. Tamaño máximo: 10 MB.</p>
+                                    @elseif ($campo->tipo === 'MAPA')
+                                        <div class="mt-2 space-y-3" data-mapa-ubicacion data-domicilio-origen="{{ data_get($campo->configuracion, 'domicilio_origen_id') }}">
+                                            <div class="flex flex-wrap items-center gap-3"><button type="button" data-mapa-ubicar class="rounded-lg border border-neza-wine px-3 py-2 text-sm font-semibold text-neza-wine hover:bg-neza-wine-soft">Ubicar domicilio</button><span data-mapa-mensaje class="text-xs text-neza-muted">Usa el botón para buscar el domicilio o coloca el punto manualmente.</span></div>
+                                            <div data-mapa-lienzo class="h-80 rounded-lg border border-neza-line" aria-label="Mapa para seleccionar la ubicación del predio"></div>
+                                            <input type="hidden" data-campo-control="{{ $campo->id }}" name="respuestas[{{ $campo->id }}][latitud]" value="{{ old('respuestas.'.$campo->id.'.latitud') }}">
+                                            <input type="hidden" name="respuestas[{{ $campo->id }}][longitud]" value="{{ old('respuestas.'.$campo->id.'.longitud') }}">
+                                        </div>
                                     @else
-                                        <input id="campo-{{ $campo->id }}" data-campo-control="{{ $campo->id }}" name="respuestas[{{ $campo->id }}]" value="{{ old('respuestas.'.$campo->id) }}" type="{{ $campo->tipo === 'EMAIL' ? 'email' : ($campo->tipo === 'DATE' ? 'date' : ($campo->tipo === 'NUMBER' ? 'number' : 'text')) }}" @if($campo->tipo === 'CURP') pattern="[A-Za-z]{4}[0-9]{6}[A-Za-z]{6}[A-Za-z0-9][0-9]" @endif @required($campo->requerido) @error('respuestas.'.$campo->id) aria-invalid="true" @enderror class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('respuestas.'.$campo->id) border-rose-600 @enderror">
+                                        @php($fechaBloqueada = $campo->tipo === 'DATE' && data_get($campo->configuracion, 'fecha_actual_bloqueada'))
+                                        <input id="campo-{{ $campo->id }}" data-campo-control="{{ $campo->id }}" name="respuestas[{{ $campo->id }}]" value="{{ $fechaBloqueada ? now()->toDateString() : old('respuestas.'.$campo->id) }}" type="{{ $campo->tipo === 'EMAIL' ? 'email' : ($campo->tipo === 'DATE' ? 'date' : ($campo->tipo === 'NUMBER' ? 'number' : 'text')) }}" @disabled($fechaBloqueada) @if($campo->tipo === 'CURP') pattern="[A-Za-z]{4}[0-9]{6}[A-Za-z]{6}[A-Za-z0-9][0-9]" @endif @required($campo->requerido && ! $fechaBloqueada) @error('respuestas.'.$campo->id) aria-invalid="true" @enderror class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm disabled:bg-neza-canvas @error('respuestas.'.$campo->id) border-rose-600 @enderror">
                                     @endif
-                                    @error('respuestas.'.$campo->id)<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                                    @unless (in_array($campo->tipo, ['RADIO', 'CHECKBOX'], true)) @error('respuestas.'.$campo->id)<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror @endunless
                                 </div>
                             @endforeach
                         </fieldset>

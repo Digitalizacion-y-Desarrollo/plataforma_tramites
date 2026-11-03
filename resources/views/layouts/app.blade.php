@@ -23,6 +23,7 @@
         };
     @endphp
     <title>@yield('title', $tituloRuta.' · '.config('app.name', 'Portal de Trámites'))</title>
+    @stack('head')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

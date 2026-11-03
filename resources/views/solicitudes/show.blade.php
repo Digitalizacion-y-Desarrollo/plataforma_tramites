@@ -1,5 +1,12 @@
 ﻿@extends('layouts.app')
 
+@if ($respuestasPorSeccion->flatten(1)->contains('campo_tipo', 'MAPA'))
+    @push('head')
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin="" defer></script>
+    @endpush
+@endif
+
 @section('content')
     @php
         $estilosEstado = [
@@ -222,9 +229,12 @@
                             </div>
                             <dl class="mt-4 grid gap-3 sm:grid-cols-2">
                                 @foreach ($respuestas as $respuesta)
-                                    <div class="rounded-lg border border-neza-line bg-neza-canvas px-4 py-3">
+                                    <div @class(['rounded-lg border border-neza-line bg-neza-canvas px-4 py-3', 'sm:col-span-2' => $respuesta->campo_tipo === 'MAPA'])>
                                         <dt class="text-xs font-bold uppercase tracking-wide text-neza-muted">{{ $respuesta->campo_etiqueta }}</dt>
                                         <dd class="mt-1 whitespace-pre-wrap break-words text-sm font-medium leading-6 text-neza-ink">{{ $respuesta->valor }}</dd>
+                                        @if ($respuesta->campo_tipo === 'MAPA' && filled(data_get($respuesta->valor_original, 'latitud')) && filled(data_get($respuesta->valor_original, 'longitud')))
+                                            <div class="mt-3 h-72 overflow-hidden rounded-lg border border-neza-line" data-mapa-lectura data-latitud="{{ data_get($respuesta->valor_original, 'latitud') }}" data-longitud="{{ data_get($respuesta->valor_original, 'longitud') }}" aria-label="Ubicación del croquis"></div>
+                                        @endif
                                     </div>
                                 @endforeach
                             </dl>
