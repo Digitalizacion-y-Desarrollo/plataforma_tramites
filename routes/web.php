@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\AccesosSesionController;
 use App\Http\Controllers\ActaNacimientoOcrController;
+use App\Http\Controllers\ApiKeyController;
 use App\Http\Controllers\AreaOperativaController;
 use App\Http\Controllers\AuditoriaController;
 use App\Http\Controllers\CanalAyudaController;
@@ -89,6 +90,9 @@ Route::prefix('admin')->middleware('accesos.auth')->group(function () {
         Route::post('/acta-nacimiento/ocr', ActaNacimientoOcrController::class)->middleware('throttle:6,1')->name('solicitudes.acta-ocr');
     });
     Route::middleware('accesos.role:superadmin,superuser')->group(function () {
+        Route::get('configuracion/api-keys', [ApiKeyController::class, 'index'])->name('api-keys.index');
+        Route::post('configuracion/api-keys', [ApiKeyController::class, 'store'])->name('api-keys.store');
+        Route::post('configuracion/api-keys/{apiKey}/revocar', [ApiKeyController::class, 'revocar'])->name('api-keys.revocar');
         Route::resource('servicios-interes', ServicioInteresController::class)->except('show')->parameters(['servicios-interes' => 'servicio_interes']);
         Route::get('configuracion/canales-ayuda', [CanalAyudaController::class, 'edit'])->name('canales-ayuda.edit');
         Route::put('configuracion/canales-ayuda', [CanalAyudaController::class, 'update'])->name('canales-ayuda.update');

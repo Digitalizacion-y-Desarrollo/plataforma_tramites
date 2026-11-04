@@ -23,6 +23,49 @@ document.querySelectorAll('[data-mapa-lectura]').forEach((lienzo) => {
 
 const cuerpo = document.body;
 
+const apiKeyGenerada = document.querySelector('[data-api-key-generada]');
+
+if (apiKeyGenerada?.dataset.apiKey) {
+    const claveApi = apiKeyGenerada.dataset.apiKey;
+
+    Swal.fire({
+        icon: 'success',
+        title: 'API Key creada',
+        html: `
+            <p class="mb-4 text-sm text-slate-600">Cópiala y guárdala ahora. Por seguridad no volverá a mostrarse.</p>
+            <div class="rounded-lg border border-slate-200 bg-white p-4 text-left">
+                <p class="text-xs font-semibold text-slate-700">API key</p>
+                <div class="mt-2 flex items-center gap-2">
+                    <input id="api-key-generada-input" class="min-w-0 flex-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 font-mono text-xs text-slate-700" type="text" value="${claveApi}" readonly aria-label="API Key generada">
+                    <button id="api-key-copiar" type="button" class="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">
+                        <svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 17.25v1.5a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9A2.25 2.25 0 0 1 4.5 7.5H6m3-4.5h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25H9A2.25 2.25 0 0 1 6.75 14.25v-9A2.25 2.25 0 0 1 9 3Z" /></svg>
+                        <span data-api-key-copiar-texto>Copiar</span>
+                    </button>
+                </div>
+            </div>
+        `,
+        confirmButtonText: 'Cerrar',
+        confirmButtonColor: '#7f1d1d',
+        didOpen: () => {
+            const input = document.getElementById('api-key-generada-input');
+            const copiar = document.getElementById('api-key-copiar');
+            const textoCopiar = copiar?.querySelector('[data-api-key-copiar-texto]');
+
+            copiar?.addEventListener('click', async () => {
+                input?.select();
+                input?.setSelectionRange(0, 99999);
+
+                try {
+                    await navigator.clipboard?.writeText(claveApi);
+                    if (textoCopiar) textoCopiar.textContent = 'Copiada';
+                } catch {
+                    if (textoCopiar) textoCopiar.textContent = 'Selecciona la clave';
+                }
+            });
+        },
+    });
+}
+
 document.querySelectorAll('[data-referencia-pago-preview]').forEach((dialogo) => {
     const vistaPrevia = dialogo.querySelector('[data-referencia-pago-preview-frame]');
     const confirmar = dialogo.querySelector('[data-referencia-pago-confirmar]');
@@ -112,7 +155,7 @@ if (botonMenuAdministracion && menuAdministracion && fondoMenuAdministracion) {
     });
 }
 
-if (cuerpo.dataset.swalSuccess) {
+if (cuerpo.dataset.swalSuccess && !apiKeyGenerada?.dataset.apiKey) {
     Swal.fire({
         icon: 'success',
         title: 'Operación realizada',

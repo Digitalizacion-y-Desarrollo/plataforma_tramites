@@ -1,7 +1,8 @@
 <?php
 
-use App\Http\Middleware\EnsureSolicitudAreaAccess;
+use App\Http\Middleware\EnsureApiKey;
 use App\Http\Middleware\EnsureAreaOperativaAccess;
+use App\Http\Middleware\EnsureSolicitudAreaAccess;
 use App\Http\Middleware\RequireAccesosIdentity;
 use App\Http\Middleware\RequireAccesosRole;
 use Illuminate\Foundation\Application;
@@ -10,6 +11,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
+        api: __DIR__.'/../routes/api.php',
         web: __DIR__.'/../routes/web.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
@@ -18,6 +20,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
 
         $middleware->alias([
+            'api.key' => EnsureApiKey::class,
             'accesos.area-operativa' => EnsureAreaOperativaAccess::class,
             'accesos.auth' => RequireAccesosIdentity::class,
             'accesos.role' => RequireAccesosRole::class,
