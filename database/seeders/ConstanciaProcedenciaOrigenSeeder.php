@@ -46,15 +46,18 @@ class ConstanciaProcedenciaOrigenSeeder extends Seeder
             'departamento_nombre_snapshot' => self::DEPARTAMENTO_NOMBRE,
             'duracion' => 'Máximo 24 horas hábiles', 'costo' => '$117.31 MXN', 'costo_pago' => 117.31,
             'flujo_pago' => 'PAGO_DIRECTO', 'pago_vigencia_dias' => 30, 'modalidades' => ['PRESENCIAL'],
-            'requisitos' => [
-                'Acta de nacimiento actualizada y en buen estado del (la) solicitante, donde demuestre ser originario o registrado en el Municipio de Nezahualcóyotl.',
-                'Comprobante de domicilio reciente no mayor a tres meses de antigüedad: recibo de luz, teléfono, pago de predio, pago de agua, aforo o correspondencia bancaria a nombre del (la) solicitante o que coincida con los datos de la credencial para votar de sus testigos. Los comprobantes digitales deben imprimirse con firma, sello digital y código QR. No se aceptan impresiones de Totalplay ni de izzi. Si la dirección está oculta en la credencial, presentar comprobante de domicilio a su nombre.',
-                'Dos fotografías recientes del (la) solicitante de estudio fotográfico, tamaño pasaporte, impresas en papel fotográfico mate y sin accesorios. No se aceptan fotos de celular o digitales ni con fondos de color.',
-                'Si el (la) solicitante es niño, niña o adolescente, los testigos deberán ser necesariamente y exclusivamente sus padres; presentar la documentación indicada para los testigos.',
-                'Dos testigos consanguíneos que coincidan con los apellidos del solicitante, con credencial para votar vigente y actualizada, acta de nacimiento y comprobante de domicilio reciente no mayor a tres meses que coincida con los datos de su credencial. Si la dirección está oculta, presentar comprobante de domicilio a su nombre. Los comprobantes digitales deben imprimirse con firma, sello digital y código QR. No se aceptan impresiones de Totalplay ni de izzi.',
-                'Si el (la) solicitante ha sido residente del Municipio de Nezahualcóyotl y esta sea su última procedencia, presentar documentos que lo acrediten, por ejemplo: credenciales para votar, acta de matrimonio del Municipio de Nezahualcóyotl, actas de nacimiento de hijos registrados en el Municipio de Nezahualcóyotl, entre otros.',
-                'El trámite de Constancia de Procedencia u Origen es sólo para los originarios o residentes del Municipio de Nezahualcóyotl que así lo acrediten.',
-            ],
+            'requisitos' => [[
+                'titulo' => 'Requisitos generales',
+                'requisitos' => [
+                    'Acta de nacimiento actualizada y en buen estado del (la) solicitante, donde demuestre ser originario o registrado en el Municipio de Nezahualcóyotl.',
+                    'Comprobante de domicilio reciente no mayor a tres meses de antigüedad: recibo de luz, teléfono, pago de predio, pago de agua, aforo o correspondencia bancaria a nombre del (la) solicitante o que coincida con los datos de la credencial para votar de sus testigos. Los comprobantes digitales deben imprimirse con firma, sello digital y código QR. No se aceptan impresiones de Totalplay ni de izzi. Si la dirección está oculta en la credencial, presentar comprobante de domicilio a su nombre.',
+                    'Dos fotografías recientes del (la) solicitante de estudio fotográfico, tamaño pasaporte, impresas en papel fotográfico mate y sin accesorios. No se aceptan fotos de celular o digitales ni con fondos de color.',
+                    'Si el (la) solicitante es niño, niña o adolescente, los testigos deberán ser necesariamente y exclusivamente sus padres; presentar la documentación indicada para los testigos.',
+                    'Dos testigos consanguíneos que coincidan con los apellidos del solicitante, con credencial para votar vigente y actualizada, acta de nacimiento y comprobante de domicilio reciente no mayor a tres meses que coincida con los datos de su credencial. Si la dirección está oculta, presentar comprobante de domicilio a su nombre. Los comprobantes digitales deben imprimirse con firma, sello digital y código QR. No se aceptan impresiones de Totalplay ni de izzi.',
+                    'Si el (la) solicitante ha sido residente del Municipio de Nezahualcóyotl y esta sea su última procedencia, presentar documentos que lo acrediten, por ejemplo: credenciales para votar, acta de matrimonio del Municipio de Nezahualcóyotl, actas de nacimiento de hijos registrados en el Municipio de Nezahualcóyotl, entre otros.',
+                    'El trámite de Constancia de Procedencia u Origen es sólo para los originarios o residentes del Municipio de Nezahualcóyotl que así lo acrediten.',
+                ],
+            ]],
             'proceso' => [
                 'Captura tu solicitud en línea y adjunta los documentos requeridos.',
                 'Recibe por correo tu referencia de pago y acude a pagar el importe de $117.31 MXN antes de la fecha de vencimiento.',

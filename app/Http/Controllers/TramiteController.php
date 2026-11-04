@@ -72,6 +72,7 @@ class TramiteController extends Controller
      */
     public function store(Request $request, AccesosClient $accesos)
     {
+        $request->merge(['requisitos' => $this->normalizarRequisitos($request->input('requisitos', []))]);
         $datos = $request->validate([
             'nombre' => ['required', 'string', 'max:200'],
             'descripcion' => ['nullable', 'string'],
@@ -85,7 +86,9 @@ class TramiteController extends Controller
             'modalidad' => ['nullable', 'string', 'in:EN_LINEA,PRESENCIAL,MIXTO'],
             'descarga_expira_dias' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'requisitos' => ['nullable', 'array'],
-            'requisitos.*' => ['string', 'max:500'],
+            'requisitos.*.titulo' => ['required', 'string', 'max:200'],
+            'requisitos.*.requisitos' => ['required', 'array', 'min:1'],
+            'requisitos.*.requisitos.*' => ['required', 'string', 'max:500'],
             'proceso' => ['nullable', 'array'],
             'proceso.*' => ['string', 'max:500'],
             'preguntas_frecuentes' => ['nullable', 'array'],
@@ -134,6 +137,7 @@ class TramiteController extends Controller
      */
     public function update(Request $request, Tramite $catalogo_tramite, AccesosClient $accesos)
     {
+        $request->merge(['requisitos' => $this->normalizarRequisitos($request->input('requisitos', []))]);
         $datos = $request->validate([
             'nombre' => ['required', 'string', 'max:200'],
             'descripcion' => ['nullable', 'string'],
@@ -147,7 +151,9 @@ class TramiteController extends Controller
             'modalidad' => ['nullable', 'string', 'in:EN_LINEA,PRESENCIAL,MIXTO'],
             'descarga_expira_dias' => ['nullable', 'integer', 'min:1', 'max:3650'],
             'requisitos' => ['nullable', 'array'],
-            'requisitos.*' => ['string', 'max:500'],
+            'requisitos.*.titulo' => ['required', 'string', 'max:200'],
+            'requisitos.*.requisitos' => ['required', 'array', 'min:1'],
+            'requisitos.*.requisitos.*' => ['required', 'string', 'max:500'],
             'proceso' => ['nullable', 'array'],
             'proceso.*' => ['string', 'max:500'],
             'preguntas_frecuentes' => ['nullable', 'array'],
@@ -279,11 +285,32 @@ class TramiteController extends Controller
             'pago_vigencia_dias' => $datos['flujo_pago'] === 'SIN_PAGO' ? null : $datos['pago_vigencia_dias'],
             'tiempo_estimado' => $datos['tiempo_estimado'] ?? null,
             'modalidades' => $modalidades,
-            'requisitos' => array_values(array_filter($datos['requisitos'] ?? [])),
+            'requisitos' => $this->normalizarRequisitos($datos['requisitos'] ?? []),
             'proceso' => array_values(array_filter($datos['proceso'] ?? [])),
             'preguntas_frecuentes' => array_values($datos['preguntas_frecuentes'] ?? []),
             'descarga_expira_dias' => in_array('EN_LINEA', $modalidades, true) ? ($datos['descarga_expira_dias'] ?? null) : null,
         ];
+    }
+
+    private function normalizarRequisitos(mixed $requisitos): array
+    {
+        if (! is_array($requisitos)) {
+            return [];
+        }
+
+        $requisitos = array_values($requisitos);
+
+        if ($requisitos !== [] && is_string($requisitos[0] ?? null)) {
+            return [[
+                'titulo' => 'Requisitos generales',
+                'requisitos' => array_values(array_filter($requisitos, fn ($requisito) => is_string($requisito) && filled(trim($requisito)))),
+            ]];
+        }
+
+        return array_values(array_map(fn (array $seccion) => [
+            'titulo' => trim((string) ($seccion['titulo'] ?? '')),
+            'requisitos' => array_values(array_filter($seccion['requisitos'] ?? [], fn ($requisito) => is_string($requisito) && filled(trim($requisito)))),
+        ], array_filter($requisitos, 'is_array')));
     }
 
     private function estadoId(string $clave): int

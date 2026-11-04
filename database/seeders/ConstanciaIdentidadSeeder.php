@@ -64,15 +64,18 @@ class ConstanciaIdentidadSeeder extends Seeder
             'pago_vigencia_dias' => 30,
             'tiempo_estimado' => null,
             'modalidades' => ['PRESENCIAL'],
-            'requisitos' => [
-                'Acta de nacimiento del interesado(a) actualizada y en buen estado. En caso de registro extemporáneo, presentar las constancias de no registro del Registro Civil de Nezahualcóyotl, Chimalhuacán y de la Ciudad de México.',
-                'Comprobante de domicilio reciente no mayor a tres meses a nombre del solicitante o que coincida con sus datos.',
-                'Una fotografía de frente reciente, tamaño infantil, impresa en papel fotográfico mate, fondo blanco y sin accesorios.',
-                'Dos testigos consanguíneos con credencial para votar vigente y comprobante de domicilio reciente no mayor a tres meses.',
-                'Si el solicitante es niño, niña o adolescente, los testigos deberán ser su padre y su madre. Si alguno falleció, presentar acta de defunción y otro familiar directo.',
-                'El trámite es exclusivo para habitantes del Municipio de Nezahualcóyotl, lo que deberá acreditarse.',
-                'Si la constancia es para un familiar hospitalizado, presentar constancia de hospitalización emitida por el hospital, sellada y firmada por Trabajo Social.',
-            ],
+            'requisitos' => [[
+                'titulo' => 'Requisitos generales',
+                'requisitos' => [
+                    'Acta de nacimiento del interesado(a) actualizada y en buen estado. En caso de registro extemporáneo, presentar las constancias de no registro del Registro Civil de Nezahualcóyotl, Chimalhuacán y de la Ciudad de México.',
+                    'Comprobante de domicilio reciente no mayor a tres meses a nombre del solicitante o que coincida con sus datos.',
+                    'Una fotografía de frente reciente, tamaño infantil, impresa en papel fotográfico mate, fondo blanco y sin accesorios.',
+                    'Dos testigos consanguíneos con credencial para votar vigente y comprobante de domicilio reciente no mayor a tres meses.',
+                    'Si el solicitante es niño, niña o adolescente, los testigos deberán ser su padre y su madre. Si alguno falleció, presentar acta de defunción y otro familiar directo.',
+                    'El trámite es exclusivo para habitantes del Municipio de Nezahualcóyotl, lo que deberá acreditarse.',
+                    'Si la constancia es para un familiar hospitalizado, presentar constancia de hospitalización emitida por el hospital, sellada y firmada por Trabajo Social.',
+                ],
+            ]],
             'proceso' => [
                 'Captura tu solicitud en línea y adjunta los documentos requeridos.',
                 'El área responsable revisa y valida tu información y documentos.',

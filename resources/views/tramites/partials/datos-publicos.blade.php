@@ -17,7 +17,15 @@
 
 <fieldset><legend class="text-sm font-semibold text-neza-ink">Modalidad</legend><p class="mt-1 text-xs text-neza-muted">Elige una modalidad.</p><div class="mt-3 flex flex-wrap gap-4"><label class="flex items-center gap-2 text-sm text-neza-ink"><input type="radio" name="modalidad" value="EN_LINEA" @checked($modalidadSeleccionada === 'EN_LINEA') class="size-4 border-neza-line text-neza-wine focus:ring-neza-wine"> En línea</label><label class="flex items-center gap-2 text-sm text-neza-ink"><input type="radio" name="modalidad" value="PRESENCIAL" @checked($modalidadSeleccionada === 'PRESENCIAL') class="size-4 border-neza-line text-neza-wine focus:ring-neza-wine"> Presencial</label><label class="flex items-center gap-2 text-sm text-neza-ink"><input type="radio" name="modalidad" value="MIXTO" @checked($modalidadSeleccionada === 'MIXTO') class="size-4 border-neza-line text-neza-wine focus:ring-neza-wine"> Mixto</label></div>@error('modalidad')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</fieldset>
 
-@foreach (['requisitos' => ['Requisitos', 'Agrega un requisito y presiona Enter'], 'proceso' => ['Proceso', 'Agrega un paso y presiona Enter']] as $campo => [$etiqueta, $ayuda])
+@php($requisitos = $valor('requisitos', $tramite?->requisitos ?? []))
+<section data-requisitos-builder data-requisitos-inicial='@json($requisitos)'>
+    <h3 class="text-sm font-semibold text-neza-ink">Requisitos</h3><p class="mt-1 text-xs text-neza-muted">Crea secciones, por ejemplo Persona física, Persona moral o Instituciones públicas, y agrega sus requisitos.</p>
+    <button type="button" data-requisitos-agregar-seccion class="mt-3 rounded-lg border border-neza-wine px-3 py-2 text-sm font-semibold text-neza-wine hover:bg-neza-wine-soft">Agregar sección</button>
+    <div data-requisitos-secciones class="mt-3 space-y-3"></div><div data-requisitos-hidden></div>
+    @error('requisitos')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+</section>
+
+@foreach (['proceso' => ['Proceso', 'Agrega un paso y presiona Enter']] as $campo => [$etiqueta, $ayuda])
     @php($items = array_values((array) $valor($campo, $tramite?->{$campo} ?? [])))
     <section data-list-builder data-list-name="{{ $campo }}" data-list-inicial='@json($items)'>
         <label for="{{ $modo }}-{{ $campo }}" class="block text-sm font-semibold text-neza-ink">{{ $etiqueta }}</label><p class="mt-1 text-xs text-neza-muted">{{ $ayuda }}.</p>

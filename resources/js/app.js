@@ -390,11 +390,11 @@ document.querySelectorAll('[data-modal-open]').forEach((boton) => {
                 opcion.checked = opcion.value === modalidad;
             });
             modal.querySelector('[name="modalidad"]:checked')?.dispatchEvent(new Event('change', { bubbles: true }));
+            const requisitos = modal.querySelector('[data-requisitos-builder]');
+            requisitos.dataset.requisitosInicial = boton.dataset.tramiteRequisitos || '[]';
+            requisitos.dispatchEvent(new Event('requisitos-builder:reset'));
             modal.querySelectorAll('[data-list-builder]').forEach((builder) => {
-                const fuente = builder.dataset.listName === 'requisitos'
-                    ? boton.dataset.tramiteRequisitos
-                    : boton.dataset.tramiteProceso;
-                builder.dataset.listInicial = fuente || '[]';
+                builder.dataset.listInicial = boton.dataset.tramiteProceso || '[]';
                 builder.dispatchEvent(new Event('list-builder:reset'));
             });
             const faq = modal.querySelector('[data-faq-builder]');
@@ -472,6 +472,60 @@ const leerJson = (valor, respaldo = []) => {
         return respaldo;
     }
 };
+
+document.querySelectorAll('[data-requisitos-builder]').forEach((builder) => {
+    const contenedor = builder.querySelector('[data-requisitos-secciones]');
+    const ocultos = builder.querySelector('[data-requisitos-hidden]');
+    const normalizar = (datos) => {
+        if (datos.every((item) => typeof item === 'string')) {
+            return datos.filter((item) => item.trim()).map((item) => item.trim()).length
+                ? [{ titulo: 'Requisitos generales', requisitos: datos.filter((item) => item.trim()).map((item) => item.trim()) }]
+                : [];
+        }
+        return datos.filter((item) => item && typeof item === 'object').map((item) => ({
+            titulo: String(item.titulo ?? ''),
+            requisitos: Array.isArray(item.requisitos) ? item.requisitos.filter((requisito) => typeof requisito === 'string' && requisito.trim()).map((requisito) => requisito.trim()) : [],
+        }));
+    };
+    let secciones = normalizar(leerJson(builder.dataset.requisitosInicial));
+    const boton = (texto, clase, accion) => {
+        const elemento = document.createElement('button');
+        elemento.type = 'button'; elemento.textContent = texto; elemento.className = clase; elemento.addEventListener('click', accion); return elemento;
+    };
+    const mover = (arreglo, indice, direccion) => {
+        const destino = indice + direccion;
+        if (destino < 0 || destino >= arreglo.length) return;
+        [arreglo[indice], arreglo[destino]] = [arreglo[destino], arreglo[indice]];
+        renderizar();
+    };
+    const renderizar = () => {
+        contenedor.replaceChildren(); ocultos.replaceChildren();
+        secciones.forEach((seccion, indiceSeccion) => {
+            const tarjeta = document.createElement('article'); tarjeta.className = 'rounded-xl border border-neza-line bg-neza-canvas p-4';
+            const cabecera = document.createElement('div'); cabecera.className = 'flex flex-wrap items-center gap-2';
+            const titulo = document.createElement('input'); titulo.type = 'text'; titulo.maxLength = 200; titulo.placeholder = 'Título de la sección'; titulo.value = seccion.titulo; titulo.className = 'min-w-48 flex-1 rounded-lg border border-neza-line bg-white px-3 py-2 text-sm'; titulo.addEventListener('input', () => { seccion.titulo = titulo.value; const oculto = ocultos.querySelector(`[name="requisitos[${indiceSeccion}][titulo]"]`); if (oculto) oculto.value = titulo.value; });
+            cabecera.append(titulo, boton('↑', 'rounded border border-neza-line px-2 py-1 text-sm', () => mover(secciones, indiceSeccion, -1)), boton('↓', 'rounded border border-neza-line px-2 py-1 text-sm', () => mover(secciones, indiceSeccion, 1)), boton('Eliminar sección', 'text-sm font-semibold text-rose-700 hover:text-rose-900', () => { secciones.splice(indiceSeccion, 1); renderizar(); }));
+            tarjeta.append(cabecera);
+            const requisitos = document.createElement('ul'); requisitos.className = 'mt-3 space-y-2';
+            seccion.requisitos.forEach((requisito, indiceRequisito) => {
+                const fila = document.createElement('li'); fila.className = 'flex items-center gap-2';
+                const texto = document.createElement('span'); texto.className = 'min-w-0 flex-1 text-sm text-neza-ink'; texto.textContent = requisito;
+                fila.append(texto, boton('↑', 'rounded border border-neza-line px-2 py-1 text-xs', () => mover(seccion.requisitos, indiceRequisito, -1)), boton('↓', 'rounded border border-neza-line px-2 py-1 text-xs', () => mover(seccion.requisitos, indiceRequisito, 1)), boton('Eliminar', 'text-xs font-semibold text-rose-700 hover:text-rose-900', () => { seccion.requisitos.splice(indiceRequisito, 1); renderizar(); }));
+                requisitos.append(fila);
+            });
+            const entrada = document.createElement('input'); entrada.type = 'text'; entrada.maxLength = 500; entrada.placeholder = 'Agrega un requisito y presiona Enter'; entrada.className = 'mt-3 w-full rounded-lg border border-neza-line bg-white px-3 py-2 text-sm';
+            const agregar = () => { const valor = entrada.value.trim(); if (!valor) return; seccion.requisitos.push(valor); renderizar(); };
+            entrada.addEventListener('keydown', (evento) => { if (evento.key === 'Enter') { evento.preventDefault(); agregar(); } });
+            tarjeta.append(requisitos, entrada, boton('Agregar requisito', 'mt-2 rounded-lg border border-neza-wine px-3 py-2 text-sm font-semibold text-neza-wine hover:bg-neza-wine-soft', agregar));
+            contenedor.append(tarjeta);
+            const ocultoTitulo = document.createElement('input'); ocultoTitulo.type = 'hidden'; ocultoTitulo.name = `requisitos[${indiceSeccion}][titulo]`; ocultoTitulo.value = seccion.titulo; ocultos.append(ocultoTitulo);
+            seccion.requisitos.forEach((requisito, indiceRequisito) => { const oculto = document.createElement('input'); oculto.type = 'hidden'; oculto.name = `requisitos[${indiceSeccion}][requisitos][${indiceRequisito}]`; oculto.value = requisito; ocultos.append(oculto); });
+        });
+    };
+    builder.querySelector('[data-requisitos-agregar-seccion]').addEventListener('click', () => { secciones.push({ titulo: '', requisitos: [] }); renderizar(); });
+    builder.addEventListener('requisitos-builder:reset', () => { secciones = normalizar(leerJson(builder.dataset.requisitosInicial)); renderizar(); });
+    renderizar();
+});
 
 document.querySelectorAll('[data-list-builder]').forEach((builder) => {
     const input = builder.querySelector('[data-list-input]');
