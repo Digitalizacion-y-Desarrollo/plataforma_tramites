@@ -19,14 +19,14 @@ return new class extends Migration
 
     public function down(): void
     {
-        $tieneForeignKey = collect(Schema::getForeignKeys('formulario_grupo_campo'))
-            ->contains(fn (array $fk): bool => $fk['name'] === 'formulario_grupo_campo_campo_id_foreign');
+        $foreignKeyCampo = collect(Schema::getForeignKeys('formulario_grupo_campo'))
+            ->first(fn (array $fk): bool => in_array('campo_id', $fk['columns'], true));
         $tieneUnique = Schema::hasIndex('formulario_grupo_campo', 'formulario_grupo_campo_campo_id_unique');
         $tieneIndice = Schema::hasIndex('formulario_grupo_campo', 'formulario_grupo_campo_campo_id_index');
 
-        if ($tieneForeignKey) {
-            Schema::table('formulario_grupo_campo', function (Blueprint $table) {
-                $table->dropForeign(['campo_id']);
+        if ($foreignKeyCampo !== null) {
+            Schema::table('formulario_grupo_campo', function (Blueprint $table) use ($foreignKeyCampo) {
+                $table->dropForeign($foreignKeyCampo['name']);
             });
         }
 
@@ -42,7 +42,7 @@ return new class extends Migration
             });
         }
 
-        if ($tieneForeignKey) {
+        if ($foreignKeyCampo !== null) {
             Schema::table('formulario_grupo_campo', function (Blueprint $table) {
                 $table->foreign('campo_id')
                     ->references('id')

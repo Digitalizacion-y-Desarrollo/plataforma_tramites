@@ -23,18 +23,19 @@ return new class extends Migration
 
     public function down(): void
     {
-        $tieneForeignKeyRespuesta = collect(Schema::getForeignKeys('solicitud_observaciones'))
-            ->contains(fn (array $fk): bool => $fk['name'] === 'solicitud_observaciones_respuesta_a_id_foreign');
+        $foreignKeyRespuesta = collect(Schema::getForeignKeys('solicitud_observaciones'))
+            ->first(fn (array $fk): bool => in_array('respuesta_a_id', $fk['columns'], true));
         $tieneUniqueRespuesta = Schema::hasIndex('solicitud_observaciones', 'solicitud_observaciones_respuesta_a_unica');
 
-        if ($tieneForeignKeyRespuesta || $tieneUniqueRespuesta) {
-            Schema::table('solicitud_observaciones', function (Blueprint $table) use ($tieneForeignKeyRespuesta, $tieneUniqueRespuesta): void {
-                if ($tieneForeignKeyRespuesta) {
-                    $table->dropForeign(['respuesta_a_id']);
-                }
-                if ($tieneUniqueRespuesta) {
-                    $table->dropUnique('solicitud_observaciones_respuesta_a_unica');
-                }
+        if ($foreignKeyRespuesta !== null) {
+            Schema::table('solicitud_observaciones', function (Blueprint $table) use ($foreignKeyRespuesta): void {
+                $table->dropForeign($foreignKeyRespuesta['name']);
+            });
+        }
+
+        if ($tieneUniqueRespuesta) {
+            Schema::table('solicitud_observaciones', function (Blueprint $table): void {
+                $table->dropUnique('solicitud_observaciones_respuesta_a_unica');
             });
         }
 

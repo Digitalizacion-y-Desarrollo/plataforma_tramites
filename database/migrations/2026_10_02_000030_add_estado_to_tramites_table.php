@@ -13,7 +13,7 @@ return new class extends Migration
             DB::statement('ALTER TABLE tramite_estados ENGINE=InnoDB');
 
             $tieneForeignKey = collect(Schema::getForeignKeys('tramites'))
-                ->contains(fn (array $fk): bool => $fk['name'] === 'tramites_tramite_estado_id_foreign');
+                ->contains(fn (array $fk): bool => in_array('tramite_estado_id', $fk['columns'], true));
             $tieneIndice = Schema::hasIndex('tramites', 'tramites_activo_tramite_estado_id_index');
 
             Schema::table('tramites', function (Blueprint $table) use ($tieneForeignKey, $tieneIndice) {
@@ -36,15 +36,18 @@ return new class extends Migration
 
     public function down(): void
     {
-        $tieneForeignKey = collect(Schema::getForeignKeys('tramites'))
-            ->contains(fn (array $fk): bool => $fk['name'] === 'tramites_tramite_estado_id_foreign');
+        $foreignKeyEstado = collect(Schema::getForeignKeys('tramites'))
+            ->first(fn (array $fk): bool => in_array('tramite_estado_id', $fk['columns'], true));
         $tieneIndice = Schema::hasIndex('tramites', 'tramites_activo_tramite_estado_id_index');
         $tieneColumna = Schema::hasColumn('tramites', 'tramite_estado_id');
 
-        Schema::table('tramites', function (Blueprint $table) use ($tieneForeignKey, $tieneIndice, $tieneColumna) {
-            if ($tieneForeignKey) {
-                $table->dropForeign(['tramite_estado_id']);
-            }
+        if ($foreignKeyEstado !== null) {
+            Schema::table('tramites', function (Blueprint $table) use ($foreignKeyEstado) {
+                $table->dropForeign($foreignKeyEstado['name']);
+            });
+        }
+
+        Schema::table('tramites', function (Blueprint $table) use ($tieneIndice, $tieneColumna) {
             if ($tieneIndice) {
                 $table->dropIndex(['activo', 'tramite_estado_id']);
             }

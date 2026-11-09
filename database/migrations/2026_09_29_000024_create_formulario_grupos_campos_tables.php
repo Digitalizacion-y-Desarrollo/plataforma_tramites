@@ -74,12 +74,12 @@ return new class extends Migration
 
     public function down(): void
     {
-        $tieneForeignKeyGrupo = collect(Schema::getForeignKeys('campo_condiciones'))
-            ->contains(fn (array $fk): bool => $fk['name'] === 'campo_condiciones_grupo_destino_id_foreign');
+        $foreignKeyGrupo = collect(Schema::getForeignKeys('campo_condiciones'))
+            ->first(fn (array $fk): bool => in_array('grupo_destino_id', $fk['columns'], true));
 
-        if ($tieneForeignKeyGrupo) {
-            Schema::table('campo_condiciones', function (Blueprint $table) {
-                $table->dropForeign(['grupo_destino_id']);
+        if ($foreignKeyGrupo !== null) {
+            Schema::table('campo_condiciones', function (Blueprint $table) use ($foreignKeyGrupo) {
+                $table->dropForeign($foreignKeyGrupo['name']);
             });
         }
 
