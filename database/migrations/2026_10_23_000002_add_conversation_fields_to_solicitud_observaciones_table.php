@@ -26,9 +26,34 @@ return new class extends Migration
         Schema::table('solicitud_observaciones', function (Blueprint $table): void {
             $table->dropForeign(['respuesta_a_id']);
             $table->dropUnique('solicitud_observaciones_respuesta_a_unica');
+        });
+
+        $this->garantizarIndiceSolicitudId();
+
+        Schema::table('solicitud_observaciones', function (Blueprint $table): void {
             $table->dropIndex('solicitud_observaciones_conversacion_indice');
             $table->dropColumn(['actor_tipo', 'respuesta_a_id']);
             $table->string('actor_accesos_id', 100)->nullable(false)->change();
+        });
+    }
+
+    /**
+     * MySQL no permite eliminar un índice si es el único que respalda una
+     * llave foránea (error 1553). Antes de eliminar el índice compuesto
+     * garantizamos que exista otro índice que empiece por solicitud_id.
+     */
+    private function garantizarIndiceSolicitudId(): void
+    {
+        $tieneIndice = collect(Schema::getIndexes('solicitud_observaciones'))
+            ->contains(fn (array $indice): bool => $indice['name'] !== 'solicitud_observaciones_conversacion_indice'
+                && ($indice['columns'][0] ?? null) === 'solicitud_id');
+
+        if ($tieneIndice) {
+            return;
+        }
+
+        Schema::table('solicitud_observaciones', function (Blueprint $table): void {
+            $table->index('solicitud_id', 'solicitud_observaciones_solicitud_id_indice');
         });
     }
 };
