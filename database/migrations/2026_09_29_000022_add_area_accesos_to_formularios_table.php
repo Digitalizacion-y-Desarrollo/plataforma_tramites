@@ -17,9 +17,19 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('formularios', function (Blueprint $table) {
-            $table->dropIndex(['area_accesos_id']);
-            $table->dropColumn(['area_accesos_id', 'area_nombre_snapshot']);
+        $tieneIndice = Schema::hasIndex('formularios', 'formularios_area_accesos_id_index');
+        $columnas = array_values(array_filter(
+            ['area_accesos_id', 'area_nombre_snapshot'],
+            fn (string $columna): bool => Schema::hasColumn('formularios', $columna)
+        ));
+
+        Schema::table('formularios', function (Blueprint $table) use ($tieneIndice, $columnas) {
+            if ($tieneIndice) {
+                $table->dropIndex(['area_accesos_id']);
+            }
+            if ($columnas !== []) {
+                $table->dropColumn($columnas);
+            }
         });
     }
 };

@@ -16,9 +16,14 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('auditorias', function (Blueprint $table) {
-            $table->dropColumn('actor_departamento_snapshot');
-            $table->uuid('entidad_id')->nullable()->change();
-        });
+        if (Schema::hasColumn('auditorias', 'actor_departamento_snapshot')) {
+            Schema::table('auditorias', function (Blueprint $table) {
+                $table->dropColumn('actor_departamento_snapshot');
+            });
+        }
+
+        // No se revierte entidad_id a uuid (char(36)): la up() lo amplió a
+        // string(36) para admitir identificadores que no son UUID. Revertir
+        // truncaría información histórica de auditoría.
     }
 };

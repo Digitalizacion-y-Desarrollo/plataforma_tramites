@@ -33,8 +33,12 @@ return new class extends Migration
             });
         }
 
-        DB::statement('ALTER TABLE formulario_grupos_campos ENGINE = InnoDB');
-        DB::statement('ALTER TABLE formulario_grupo_campo ENGINE = InnoDB');
+        if (Schema::hasTable('formulario_grupos_campos')) {
+            DB::statement('ALTER TABLE formulario_grupos_campos ENGINE = InnoDB');
+        }
+        if (Schema::hasTable('formulario_grupo_campo')) {
+            DB::statement('ALTER TABLE formulario_grupo_campo ENGINE = InnoDB');
+        }
 
         Schema::table('campo_condiciones', function (Blueprint $table) {
             if (! Schema::hasColumn('campo_condiciones', 'grupo_destino_id')) {
@@ -70,10 +74,20 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('campo_condiciones', function (Blueprint $table) {
-            $table->dropForeign(['grupo_destino_id']);
-            $table->dropColumn('grupo_destino_id');
-        });
+        $tieneForeignKeyGrupo = collect(Schema::getForeignKeys('campo_condiciones'))
+            ->contains(fn (array $fk): bool => $fk['name'] === 'campo_condiciones_grupo_destino_id_foreign');
+
+        if ($tieneForeignKeyGrupo) {
+            Schema::table('campo_condiciones', function (Blueprint $table) {
+                $table->dropForeign(['grupo_destino_id']);
+            });
+        }
+
+        if (Schema::hasColumn('campo_condiciones', 'grupo_destino_id')) {
+            Schema::table('campo_condiciones', function (Blueprint $table) {
+                $table->dropColumn('grupo_destino_id');
+            });
+        }
 
         // campo_destino_id se vuelve obligatorio solo si no existen condiciones
         // dirigidas a un grupo (campo_destino_id NULL). Revertirlo con esos datos

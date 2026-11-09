@@ -12,9 +12,17 @@ return new class extends Migration
         if (Schema::hasColumn('tramites', 'tramite_estado_id')) {
             DB::statement('ALTER TABLE tramite_estados ENGINE=InnoDB');
 
-            Schema::table('tramites', function (Blueprint $table) {
-                $table->foreign('tramite_estado_id')->references('id')->on('tramite_estados')->restrictOnDelete();
-                $table->index(['activo', 'tramite_estado_id']);
+            $tieneForeignKey = collect(Schema::getForeignKeys('tramites'))
+                ->contains(fn (array $fk): bool => $fk['name'] === 'tramites_tramite_estado_id_foreign');
+            $tieneIndice = Schema::hasIndex('tramites', 'tramites_activo_tramite_estado_id_index');
+
+            Schema::table('tramites', function (Blueprint $table) use ($tieneForeignKey, $tieneIndice) {
+                if (! $tieneForeignKey) {
+                    $table->foreign('tramite_estado_id')->references('id')->on('tramite_estados')->restrictOnDelete();
+                }
+                if (! $tieneIndice) {
+                    $table->index(['activo', 'tramite_estado_id']);
+                }
             });
 
             return;
@@ -28,10 +36,21 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('tramites', function (Blueprint $table) {
-            $table->dropForeign(['tramite_estado_id']);
-            $table->dropIndex(['activo', 'tramite_estado_id']);
-            $table->dropColumn('tramite_estado_id');
+        $tieneForeignKey = collect(Schema::getForeignKeys('tramites'))
+            ->contains(fn (array $fk): bool => $fk['name'] === 'tramites_tramite_estado_id_foreign');
+        $tieneIndice = Schema::hasIndex('tramites', 'tramites_activo_tramite_estado_id_index');
+        $tieneColumna = Schema::hasColumn('tramites', 'tramite_estado_id');
+
+        Schema::table('tramites', function (Blueprint $table) use ($tieneForeignKey, $tieneIndice, $tieneColumna) {
+            if ($tieneForeignKey) {
+                $table->dropForeign(['tramite_estado_id']);
+            }
+            if ($tieneIndice) {
+                $table->dropIndex(['activo', 'tramite_estado_id']);
+            }
+            if ($tieneColumna) {
+                $table->dropColumn('tramite_estado_id');
+            }
         });
     }
 };

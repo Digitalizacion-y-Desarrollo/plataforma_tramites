@@ -21,9 +21,11 @@ return new class extends Migration
             $table->index('departamento_accesos_id_snapshot');
         });
 
-        Schema::table('tramite_formulario', function (Blueprint $table): void {
-            $table->dropUnique('tramite_formulario_tramite_id_unique');
-        });
+        if (Schema::hasIndex('tramite_formulario', 'tramite_formulario_tramite_id_unique')) {
+            Schema::table('tramite_formulario', function (Blueprint $table): void {
+                $table->dropUnique('tramite_formulario_tramite_id_unique');
+            });
+        }
 
         DB::table('tramite_formulario')
             ->join('formulario_versiones', 'formulario_versiones.id', '=', 'tramite_formulario.formulario_version_id')
@@ -60,20 +62,40 @@ return new class extends Migration
             ->havingRaw('COUNT(*) > 1')
             ->exists();
 
-        if (! $hayVinculosMultiples) {
+        if (! $hayVinculosMultiples && ! Schema::hasIndex('tramite_formulario', 'tramite_formulario_tramite_id_unique')) {
             Schema::table('tramite_formulario', function (Blueprint $table): void {
                 $table->unique('tramite_id', 'tramite_formulario_tramite_id_unique');
             });
         }
 
-        Schema::table('solicitudes', function (Blueprint $table): void {
-            $table->dropIndex(['departamento_accesos_id_snapshot']);
-            $table->dropColumn(['departamento_accesos_id_snapshot', 'departamento_nombre_snapshot']);
+        $columnasSolicitudes = array_values(array_filter(
+            ['departamento_accesos_id_snapshot', 'departamento_nombre_snapshot'],
+            fn (string $columna): bool => Schema::hasColumn('solicitudes', $columna)
+        ));
+        $tieneIndiceSolicitudes = Schema::hasIndex('solicitudes', 'solicitudes_departamento_accesos_id_snapshot_index');
+
+        Schema::table('solicitudes', function (Blueprint $table) use ($columnasSolicitudes, $tieneIndiceSolicitudes): void {
+            if ($tieneIndiceSolicitudes) {
+                $table->dropIndex(['departamento_accesos_id_snapshot']);
+            }
+            if ($columnasSolicitudes !== []) {
+                $table->dropColumn($columnasSolicitudes);
+            }
         });
 
-        Schema::table('tramites', function (Blueprint $table): void {
-            $table->dropIndex(['departamento_accesos_id']);
-            $table->dropColumn(['departamento_accesos_id', 'departamento_nombre_snapshot']);
+        $columnasTramites = array_values(array_filter(
+            ['departamento_accesos_id', 'departamento_nombre_snapshot'],
+            fn (string $columna): bool => Schema::hasColumn('tramites', $columna)
+        ));
+        $tieneIndiceTramites = Schema::hasIndex('tramites', 'tramites_departamento_accesos_id_index');
+
+        Schema::table('tramites', function (Blueprint $table) use ($columnasTramites, $tieneIndiceTramites): void {
+            if ($tieneIndiceTramites) {
+                $table->dropIndex(['departamento_accesos_id']);
+            }
+            if ($columnasTramites !== []) {
+                $table->dropColumn($columnasTramites);
+            }
         });
     }
 };

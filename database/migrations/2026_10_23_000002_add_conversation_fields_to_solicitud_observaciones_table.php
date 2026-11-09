@@ -23,17 +23,39 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::table('solicitud_observaciones', function (Blueprint $table): void {
-            $table->dropForeign(['respuesta_a_id']);
-            $table->dropUnique('solicitud_observaciones_respuesta_a_unica');
-        });
+        $tieneForeignKeyRespuesta = collect(Schema::getForeignKeys('solicitud_observaciones'))
+            ->contains(fn (array $fk): bool => $fk['name'] === 'solicitud_observaciones_respuesta_a_id_foreign');
+        $tieneUniqueRespuesta = Schema::hasIndex('solicitud_observaciones', 'solicitud_observaciones_respuesta_a_unica');
+
+        if ($tieneForeignKeyRespuesta || $tieneUniqueRespuesta) {
+            Schema::table('solicitud_observaciones', function (Blueprint $table) use ($tieneForeignKeyRespuesta, $tieneUniqueRespuesta): void {
+                if ($tieneForeignKeyRespuesta) {
+                    $table->dropForeign(['respuesta_a_id']);
+                }
+                if ($tieneUniqueRespuesta) {
+                    $table->dropUnique('solicitud_observaciones_respuesta_a_unica');
+                }
+            });
+        }
 
         $this->garantizarIndiceSolicitudId();
 
-        Schema::table('solicitud_observaciones', function (Blueprint $table): void {
-            $table->dropIndex('solicitud_observaciones_conversacion_indice');
-            $table->dropColumn(['actor_tipo', 'respuesta_a_id']);
-            $table->string('actor_accesos_id', 100)->nullable(false)->change();
+        $tieneIndiceConversacion = Schema::hasIndex('solicitud_observaciones', 'solicitud_observaciones_conversacion_indice');
+        $columnas = array_values(array_filter(
+            ['actor_tipo', 'respuesta_a_id'],
+            fn (string $columna): bool => Schema::hasColumn('solicitud_observaciones', $columna)
+        ));
+
+        Schema::table('solicitud_observaciones', function (Blueprint $table) use ($tieneIndiceConversacion, $columnas): void {
+            if ($tieneIndiceConversacion) {
+                $table->dropIndex('solicitud_observaciones_conversacion_indice');
+            }
+            if ($columnas !== []) {
+                $table->dropColumn($columnas);
+            }
+            if (! DB::table('solicitud_observaciones')->whereNull('actor_accesos_id')->exists()) {
+                $table->string('actor_accesos_id', 100)->nullable(false)->change();
+            }
         });
     }
 

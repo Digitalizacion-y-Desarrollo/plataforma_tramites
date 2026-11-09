@@ -65,11 +65,21 @@ return new class extends Migration
     {
         Schema::dropIfExists('solicitud_pago_fichas');
 
-        Schema::table('solicitud_pagos', function (Blueprint $table): void {
-            $table->string('referencia', 80)->nullable(false)->change();
-            $table->string('pdf_nombre_original', 255)->nullable(false)->change();
-            $table->string('pdf_storage_key', 500)->nullable(false)->change();
-            $table->string('pdf_hash_archivo', 128)->nullable(false)->change();
+        $columnas = [
+            'referencia' => 80,
+            'pdf_nombre_original' => 255,
+            'pdf_storage_key' => 500,
+            'pdf_hash_archivo' => 128,
+        ];
+
+        // Solo se restaura NOT NULL en las columnas que no tengan NULLs,
+        // para no perder información creada por el flujo de fichas.
+        Schema::table('solicitud_pagos', function (Blueprint $table) use ($columnas): void {
+            foreach ($columnas as $columna => $longitud) {
+                if (! DB::table('solicitud_pagos')->whereNull($columna)->exists()) {
+                    $table->string($columna, $longitud)->nullable(false)->change();
+                }
+            }
         });
     }
 };
