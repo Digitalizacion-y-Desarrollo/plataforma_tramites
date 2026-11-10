@@ -5,12 +5,12 @@
         <section class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
             <div>
                 <p class="text-sm font-semibold text-neza-wine">Administración</p>
-                <h1 class="mt-1 text-3xl font-bold tracking-tight text-neza-ink">Catálogo de trámites</h1>
-                <p class="mt-2 text-sm text-neza-muted">Gestiona los trámites disponibles en el sistema.</p>
+                <h1 class="mt-1 text-3xl font-bold tracking-tight text-neza-ink">Catálogo de {{ $tipoCatalogo === 'Servicio' ? 'servicios' : 'trámites' }}</h1>
+                <p class="mt-2 text-sm text-neza-muted">Gestiona los {{ $tipoCatalogo === 'Servicio' ? 'servicios' : 'trámites' }} disponibles en el sistema.</p>
             </div>
             <button type="button" data-modal-open="tramite-crear" class="inline-flex items-center justify-center gap-2 rounded-lg bg-neza-wine px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">
                 <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                Nuevo trámite
+                Nuevo {{ $tipoCatalogo === 'Servicio' ? 'servicio' : 'trámite' }}
             </button>
         </section>
 
@@ -18,7 +18,7 @@
             <section class="overflow-hidden rounded-xl border border-neza-line bg-white shadow-sm">
                 <div class="flex flex-col gap-2 border-b border-neza-line px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
-                        <h2 class="text-base font-bold text-neza-ink">Trámites registrados</h2>
+                            <h2 class="text-base font-bold text-neza-ink">{{ $tipoCatalogo === 'Servicio' ? 'Servicios' : 'Trámites' }} registrados</h2>
                         <p class="mt-1 text-xs text-neza-muted">Consulta las claves, descripciones y disponibilidad del catálogo.</p>
                     </div>
                     <span class="text-xs font-medium text-neza-muted">{{ $totalTramites }} en total</span>

@@ -12,6 +12,7 @@
             request()->routeIs('solicitudes.*') => 'Solicitudes',
             request()->routeIs('formulario.*') => 'Formularios',
             request()->routeIs('catalogo-tramites.*') => 'Catálogo de trámites',
+            request()->routeIs('catalogo-servicios.*') => 'Catálogo de servicios',
             request()->routeIs('catalogo-estados*') => 'Catálogos',
             request()->routeIs('auditoria.*') => 'Auditoría',
             request()->routeIs('configuracion-general.*') => 'Configuración general',
@@ -93,6 +94,11 @@
                         <path stroke-linecap="round" stroke-linejoin="round"
                             d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
                     </svg>Trámites</a>
+                <a href="{{ route('catalogo-servicios.index') }}" @class(['active' => request()->routeIs('catalogo-servicios.*')])><svg class="nav-icon" aria-hidden="true" fill="none" viewBox="0 0 24 24"
+                        stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                            d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 0 1 0 3.75H5.625a1.875 1.875 0 0 1 0-3.75Z" />
+                    </svg>Servicios</a>
                 <details class="group" @if (request()->routeIs('catalogo-*')) open @endif>
                     <summary
                         class="flex cursor-pointer list-none items-center gap-[11px] rounded-[10px] px-3 py-[11px] text-[13px] font-medium text-[#667085] outline-none transition hover:bg-neza-wine-soft hover:text-neza-wine focus-visible:ring-2 focus-visible:ring-neza-wine [&::-webkit-details-marker]:hidden{{ request()->routeIs('catalogo-*') ? ' active' : '' }}">

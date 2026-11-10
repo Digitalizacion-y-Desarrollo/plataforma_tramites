@@ -20,6 +20,7 @@ class TramiteController extends Controller
      */
     public function index(AccesosClient $accesos)
     {
+        $tipoCatalogo = request()->routeIs('catalogo-servicios.*') ? 'Servicio' : 'Trámite';
         $filtros = request()->validate([
             'q' => ['nullable', 'string', 'max:200'],
             'departamento_accesos_id' => ['nullable', 'string', 'max:100'],
@@ -30,6 +31,7 @@ class TramiteController extends Controller
 
         $tramites = Tramite::query()
             ->with(['estado', 'formularioActivo.formulario'])
+            ->where('tipo', $tipoCatalogo)
             ->when($filtros['q'] ?? null, function ($consulta, string $busqueda): void {
                 $consulta->where(function ($subconsulta) use ($busqueda): void {
                     $subconsulta->where('clave', 'like', "%{$busqueda}%")
@@ -52,15 +54,15 @@ class TramiteController extends Controller
             ->orderBy('nombre')
             ->paginate(10)
             ->withQueryString();
-        $totalTramites = Tramite::count();
-        $tramitesActivos = Tramite::where('activo', true)->count();
+        $totalTramites = Tramite::where('tipo', $tipoCatalogo)->count();
+        $tramitesActivos = Tramite::where('tipo', $tipoCatalogo)->where('activo', true)->count();
         $tramitesInactivos = $totalTramites - $tramitesActivos;
-        $tramitesPublicados = Tramite::whereHas('estado', fn ($estado) => $estado->where('clave', 'PUBLICADO'))->count();
-        $tramitesBorrador = Tramite::where(function ($consulta): void {
+        $tramitesPublicados = Tramite::where('tipo', $tipoCatalogo)->whereHas('estado', fn ($estado) => $estado->where('clave', 'PUBLICADO'))->count();
+        $tramitesBorrador = Tramite::where('tipo', $tipoCatalogo)->where(function ($consulta): void {
             $consulta->whereNull('tramite_estado_id')
                 ->orWhereHas('estado', fn ($estado) => $estado->where('clave', 'BORRADOR'));
         })->count();
-        $tramitesArchivados = Tramite::whereHas('estado', fn ($estado) => $estado->where('clave', 'ARCHIVADO'))->count();
+        $tramitesArchivados = Tramite::where('tipo', $tipoCatalogo)->whereHas('estado', fn ($estado) => $estado->where('clave', 'ARCHIVADO'))->count();
 
         try {
             $departamentos = collect($accesos->departamentosActivos())
@@ -83,7 +85,12 @@ class TramiteController extends Controller
                 || ! DB::table('tramite_formulario')->where('formulario_version_id', $version->id)->where('activo', true)->exists())
             ->values();
 
-        return view('tramites.index', compact('tramites', 'totalTramites', 'tramitesActivos', 'tramitesInactivos', 'tramitesPublicados', 'tramitesBorrador', 'tramitesArchivados', 'departamentos', 'formularios'));
+        return view('tramites.index', compact('tramites', 'totalTramites', 'tramitesActivos', 'tramitesInactivos', 'tramitesPublicados', 'tramitesBorrador', 'tramitesArchivados', 'departamentos', 'formularios', 'tipoCatalogo'));
+    }
+
+    public function servicios(AccesosClient $accesos)
+    {
+        return $this->index($accesos);
     }
 
     /**
