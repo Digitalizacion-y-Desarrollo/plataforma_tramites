@@ -24,6 +24,30 @@
                     <span class="text-xs font-medium text-neza-muted">{{ $totalTramites }} en total</span>
                 </div>
 
+                @php
+                    $hayFiltros = request()->filled('q')
+                        || request()->filled('departamento_accesos_id')
+                        || request()->filled('estado')
+                        || request()->filled('activo')
+                        || request()->filled('modalidad');
+                @endphp
+                <form action="{{ route('catalogo-tramites.index') }}" method="GET" class="border-b border-neza-line bg-gradient-to-b from-neza-canvas to-white p-4 sm:p-5">
+                    <div class="rounded-xl border border-neza-line bg-white/80 p-4 shadow-sm sm:p-5">
+                    <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div class="flex items-center gap-3"><span class="grid size-9 place-items-center rounded-lg bg-neza-wine-soft text-neza-wine"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3.75a4.5 4.5 0 0 0-4.5 4.5v1.06a1.5 1.5 0 0 1-.44 1.06L5.25 12.19v1.31h13.5v-1.31l-1.81-1.82a1.5 1.5 0 0 1-.44-1.06V8.25a4.5 4.5 0 0 0-4.5-4.5Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17.25h4.5" /></svg></span><div><h3 class="text-sm font-bold text-neza-ink">Filtrar catálogo</h3><p class="text-xs text-neza-muted">Ubica un trámite por sus datos operativos.</p></div></div>
+                        @if ($hayFiltros)<span class="inline-flex w-fit items-center gap-1.5 rounded-full bg-neza-wine-soft px-3 py-1 text-xs font-bold text-neza-wine"><span class="size-1.5 rounded-full bg-neza-wine"></span>Filtros aplicados</span>@endif
+                    </div>
+                    <div class="mt-5 grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+                        <div class="2xl:col-span-2"><label for="filtro-q" class="mb-1.5 block text-xs font-semibold text-neza-muted">Buscar</label><div class="relative"><svg class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-neza-muted" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35m1.35-5.4a6.75 6.75 0 1 1-13.5 0 6.75 6.75 0 0 1 13.5 0Z" /></svg><input id="filtro-q" name="q" value="{{ request('q') }}" class="h-11 w-full rounded-lg border border-neza-line bg-white py-2 pl-9 pr-3 text-sm text-neza-ink shadow-sm placeholder:text-neza-muted focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft" placeholder="Clave, nombre o descripción"></div></div>
+                        <div><label for="filtro-departamento" class="mb-1.5 block text-xs font-semibold text-neza-muted">Dependencia</label><select id="filtro-departamento" name="departamento_accesos_id" class="h-11 w-full rounded-lg border border-neza-line bg-white px-3 text-sm text-neza-ink shadow-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft"><option value="">Todas</option>@foreach (collect($departamentos)->whereNull('parent_id') as $departamento)<option value="{{ $departamento['id'] }}" @selected((string) request('departamento_accesos_id') === (string) $departamento['id'])>{{ $departamento['nombre'] }}</option>@endforeach</select></div>
+                        <div><label for="filtro-estado" class="mb-1.5 block text-xs font-semibold text-neza-muted">Estado</label><select id="filtro-estado" name="estado" class="h-11 w-full rounded-lg border border-neza-line bg-white px-3 text-sm text-neza-ink shadow-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft"><option value="">Todos</option>@foreach (['BORRADOR' => 'Borrador', 'PUBLICADO' => 'Publicado', 'ARCHIVADO' => 'Archivado'] as $clave => $nombre)<option value="{{ $clave }}" @selected(request('estado') === $clave)>{{ $nombre }}</option>@endforeach</select></div>
+                        <div><label for="filtro-activo" class="mb-1.5 block text-xs font-semibold text-neza-muted">Disponibilidad</label><select id="filtro-activo" name="activo" class="h-11 w-full rounded-lg border border-neza-line bg-white px-3 text-sm text-neza-ink shadow-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft"><option value="">Todos</option><option value="1" @selected(request('activo') === '1')>Habilitado</option><option value="0" @selected(request('activo') === '0')>Deshabilitado</option></select></div>
+                        <div><label for="filtro-modalidad" class="mb-1.5 block text-xs font-semibold text-neza-muted">Modalidad</label><select id="filtro-modalidad" name="modalidad" class="h-11 w-full rounded-lg border border-neza-line bg-white px-3 text-sm text-neza-ink shadow-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft"><option value="">Todas</option><option value="EN_LINEA" @selected(request('modalidad') === 'EN_LINEA')>En línea</option><option value="PRESENCIAL" @selected(request('modalidad') === 'PRESENCIAL')>Presencial</option><option value="MIXTO" @selected(request('modalidad') === 'MIXTO')>Mixto</option></select></div>
+                    </div>
+                    <div class="mt-5 flex flex-col-reverse gap-3 border-t border-neza-line pt-4 sm:flex-row sm:items-center sm:justify-between"><p class="text-xs leading-5 text-neza-muted">Los resultados conservan los filtros al cambiar de página.</p><div class="flex flex-col gap-2 sm:flex-row"><a href="{{ route('catalogo-tramites.index') }}" class="inline-flex h-10 items-center justify-center rounded-lg px-3 text-sm font-semibold text-neza-muted hover:bg-neza-canvas hover:text-neza-ink">Restablecer</a><button type="submit" class="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-neza-wine px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine"><svg class="size-4" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4.5h18M6.75 9.75h10.5M10.5 15h3" /></svg>Aplicar filtros</button></div></div>
+                    </div>
+                </form>
+
                 <div class="overflow-x-auto">
                     <table class="w-full min-w-[880px] text-left text-sm">
                         <thead class="bg-neza-canvas text-xs font-semibold text-neza-muted">
@@ -46,12 +70,20 @@
                                         'ARCHIVADO' => 'bg-slate-100 text-slate-600 ring-slate-200',
                                         default => 'bg-amber-50 text-amber-800 ring-amber-200',
                                     };
+                                    $detalleAdministrativo = [
+                                        'doc_a_obtener' => $tramite->doc_a_obtener,
+                                        'vigencia_doc' => $tramite->vigencia_doc,
+                                        'sujeto_inspeccion' => $tramite->sujeto_inspeccion,
+                                        'criterios_resolucion' => $tramite->criterios_resolucion,
+                                        'unidad_administrativa_responsable' => $tramite->unidad_administrativa_responsable,
+                                        'fund_juridico' => $tramite->fund_juridico,
+                                    ];
                                 @endphp
                                 <tr class="hover:bg-neza-canvas">
                                     <td class="px-5 py-4 font-mono text-xs font-semibold text-neza-wine">{{ $tramite->clave }}</td>
                                     <td class="px-4 py-4 font-semibold text-neza-ink">{{ $tramite->nombre }}</td>
                                     <td class="max-w-xl px-4 py-4 text-neza-muted">{{ $tramite->descripcion ?: 'Sin descripción' }}</td>
-                                    <td class="px-4 py-4 text-xs text-neza-muted"><span class="block">{{ $tramite->duracion ?: 'Sin duración' }}</span><span class="block">{{ $tramite->costo ?: 'Sin costo' }} · {{ $tramite->tiempo_estimado ?: 'Sin tiempo estimado' }}</span><span class="block">{{ collect($tramite->modalidades ?? [])->map(fn ($modalidad) => $modalidad === 'EN_LINEA' ? 'En línea' : 'Presencial')->join(' y ') ?: 'Sin modalidad' }}</span></td>
+                                    <td class="px-4 py-4 text-xs text-neza-muted"><span class="block">{{ $tramite->duracion ?: 'Sin duración' }}</span><span class="block">{{ $tramite->costo_texto ?: 'Sin costo' }} · {{ $tramite->tiempo_estimado ?: 'Sin tiempo estimado' }}</span><span class="block">{{ collect($tramite->modalidades ?? [])->map(fn ($modalidad) => $modalidad === 'EN_LINEA' ? 'En línea' : 'Presencial')->join(' y ') ?: 'Sin modalidad' }}</span></td>
                                     @php($formularioActivo = $tramite->formularioActivo->first())
                                     <td class="px-4 py-4 text-xs text-neza-muted"><span class="block font-semibold text-neza-ink">{{ $tramite->departamento_nombre_snapshot ?: 'Sin departamento' }}</span><span class="block">{{ $formularioActivo?->formulario?->nombre ?: 'Sin formulario' }}</span></td>
                                     <td class="px-5 py-4">
@@ -82,7 +114,8 @@
                                                     <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 2.25v9m6.364-4.114a9 9 0 1 1-12.728 0" /></svg>
                                                 </button>
                                             </form>
-                                            <button type="button" title="Editar trámite" aria-label="Editar trámite" data-modal-open="tramite-editar" data-tramite-id="{{ $tramite->id }}" data-tramite-clave="{{ $tramite->clave }}" data-tramite-nombre="{{ $tramite->nombre }}" data-tramite-descripcion="{{ $tramite->descripcion }}" data-tramite-duracion="{{ $tramite->duracion }}" data-tramite-costo="{{ $tramite->costo_pago }}" data-tramite-flujo-pago="{{ $tramite->flujo_pago }}" data-tramite-pago-vigencia="{{ $tramite->pago_vigencia_dias }}" data-tramite-tiempo-estimado="{{ $tramite->tiempo_estimado }}" data-tramite-expira-dias="{{ $tramite->descarga_expira_dias }}" data-tramite-modalidades='@json($tramite->modalidades ?? [])' data-tramite-requisitos='@json($tramite->requisitos ?? [])' data-tramite-proceso='@json($tramite->proceso ?? [])' data-tramite-preguntas-frecuentes='@json($tramite->preguntas_frecuentes ?? [])' data-tramite-activo="{{ $tramite->activo ? '1' : '0' }}" data-tramite-update-url="{{ route('catalogo-tramites.update', $tramite) }}" class="text-neza-muted transition hover:text-neza-wine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">
+                                            <a href="{{ route('catalogo-tramites.show', $tramite) }}" title="Ver trámite" aria-label="Ver trámite" class="text-neza-muted transition hover:text-neza-wine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12S5.25 4.5 12 4.5 21.75 12 21.75 12 18.75 19.5 12 19.5 2.25 12 2.25 12Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg></a>
+                                            <button type="button" title="Editar trámite" aria-label="Editar trámite" data-modal-open="tramite-editar" data-tramite-id="{{ $tramite->id }}" data-tramite-clave="{{ $tramite->clave }}" data-tramite-nombre="{{ $tramite->nombre }}" data-tramite-descripcion="{{ $tramite->descripcion }}" data-tramite-duracion="{{ $tramite->duracion }}" data-tramite-costo="{{ $tramite->costo_pago }}" data-tramite-flujo-pago="{{ $tramite->flujo_pago }}" data-tramite-pago-vigencia="{{ $tramite->pago_vigencia_dias }}" data-tramite-tiempo-estimado="{{ $tramite->tiempo_estimado }}" data-tramite-expira-dias="{{ $tramite->descarga_expira_dias }}" data-tramite-modalidades='@json($tramite->modalidades ?? [])' data-tramite-requisitos='@json($tramite->requisitos ?? [])' data-tramite-proceso='@json($tramite->proceso ?? [])' data-tramite-preguntas-frecuentes='@json($tramite->preguntas_frecuentes ?? [])' data-tramite-detalle-administrativo='@json($detalleAdministrativo)' data-tramite-activo="{{ $tramite->activo ? '1' : '0' }}" data-tramite-update-url="{{ route('catalogo-tramites.update', $tramite) }}" class="text-neza-muted transition hover:text-neza-wine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">
                                                 <svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
                                             </button>
                                             <form action="{{ route('catalogo-tramites.destroy', $tramite) }}" method="POST" data-confirm-delete data-confirm-title="¿Eliminar trámite?" data-confirm-text="El trámite se ocultará del catálogo, pero su información histórica se conservará." class="inline-flex">
@@ -148,7 +181,7 @@
         </div>
 
         <dialog id="tramite-crear" @if ($errors->any() && old('_modal') === 'crear') open @endif class="fixed inset-0 m-auto max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-neza-line p-0 shadow-xl backdrop:bg-neza-ink/40">
-            <form action="{{ route('catalogo-tramites.store') }}" method="POST" class="bg-white" novalidate>
+            <form action="{{ route('catalogo-tramites.store') }}" method="POST" class="bg-white" novalidate data-submit-lock>
                 @csrf
                 <input type="hidden" name="_modal" value="crear">
                 <div class="flex items-start justify-between border-b border-neza-line px-6 py-5"><div><h2 class="text-lg font-bold text-neza-ink">Nuevo trámite</h2><p class="mt-1 text-sm text-neza-muted">Registra la información del catálogo.</p></div><button type="button" data-modal-close="tramite-crear" class="text-neza-muted hover:text-neza-ink" aria-label="Cerrar"><svg class="size-5" aria-hidden="true" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12" /></svg></button></div>
@@ -158,6 +191,7 @@
                     <div><label for="crear-descripcion" class="block text-sm font-semibold text-neza-ink">Descripción</label><textarea id="crear-descripcion" name="descripcion" rows="4" maxlength="5000" class="mt-2 w-full resize-y rounded-lg border border-neza-line px-3 py-2.5 text-sm text-neza-ink @error('descripcion') border-rose-600 @enderror">{{ old('_modal') === 'crear' ? old('descripcion') : '' }}</textarea>@if (old('_modal') === 'crear') @error('descripcion')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror @endif</div>
                     @include('tramites.partials.asignacion-dependencia-formulario', ['modo' => 'crear'])
                     @include('tramites.partials.datos-publicos', ['modo' => 'crear', 'tramite' => null])
+                    @include('tramites.partials.detalle-administrativo', ['modo' => 'crear', 'tramite' => null])
                     <label class="flex items-center gap-3 text-sm font-semibold text-neza-ink"><input type="checkbox" name="activo" value="1" @checked(old('_modal') !== 'crear' || old('activo')) class="size-4 rounded border-neza-line text-neza-wine focus:ring-neza-wine"> Trámite activo</label>
                 </div>
                 <div class="flex justify-end gap-3 border-t border-neza-line px-6 py-4"><button type="button" data-modal-close="tramite-crear" class="rounded-lg border border-neza-line px-4 py-2.5 text-sm font-semibold text-neza-muted hover:bg-neza-canvas">Cancelar</button><button type="submit" class="rounded-lg bg-neza-wine px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">Crear trámite</button></div>
@@ -165,7 +199,7 @@
         </dialog>
 
         <dialog id="tramite-editar" @if ($errors->any() && old('_modal') === 'editar') open @endif class="fixed inset-0 m-auto max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-xl border border-neza-line p-0 shadow-xl backdrop:bg-neza-ink/40">
-            <form id="tramite-editar-form" action="{{ old('update_url', '') }}" method="POST" class="bg-white" novalidate>
+            <form id="tramite-editar-form" action="{{ old('update_url', '') }}" method="POST" class="bg-white" novalidate data-submit-lock>
                 @csrf
                 @method('PUT')
                 <input type="hidden" name="_modal" value="editar"><input type="hidden" name="update_url" value="{{ old('update_url') }}"><input type="hidden" name="clave_visual" value="{{ old('clave_visual') }}">
@@ -176,6 +210,7 @@
                     <div><label for="editar-descripcion" class="block text-sm font-semibold text-neza-ink">Descripción</label><textarea id="editar-descripcion" name="descripcion" rows="4" maxlength="5000" class="mt-2 w-full resize-y rounded-lg border border-neza-line px-3 py-2.5 text-sm text-neza-ink @error('descripcion') border-rose-600 @enderror">{{ old('_modal') === 'editar' ? old('descripcion') : '' }}</textarea>@if (old('_modal') === 'editar') @error('descripcion')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror @endif</div>
                     @include('tramites.partials.asignacion-dependencia-formulario', ['modo' => 'editar'])
                     @include('tramites.partials.datos-publicos', ['modo' => 'editar', 'tramite' => null])
+                    @include('tramites.partials.detalle-administrativo', ['modo' => 'editar', 'tramite' => null])
                     <label class="flex items-center gap-3 text-sm font-semibold text-neza-ink"><input id="editar-activo" type="checkbox" name="activo" value="1" @checked(old('_modal') === 'editar' && old('activo')) class="size-4 rounded border-neza-line text-neza-wine focus:ring-neza-wine"> Trámite activo</label>
                 </div>
                 <div class="flex justify-end gap-3 border-t border-neza-line px-6 py-4"><button type="button" data-modal-close="tramite-editar" class="rounded-lg border border-neza-line px-4 py-2.5 text-sm font-semibold text-neza-muted hover:bg-neza-canvas">Cancelar</button><button type="submit" class="rounded-lg bg-neza-wine px-4 py-2.5 text-sm font-semibold text-white hover:opacity-90">Guardar cambios</button></div>

@@ -173,7 +173,7 @@
                                             'descripcion' => $tramite->descripcion ?: 'Consulta la información de este trámite.',
                                             'dependencia' => $grupo['nombre'],
                                             'modalidad' => $modalidadEtiqueta,
-                                            'costo' => $tramite->costo ?: 'Costo por definir',
+                                            'costo' => $tramite->costo_texto ?: 'Costo por definir',
                                             'tiempo' => $tramite->tiempo_estimado ?: 'Tiempo por definir',
                                             'url' => route('portal.tramites.detalle', $tramite),
                                         ]])

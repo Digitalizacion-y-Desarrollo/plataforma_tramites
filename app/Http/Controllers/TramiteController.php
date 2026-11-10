@@ -20,11 +20,38 @@ class TramiteController extends Controller
      */
     public function index(AccesosClient $accesos)
     {
+        $filtros = request()->validate([
+            'q' => ['nullable', 'string', 'max:200'],
+            'departamento_accesos_id' => ['nullable', 'string', 'max:100'],
+            'estado' => ['nullable', 'string', 'in:BORRADOR,PUBLICADO,ARCHIVADO'],
+            'activo' => ['nullable', 'boolean'],
+            'modalidad' => ['nullable', 'string', 'in:EN_LINEA,PRESENCIAL,MIXTO'],
+        ]);
+
         $tramites = Tramite::query()
             ->with(['estado', 'formularioActivo.formulario'])
+            ->when($filtros['q'] ?? null, function ($consulta, string $busqueda): void {
+                $consulta->where(function ($subconsulta) use ($busqueda): void {
+                    $subconsulta->where('clave', 'like', "%{$busqueda}%")
+                        ->orWhere('nombre', 'like', "%{$busqueda}%")
+                        ->orWhere('descripcion', 'like', "%{$busqueda}%");
+                });
+            })
+            ->when($filtros['departamento_accesos_id'] ?? null, fn ($consulta, string $departamento) => $consulta->where('departamento_accesos_id', $departamento))
+            ->when($filtros['estado'] ?? null, fn ($consulta, string $estado) => $consulta->whereHas('estado', fn ($subconsulta) => $subconsulta->where('clave', $estado)))
+            ->when(filled($filtros['activo'] ?? null), fn ($consulta) => $consulta->where('activo', $filtros['activo']))
+            ->when($filtros['modalidad'] ?? null, function ($consulta, string $modalidad): void {
+                if ($modalidad === 'MIXTO') {
+                    $consulta->whereRaw("JSON_SEARCH(modalidades, 'one', 'EN_LINEA') IS NOT NULL")
+                        ->whereRaw("JSON_SEARCH(modalidades, 'one', 'PRESENCIAL') IS NOT NULL");
+                } else {
+                    $consulta->whereRaw("JSON_SEARCH(modalidades, 'one', ?) IS NOT NULL", [$modalidad]);
+                }
+            })
             ->orderByDesc('activo')
             ->orderBy('nombre')
-            ->paginate(10);
+            ->paginate(10)
+            ->withQueryString();
         $totalTramites = Tramite::count();
         $tramitesActivos = Tramite::where('activo', true)->count();
         $tramitesInactivos = $totalTramites - $tramitesActivos;
@@ -95,6 +122,7 @@ class TramiteController extends Controller
             'preguntas_frecuentes.*.pregunta' => ['required_with:preguntas_frecuentes', 'string', 'max:500'],
             'preguntas_frecuentes.*.respuesta' => ['required_with:preguntas_frecuentes', 'string', 'max:2000'],
             'activo' => ['nullable', 'boolean'],
+            ...$this->reglasDetalleAdministrativo(),
         ]);
 
         $departamento = $this->departamentoValido($datos['departamento_accesos_id'], $accesos);
@@ -106,7 +134,7 @@ class TramiteController extends Controller
             $tramite = Tramite::create([
                 'clave' => $this->generarClave(), 'nombre' => $datos['nombre'], 'descripcion' => $datos['descripcion'] ?? null,
                 'departamento_accesos_id' => $departamento['id'], 'departamento_nombre_snapshot' => $departamento['nombre'],
-                ...$this->datosPublicos($datos), 'activo' => $request->boolean('activo'),
+                ...$this->datosPublicos($datos), ...$this->datosDetalleAdministrativo($datos), 'activo' => $request->boolean('activo'),
                 'tramite_estado_id' => $this->estadoId('BORRADOR'),
             ]);
             $this->sincronizarFormulario($tramite, $datos['formulario_version_id'] ?? null, $departamento['id']);
@@ -121,7 +149,9 @@ class TramiteController extends Controller
      */
     public function show(Tramite $catalogo_tramite)
     {
-        return redirect()->route('catalogo-tramites.index');
+        $catalogo_tramite->load(['estado', 'formularioActivo.formulario']);
+
+        return view('tramites.show', ['tramite' => $catalogo_tramite]);
     }
 
     /**
@@ -160,6 +190,7 @@ class TramiteController extends Controller
             'preguntas_frecuentes.*.pregunta' => ['required_with:preguntas_frecuentes', 'string', 'max:500'],
             'preguntas_frecuentes.*.respuesta' => ['required_with:preguntas_frecuentes', 'string', 'max:2000'],
             'activo' => ['nullable', 'boolean'],
+            ...$this->reglasDetalleAdministrativo(),
         ]);
 
         $departamento = $this->departamentoValido($datos['departamento_accesos_id'], $accesos);
@@ -172,7 +203,7 @@ class TramiteController extends Controller
             $catalogo_tramite->update([
                 'nombre' => $datos['nombre'], 'descripcion' => $datos['descripcion'] ?? null,
                 'departamento_accesos_id' => $departamento['id'], 'departamento_nombre_snapshot' => $departamento['nombre'],
-                ...$this->datosPublicos($datos), 'activo' => $request->boolean('activo'),
+                ...$this->datosPublicos($datos), ...$this->datosDetalleAdministrativo($datos), 'activo' => $request->boolean('activo'),
             ]);
             $this->sincronizarFormulario($catalogo_tramite, $datos['formulario_version_id'] ?? null, $departamento['id']);
             Auditoria::registrar($request, 'TRAMITE_ACTUALIZADO', 'TRAMITE', $catalogo_tramite->id, $anteriores, $this->datosAuditoria($catalogo_tramite->refresh()));
@@ -256,6 +287,8 @@ class TramiteController extends Controller
             'activo', 'tramite_estado_id', 'duracion', 'costo', 'costo_pago', 'flujo_pago',
             'pago_vigencia_dias', 'tiempo_estimado', 'modalidades', 'requisitos', 'proceso',
             'preguntas_frecuentes', 'descarga_expira_dias',
+            'doc_a_obtener', 'vigencia_doc', 'sujeto_inspeccion', 'criterios_resolucion', 'unidad_administrativa_responsable',
+            'fund_juridico',
         ]);
     }
 
@@ -279,7 +312,7 @@ class TramiteController extends Controller
 
         return [
             'duracion' => $datos['duracion'] ?? null,
-            'costo' => isset($datos['costo']) ? '$'.number_format((float) $datos['costo'], 2).' MXN' : null,
+            'costo' => isset($datos['costo']) ? ['$'.number_format((float) $datos['costo'], 2).' PESOS'] : null,
             'costo_pago' => $datos['flujo_pago'] === 'SIN_PAGO' ? null : $datos['costo'],
             'flujo_pago' => $datos['flujo_pago'],
             'pago_vigencia_dias' => $datos['flujo_pago'] === 'SIN_PAGO' ? null : $datos['pago_vigencia_dias'],
@@ -290,6 +323,25 @@ class TramiteController extends Controller
             'preguntas_frecuentes' => array_values($datos['preguntas_frecuentes'] ?? []),
             'descarga_expira_dias' => in_array('EN_LINEA', $modalidades, true) ? ($datos['descarga_expira_dias'] ?? null) : null,
         ];
+    }
+
+    private function reglasDetalleAdministrativo(): array
+    {
+        return [
+            'doc_a_obtener' => ['nullable', 'string', 'max:5000'],
+            'vigencia_doc' => ['nullable', 'string', 'max:5000'],
+            'sujeto_inspeccion' => ['nullable', 'string', 'max:5000'],
+            'criterios_resolucion' => ['nullable', 'string', 'max:5000'],
+            'unidad_administrativa_responsable' => ['nullable', 'string', 'max:5000'],
+            'fund_juridico' => ['nullable', 'string', 'max:5000'],
+        ];
+    }
+
+    private function datosDetalleAdministrativo(array $datos): array
+    {
+        return collect(array_keys($this->reglasDetalleAdministrativo()))
+            ->mapWithKeys(fn (string $campo): array => [$campo => filled($datos[$campo] ?? null) ? trim($datos[$campo]) : null])
+            ->all();
     }
 
     private function normalizarRequisitos(mixed $requisitos): array

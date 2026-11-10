@@ -5,7 +5,7 @@
         <div>
             <p class="text-sm font-semibold text-neza-wine">Configuración</p>
             <h1 class="mt-1 text-3xl font-bold text-neza-ink">API Keys</h1>
-            <p class="mt-2 max-w-3xl text-sm text-neza-muted">Crea credenciales para que sistemas externos consulten el listado de solicitudes mediante la API.</p>
+            <p class="mt-2 max-w-3xl text-sm text-neza-muted">Crea credenciales para que sistemas externos consulten solicitudes y el catálogo de trámites mediante la API.</p>
         </div>
 
         <section class="rounded-xl border border-neza-line bg-white p-5 shadow-sm sm:p-6" aria-labelledby="crear-api-key">
@@ -128,6 +128,72 @@ Accept: application/json</code></pre>
             </div>
 
             <p class="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900"><strong>Seguridad:</strong> la API Key equivale a una credencial de acceso. No la compartas por correo ni la publiques en código fuente. Si se compromete, revócala aquí y genera una nueva.</p>
+        </section>
+
+        <section class="rounded-xl border border-neza-line bg-white p-5 shadow-sm sm:p-6" aria-labelledby="documentacion-api-tramites">
+            <div><p class="text-sm font-semibold text-neza-wine">Integración</p><h2 id="documentacion-api-tramites" class="mt-1 text-xl font-bold text-neza-ink">Cómo consultar el catálogo de trámites</h2><p class="mt-2 text-sm text-neza-muted">Incluye borradores, publicados y archivados. Usa la misma API Key activa mediante Bearer Token.</p></div>
+            <div class="mt-6 grid gap-5 lg:grid-cols-2"><div class="rounded-lg border border-neza-line bg-neza-canvas p-4"><h3 class="text-sm font-bold text-neza-ink">Endpoint</h3><code class="mt-3 block break-all rounded-md border border-neza-line bg-white px-3 py-2 font-mono text-xs text-neza-ink">GET {{ url('/api/v1/tramites') }}</code><h3 class="mt-5 text-sm font-bold text-neza-ink">Encabezados requeridos</h3><pre class="mt-3 overflow-x-auto rounded-md border border-neza-line bg-neza-ink p-3 text-xs leading-6 text-white"><code>Authorization: Bearer pt_live_tu_api_key
+Accept: application/json</code></pre></div><div class="rounded-lg border border-neza-line bg-neza-canvas p-4"><h3 class="text-sm font-bold text-neza-ink">Ejemplo con cURL</h3><pre class="mt-3 overflow-x-auto rounded-md border border-neza-line bg-neza-ink p-3 text-xs leading-6 text-white"><code>curl -X GET "{{ url('/api/v1/tramites') }}?estado=PUBLICADO&amp;per_page=20" \
+  -H "Authorization: Bearer pt_live_tu_api_key" \
+  -H "Accept: application/json"</code></pre></div></div>
+            <div class="mt-6 overflow-x-auto rounded-lg border border-neza-line"><table class="min-w-full divide-y divide-neza-line text-left text-sm"><thead class="bg-neza-canvas text-xs font-bold uppercase tracking-wide text-neza-muted"><tr><th class="px-4 py-3">Parámetro</th><th class="px-4 py-3">Descripción</th></tr></thead><tbody class="divide-y divide-neza-line bg-white text-neza-ink"><tr><td class="px-4 py-3 font-mono text-xs">q</td><td class="px-4 py-3">Busca por clave, nombre o descripción.</td></tr><tr><td class="px-4 py-3 font-mono text-xs">departamento_accesos_id</td><td class="px-4 py-3">ID del departamento responsable.</td></tr><tr><td class="px-4 py-3 font-mono text-xs">estado</td><td class="px-4 py-3">BORRADOR, PUBLICADO o ARCHIVADO.</td></tr><tr><td class="px-4 py-3 font-mono text-xs">activo</td><td class="px-4 py-3">1 para habilitados o 0 para deshabilitados.</td></tr><tr><td class="px-4 py-3 font-mono text-xs">modalidad</td><td class="px-4 py-3">EN_LINEA, PRESENCIAL o MIXTO.</td></tr><tr><td class="px-4 py-3 font-mono text-xs">per_page, page</td><td class="px-4 py-3">Paginación; máximo 100 registros por página.</td></tr></tbody></table></div>
+            <div class="mt-6 rounded-lg border border-neza-line bg-neza-canvas p-4"><h3 class="text-sm font-bold text-neza-ink">Ejemplo de respuesta</h3><p class="mt-1 text-xs text-neza-muted">La respuesta incluye los trámites en <code class="font-mono">data</code> y la información de paginación en <code class="font-mono">links</code> y <code class="font-mono">meta</code>.</p><pre class="mt-3 overflow-x-auto rounded-md border border-neza-line bg-neza-ink p-3 text-xs leading-6 text-white"><code>{
+  "data": [
+    {
+      "id": 1,
+      "clave": "TRM-AB12CD34",
+      "nombre": "Licencia única de construcción",
+      "descripcion": "Trámite para solicitar una licencia de construcción.",
+      "doc_a_obtener": "Licencia única de construcción",
+      "vigencia_doc": "Un año",
+      "sujeto_inspeccion": null,
+      "criterios_resolucion": "Cumplir con los requisitos aplicables.",
+      "unidad_administrativa_responsable": "Dirección de Desarrollo Urbano",
+      "departamento": { "id": "12", "nombre": "DIRECCIÓN DE DESARROLLO URBANO" },
+      "estado": { "id": 2, "clave": "PUBLICADO", "nombre": "Publicado" },
+      "activo": true,
+      "tiempo_estimado": "10 días hábiles",
+      "costo": ["$350.00 PESOS"],
+      "costo_pago": "350.00",
+      "flujo_pago": "PAGO_DIRECTO",
+      "pago_vigencia_dias": 30,
+      "modalidades": ["EN_LINEA", "PRESENCIAL"],
+      "requisitos": [{ "titulo": "Persona física", "requisitos": ["Identificación oficial vigente"] }],
+      "proceso": ["Captura tu solicitud", "Adjunta los documentos"],
+      "preguntas_frecuentes": [{ "pregunta": "¿Dónde se realiza?", "respuesta": "En línea o presencial." }],
+      "descarga_expira_dias": 30,
+      "created_at": "2026-11-10T15:00:00.000000Z",
+      "updated_at": "2026-11-10T15:00:00.000000Z"
+    }
+  ],
+  "links": { "first": "http://127.0.0.1:8000/api/v1/tramites?page=1", "last": "http://127.0.0.1:8000/api/v1/tramites?page=1", "prev": null, "next": null },
+  "meta": { "current_page": 1, "from": 1, "last_page": 1, "per_page": 20, "to": 1, "total": 1 }
+}</code></pre></div>
+        </section>
+
+        <section class="rounded-xl border border-neza-line bg-white p-5 shadow-sm sm:p-6" aria-labelledby="documentacion-api-retys">
+            <div><p class="text-sm font-semibold text-neza-wine">RETyS</p><h2 id="documentacion-api-retys" class="mt-1 text-xl font-bold text-neza-ink">Consulta de información para RETyS</h2><p class="mt-2 text-sm text-neza-muted">Consulta un trámite por su clave o busca por nombre. Se requiere una API Key activa mediante Bearer Token.</p></div>
+            <div class="mt-6 grid gap-5 lg:grid-cols-2"><div class="rounded-lg border border-neza-line bg-neza-canvas p-4"><h3 class="text-sm font-bold text-neza-ink">Endpoint</h3><code class="mt-3 block break-all rounded-md border border-neza-line bg-white px-3 py-2 font-mono text-xs text-neza-ink">GET {{ url('/api/v1/retys/tramites') }}</code><p class="mt-4 text-xs text-neza-muted">Envía exactamente uno de estos parámetros: <code class="font-mono">clave</code> o <code class="font-mono">nombre</code>.</p><h3 class="mt-5 text-sm font-bold text-neza-ink">Listado reducido</h3><code class="mt-3 block break-all rounded-md border border-neza-line bg-white px-3 py-2 font-mono text-xs text-neza-ink">GET {{ url('/api/v1/retys/tramites/lista') }}</code><p class="mt-2 text-xs text-neza-muted">Devuelve todos los trámites con solo <code class="font-mono">clave</code> y <code class="font-mono">nombre</code>.</p></div><div class="rounded-lg border border-neza-line bg-neza-canvas p-4"><h3 class="text-sm font-bold text-neza-ink">Ejemplos con cURL</h3><pre class="mt-3 overflow-x-auto rounded-md border border-neza-line bg-neza-ink p-3 text-xs leading-6 text-white"><code>curl "{{ url('/api/v1/retys/tramites') }}?clave=DDU/05/2026" \
+  -H "Authorization: Bearer pt_live_tu_api_key" \
+  -H "Accept: application/json"
+
+curl "{{ url('/api/v1/retys/tramites') }}?nombre=Constancia%20de%20regularización" \
+  -H "Authorization: Bearer pt_live_tu_api_key" \
+  -H "Accept: application/json"</code></pre></div></div>
+            <div class="mt-6 rounded-lg border border-neza-line bg-neza-canvas p-4"><h3 class="text-sm font-bold text-neza-ink">Respuesta</h3><p class="mt-1 text-xs text-neza-muted"><code class="font-mono">tipo</code> será <code class="font-mono">null</code> hasta que se agregue ese campo a la tabla de trámites.</p><pre class="mt-3 overflow-x-auto rounded-md border border-neza-line bg-neza-ink p-3 text-xs leading-6 text-white"><code>{
+  "data": [
+    {
+      "clave": "DDU/05/2026",
+      "nombre": "Constancia de regularización",
+      "area": "DIRECCIÓN DE DESARROLLO URBANO",
+      "tipo": null,
+      "fundamento_juridico": "Fundamento aplicable al trámite.",
+      "costo": ["$350.00 PESOS"],
+      "requisitos": [{ "titulo": "Requisitos generales", "requisitos": ["Identificación oficial vigente"] }],
+      "tiempo": "10 días hábiles"
+    }
+  ]
+}</code></pre></div>
         </section>
     </div>
 

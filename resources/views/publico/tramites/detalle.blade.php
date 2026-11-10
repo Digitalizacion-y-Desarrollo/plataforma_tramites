@@ -8,7 +8,7 @@
     @else
         @php
             $modalidades = collect($tramite->modalidades ?? [])->filter()->map(fn ($valor) => $valor === 'EN_LINEA' ? 'En línea' : 'Presencial');
-            $datosResumen = collect(['Duración' => $tramite->duracion, 'Costo' => $tramite->costo, 'Tiempo estimado' => $tramite->tiempo_estimado])->filter(fn ($valor) => filled($valor));
+            $datosResumen = collect(['Duración' => $tramite->duracion, 'Costo' => $tramite->costo_texto, 'Tiempo estimado' => $tramite->tiempo_estimado])->filter(fn ($valor) => filled($valor));
             $requisitosGuardados = collect($tramite->requisitos ?? []);
             $requisitos = $requisitosGuardados->isNotEmpty() && is_string($requisitosGuardados->first())
                 ? collect([['titulo' => 'Requisitos generales', 'requisitos' => $requisitosGuardados->filter(fn ($requisito) => filled($requisito))->values()->all()]])

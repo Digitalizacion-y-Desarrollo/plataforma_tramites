@@ -17,6 +17,12 @@ class Tramite extends Model
         'descripcion',
         'departamento_accesos_id',
         'departamento_nombre_snapshot',
+        'doc_a_obtener',
+        'vigencia_doc',
+        'sujeto_inspeccion',
+        'criterios_resolucion',
+        'unidad_administrativa_responsable',
+        'fund_juridico',
         'duracion',
         'costo',
         'costo_pago',
@@ -36,6 +42,7 @@ class Tramite extends Model
     {
         return [
             'activo' => 'boolean',
+            'costo' => 'array',
             'modalidades' => 'array',
             'requisitos' => 'array',
             'proceso' => 'array',
@@ -44,6 +51,26 @@ class Tramite extends Model
             'costo_pago' => 'decimal:2',
             'pago_vigencia_dias' => 'integer',
         ];
+    }
+
+    public function getCostoTextoAttribute(): ?string
+    {
+        $costo = $this->costo;
+
+        if (! is_array($costo)) {
+            $costo = $this->getRawOriginal('costo');
+        }
+
+        if (is_array($costo)) {
+            $texto = collect($costo)
+                ->filter(fn ($valor) => is_string($valor) && filled(trim($valor)))
+                ->map(fn (string $valor) => trim($valor))
+                ->join(' · ');
+
+            return filled($texto) ? $texto : null;
+        }
+
+        return is_string($costo) && filled(trim($costo)) ? trim($costo) : null;
     }
 
     public function estado(): BelongsTo

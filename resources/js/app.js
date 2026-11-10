@@ -384,6 +384,16 @@ document.querySelectorAll('[data-modal-open]').forEach((boton) => {
             modal.querySelector('#editar-expira').value = boton.dataset.tramiteExpiraDias || '';
             modal.querySelector('#editar-flujo-pago').value = boton.dataset.tramiteFlujoPago || 'SIN_PAGO';
             modal.querySelector('#editar-pago-vigencia').value = boton.dataset.tramitePagoVigencia || '';
+            let detalleAdministrativo = {};
+            try {
+                detalleAdministrativo = JSON.parse(boton.dataset.tramiteDetalleAdministrativo || '{}');
+            } catch {
+                detalleAdministrativo = {};
+            }
+            Object.entries(detalleAdministrativo).forEach(([campo, valor]) => {
+                const input = modal.querySelector(`#editar-${campo}`);
+                if (input) input.value = valor || '';
+            });
             modal.querySelectorAll('[name="modalidad"]').forEach((opcion) => {
                 const guardadas = JSON.parse(boton.dataset.tramiteModalidades || '[]');
                 const modalidad = guardadas.length > 1 ? 'MIXTO' : (guardadas[0] || '');
