@@ -3,6 +3,20 @@ import './accessibility';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
+document.querySelectorAll('[data-password-toggle]').forEach((boton) => {
+    const campo = document.getElementById(boton.getAttribute('aria-controls'));
+    if (!campo) return;
+
+    boton.addEventListener('click', () => {
+        const visible = campo.type === 'password';
+        campo.type = visible ? 'text' : 'password';
+        boton.setAttribute('aria-label', visible ? 'Ocultar contraseña' : 'Mostrar contraseña');
+        boton.setAttribute('aria-pressed', String(visible));
+        boton.querySelector('[data-password-visible-icon]')?.classList.toggle('hidden', visible);
+        boton.querySelector('[data-password-hidden-icon]')?.classList.toggle('hidden', !visible);
+    });
+});
+
 document.querySelectorAll('[data-dismiss-public-notice]').forEach((button) => {
     button.addEventListener('click', () => {
         button.closest('[data-public-notice]')?.remove();

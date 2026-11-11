@@ -37,9 +37,12 @@ Configure el proxy HTTPS existente para reenviar el dominio del portal a `http:/
 
 ```bash
 git pull
-docker compose build
-docker compose up -d
+docker compose build app nginx
+docker compose up -d --force-recreate app nginx worker
+docker compose exec app php artisan view:clear
 docker compose exec app php artisan migrate --force
 ```
+
+`npm run build` se ejecuta durante la construcción de las imágenes; la imagen final de PHP no incluye Node.js ni npm. El volumen `portal_tramites_storage` conserva las vistas Blade compiladas, así que `view:clear` evita mostrar una versión anterior después de actualizar el código.
 
 Los documentos, sesiones y archivos de Laravel permanecen en el volumen `portal_tramites_storage`. No elimine ese volumen durante actualizaciones. Revise la salida de los procesos con `docker compose logs -f app nginx worker`.
