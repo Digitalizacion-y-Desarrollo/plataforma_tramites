@@ -18,6 +18,10 @@ class SolicitudEdicionRespuestasTest extends TestCase
 
     private string $campoRadioId;
 
+    private string $municipioId;
+
+    private string $regimenFiscalId;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -35,6 +39,12 @@ class SolicitudEdicionRespuestasTest extends TestCase
             'curp_consulta' => 'GARC900101HMCXXX01',
             'email_contacto' => 'ana@example.test',
             'telefono_contacto' => '5512345678',
+            'calle' => 'Avenida Nezahualcóyotl',
+            'numero_exterior' => '120',
+            'colonia' => 'Benito Juárez',
+            'codigo_postal' => '57000',
+            'municipio_id' => 715,
+            'regimen_fiscal_id' => $this->regimenFiscalId,
         ])->assertRedirect(route('solicitudes.show', $this->solicitudId));
 
         $this->assertDatabaseHas('solicitudes', [
@@ -105,6 +115,12 @@ class SolicitudEdicionRespuestasTest extends TestCase
             'curp_consulta' => 'GARC900101HMCXXX01',
             'email_contacto' => 'ana@example.test',
             'telefono_contacto' => '5512345678',
+            'calle' => 'Avenida Nezahualcóyotl',
+            'numero_exterior' => '120',
+            'colonia' => 'Benito Juárez',
+            'codigo_postal' => '57000',
+            'municipio_id' => 715,
+            'regimen_fiscal_id' => $this->regimenFiscalId,
         ])->assertStatus(422);
 
         $this->put(route('solicitudes.respuestas.actualizar', [$this->solicitudId, $this->seccionId]), [
@@ -241,8 +257,47 @@ class SolicitudEdicionRespuestasTest extends TestCase
             $table->softDeletes();
             $table->timestamps();
         });
+        Schema::create('municipios', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('nombre', 120);
+            $table->string('estado', 120)->nullable();
+            $table->boolean('activo')->default(true);
+            $table->timestamps();
+        });
+        Schema::create('regimenes_fiscales', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('clave', 10);
+            $table->string('nombre', 120);
+            $table->boolean('activo')->default(true);
+            $table->timestamps();
+        });
+        $this->municipioId = (string) Str::uuid();
+        DB::table('municipios')->insert(['id' => $this->municipioId, 'nombre' => 'Nezahualcóyotl', 'estado' => 'Estado de México', 'activo' => true, 'created_at' => now(), 'updated_at' => now()]);
+        $this->regimenFiscalId = (string) Str::uuid();
+        DB::table('regimenes_fiscales')->insert(['id' => $this->regimenFiscalId, 'clave' => '616', 'nombre' => 'Sin obligaciones fiscales', 'activo' => true, 'created_at' => now(), 'updated_at' => now()]);
+        Schema::create('expedientes', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('curp_consulta', 18);
+            $table->string('tipo_persona', 10);
+            $table->string('id_externo', 100)->nullable();
+            $table->string('email_contacto', 200);
+            $table->string('telefono_contacto', 30)->nullable();
+            $table->string('nombres_solicitante', 100)->nullable();
+            $table->string('apellido_paterno_solicitante', 100)->nullable();
+            $table->string('apellido_materno_solicitante', 100)->nullable();
+            $table->string('razon_social', 200)->nullable();
+            $table->string('calle', 200);
+            $table->string('numero_exterior', 30);
+            $table->string('colonia', 200);
+            $table->string('codigo_postal', 10);
+            $table->uuid('municipio_id');
+            $table->uuid('regimen_fiscal_id');
+            $table->timestamps();
+            $table->unique(['curp_consulta', 'tipo_persona']);
+        });
         Schema::create('solicitudes', function (Blueprint $table): void {
             $table->uuid('id')->primary();
+            $table->uuid('expediente_id')->nullable();
             $table->string('folio', 50);
             $table->unsignedBigInteger('tramite_id');
             $table->uuid('formulario_version_id');
@@ -254,6 +309,14 @@ class SolicitudEdicionRespuestasTest extends TestCase
             $table->string('nombres_solicitante')->nullable();
             $table->string('apellido_paterno_solicitante')->nullable();
             $table->string('apellido_materno_solicitante')->nullable();
+            $table->string('tipo_persona', 10)->nullable();
+            $table->string('razon_social', 200)->nullable();
+            $table->string('calle', 200)->nullable();
+            $table->string('numero_exterior', 30)->nullable();
+            $table->string('colonia', 200)->nullable();
+            $table->string('codigo_postal', 10)->nullable();
+            $table->uuid('municipio_id')->nullable();
+            $table->uuid('regimen_fiscal_id')->nullable();
             $table->string('flujo_pago', 30)->default('SIN_PAGO');
             $table->decimal('importe_pago', 12, 2)->nullable();
             $table->unsignedSmallInteger('pago_vigencia_dias')->nullable();

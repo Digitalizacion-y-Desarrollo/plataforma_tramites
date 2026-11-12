@@ -60,11 +60,33 @@ class ApiKeysTest extends TestCase
             $table->string('nombres_solicitante', 100)->nullable();
             $table->string('apellido_paterno_solicitante', 100)->nullable();
             $table->string('apellido_materno_solicitante', 100)->nullable();
+            $table->string('tipo_persona', 10)->nullable();
+            $table->string('razon_social', 200)->nullable();
+            $table->string('calle', 200)->nullable();
+            $table->string('numero_exterior', 30)->nullable();
+            $table->string('colonia', 200)->nullable();
+            $table->string('codigo_postal', 10)->nullable();
+            $table->uuid('municipio_id')->nullable();
+            $table->uuid('regimen_fiscal_id')->nullable();
             $table->string('flujo_pago', 30)->nullable();
             $table->decimal('importe_pago', 12, 2)->nullable();
             $table->unsignedSmallInteger('pago_vigencia_dias')->nullable();
             $table->timestamp('fecha_envio')->nullable();
             $table->timestamp('fecha_terminacion')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('municipios', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('nombre', 120);
+            $table->string('estado', 120)->nullable();
+            $table->boolean('activo')->default(true);
+            $table->timestamps();
+        });
+        Schema::create('regimenes_fiscales', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('clave', 10);
+            $table->string('nombre', 120);
+            $table->boolean('activo')->default(true);
             $table->timestamps();
         });
         Schema::create('auditorias', function (Blueprint $table): void {

@@ -4,8 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Mail\SolicitudEnviadaMail;
 use App\Mail\TokenConsultaMail;
+use App\Models\Auditoria;
 use App\Models\CanalAyuda;
 use App\Models\EstadoSolicitud;
+use App\Models\Expediente;
+use App\Models\RegimenFiscal;
 use App\Models\ServicioInteres;
 use App\Models\Solicitud;
 use App\Models\SolicitudDocumentoEmitido;
@@ -140,7 +143,47 @@ class PublicoController extends Controller
         $formularioVersion = $this->formularioActivo($tramite);
         abort_unless($formularioVersion, 404);
 
-        return view('publico.tramites.formulario', compact('tramite', 'formularioVersion'));
+        $regimenesFiscales = RegimenFiscal::query()->where('activo', true)->orderBy('clave')->get(['id', 'clave', 'nombre']);
+
+        return view('publico.tramites.formulario', compact('tramite', 'formularioVersion', 'regimenesFiscales'));
+    }
+
+    public function verificarExpediente(Request $request)
+    {
+        $datos = $request->validate([
+            'curp' => ['required', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'],
+            'tipo_persona' => ['required', 'in:FISICA,MORAL'],
+        ]);
+
+        $expediente = Expediente::query()
+            ->where('curp_consulta', Str::upper(trim($datos['curp'])))
+            ->where('tipo_persona', $datos['tipo_persona'])
+            ->first();
+
+        if (! $expediente) {
+            return response()->json(['existe' => false]);
+        }
+
+        $datosExpediente = $expediente->only([
+            'email_contacto',
+            'telefono_contacto',
+            'nombres_solicitante',
+            'apellido_paterno_solicitante',
+            'apellido_materno_solicitante',
+            'razon_social',
+            'calle',
+            'numero_exterior',
+            'colonia',
+            'codigo_postal',
+            'municipio_id',
+            'regimen_fiscal_id',
+        ]);
+        $datosExpediente['municipio_id'] = (int) $datosExpediente['municipio_id'];
+
+        return response()->json([
+            'existe' => true,
+            'datos' => $datosExpediente,
+        ]);
     }
 
     public function storeSolicitud(Request $request, Tramite $tramite)
@@ -150,14 +193,40 @@ class PublicoController extends Controller
         abort_unless($formularioVersion, 404);
         $base = $request->validate([
             'formulario_version_id' => ['required', 'uuid'],
-            'nombres_solicitante' => ['required', 'string', 'min:2', 'max:100'],
-            'apellido_paterno_solicitante' => ['required', 'string', 'min:2', 'max:100'],
-            'apellido_materno_solicitante' => ['required', 'string', 'min:2', 'max:100'],
+            'tipo_persona' => ['required', 'in:FISICA,MORAL'],
             'curp_consulta' => ['required', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'],
             'email_contacto' => ['required', 'email', 'max:200'],
-            'telefono_contacto' => ['required', 'string', 'regex:/^[0-9+()\-\s]{7,30}$/'],
+            'calle' => ['required', 'string', 'min:2', 'max:200'],
+            'numero_exterior' => ['required', 'string', 'min:1', 'max:30'],
+            'colonia' => ['required', 'string', 'min:2', 'max:200'],
+            'codigo_postal' => ['required', 'string', 'regex:/^[0-9]{5}$/'],
+            'municipio_id' => ['required', 'integer', 'in:715'],
+            'regimen_fiscal_id' => ['required', 'uuid', 'exists:regimenes_fiscales,id'],
+            'nombres_solicitante' => ['nullable', 'string', 'min:2', 'max:100'],
+            'apellido_paterno_solicitante' => ['nullable', 'string', 'min:2', 'max:100'],
+            'apellido_materno_solicitante' => ['nullable', 'string', 'min:2', 'max:100'],
+            'telefono_contacto' => ['nullable', 'string', 'regex:/^[0-9+()\-\s]{7,30}$/'],
+            'razon_social' => ['nullable', 'string', 'min:2', 'max:200'],
             'acepto_aviso_privacidad' => ['accepted'],
         ]);
+
+        if ($base['tipo_persona'] === 'FISICA') {
+            $base = array_merge($base, $request->validate([
+                'nombres_solicitante' => ['required', 'string', 'min:2', 'max:100'],
+                'apellido_paterno_solicitante' => ['required', 'string', 'min:2', 'max:100'],
+                'apellido_materno_solicitante' => ['required', 'string', 'min:2', 'max:100'],
+                'telefono_contacto' => ['required', 'string', 'regex:/^[0-9+()\-\s]{7,30}$/'],
+            ]));
+            $base['razon_social'] = null;
+        } else {
+            $base = array_merge($base, $request->validate([
+                'razon_social' => ['required', 'string', 'min:2', 'max:200'],
+            ]));
+            $base['nombres_solicitante'] = null;
+            $base['apellido_paterno_solicitante'] = null;
+            $base['apellido_materno_solicitante'] = null;
+            $base['telefono_contacto'] = null;
+        }
 
         if ($base['formulario_version_id'] !== $formularioVersion->id) {
             return back()
@@ -262,7 +331,7 @@ class PublicoController extends Controller
             return back()->withErrors($errores)->withInput();
         }
 
-        [$solicitudId, $notificacionId] = DB::transaction(function () use ($tramite, $formularioVersion, $campos, $respuestas, $base) {
+        [$solicitudId, $notificacionId] = DB::transaction(function () use ($request, $tramite, $formularioVersion, $campos, $respuestas, $base) {
             $estadoId = DB::table('solicitud_estados')->where('clave', 'ENVIADA')->where('activo', true)->value('id');
             abort_unless($estadoId, 500);
             $notificacionPendienteId = DB::table('notificacion_estados')->where('clave', 'PENDIENTE')->where('activo', true)->value('id');
@@ -271,10 +340,30 @@ class PublicoController extends Controller
             do {
                 $folio = 'SOL-'.now()->format('Ymd').'-'.Str::upper(Str::random(6));
             } while (DB::table('solicitudes')->where('folio', $folio)->exists());
-            $nombres = trim($base['nombres_solicitante']);
-            $paterno = trim($base['apellido_paterno_solicitante']);
-            $materno = trim($base['apellido_materno_solicitante']);
-            DB::table('solicitudes')->insert(['id' => $id, 'folio' => $folio, 'tramite_id' => $tramite->id, 'departamento_accesos_id_snapshot' => $tramite->departamento_accesos_id, 'departamento_nombre_snapshot' => $tramite->departamento_nombre_snapshot, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => Str::upper($base['curp_consulta']), 'email_contacto' => Str::lower(trim($base['email_contacto'])), 'telefono_contacto' => trim($base['telefono_contacto']), 'nombre_solicitante_snapshot' => implode(' ', [$nombres, $paterno, $materno]), 'nombres_solicitante' => $nombres, 'apellido_paterno_solicitante' => $paterno, 'apellido_materno_solicitante' => $materno, 'flujo_pago' => $tramite->flujo_pago ?? 'SIN_PAGO', 'importe_pago' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->costo_pago, 'pago_vigencia_dias' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->pago_vigencia_dias, 'fecha_envio' => now(), 'aviso_privacidad_aceptado_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+            $nombres = trim((string) ($base['nombres_solicitante'] ?? ''));
+            $paterno = trim((string) ($base['apellido_paterno_solicitante'] ?? ''));
+            $materno = trim((string) ($base['apellido_materno_solicitante'] ?? ''));
+            $nombreSnapshot = $base['tipo_persona'] === 'FISICA'
+                ? implode(' ', array_filter([$nombres, $paterno, $materno], fn ($valor) => filled($valor)))
+                : trim((string) $base['razon_social']);
+            $datosExpediente = [
+                'curp_consulta' => Str::upper($base['curp_consulta']),
+                'tipo_persona' => $base['tipo_persona'],
+                'email_contacto' => Str::lower(trim($base['email_contacto'])),
+                'telefono_contacto' => filled($base['telefono_contacto'] ?? null) ? trim($base['telefono_contacto']) : null,
+                'nombres_solicitante' => filled($nombres) ? $nombres : null,
+                'apellido_paterno_solicitante' => filled($paterno) ? $paterno : null,
+                'apellido_materno_solicitante' => filled($materno) ? $materno : null,
+                'razon_social' => filled($base['razon_social'] ?? null) ? trim($base['razon_social']) : null,
+                'calle' => trim($base['calle']),
+                'numero_exterior' => trim($base['numero_exterior']),
+                'colonia' => trim($base['colonia']),
+                'codigo_postal' => trim($base['codigo_postal']),
+                'municipio_id' => $base['municipio_id'],
+                'regimen_fiscal_id' => $base['regimen_fiscal_id'],
+            ];
+            $expedienteId = $this->sincronizarExpediente($request, $datosExpediente);
+            DB::table('solicitudes')->insert(['id' => $id, 'expediente_id' => $expedienteId, 'folio' => $folio, 'tramite_id' => $tramite->id, 'departamento_accesos_id_snapshot' => $tramite->departamento_accesos_id, 'departamento_nombre_snapshot' => $tramite->departamento_nombre_snapshot, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => $datosExpediente['curp_consulta'], 'email_contacto' => $datosExpediente['email_contacto'], 'telefono_contacto' => $datosExpediente['telefono_contacto'], 'nombre_solicitante_snapshot' => $nombreSnapshot, 'nombres_solicitante' => $datosExpediente['nombres_solicitante'], 'apellido_paterno_solicitante' => $datosExpediente['apellido_paterno_solicitante'], 'apellido_materno_solicitante' => $datosExpediente['apellido_materno_solicitante'], 'tipo_persona' => $datosExpediente['tipo_persona'], 'razon_social' => $datosExpediente['razon_social'], 'calle' => $datosExpediente['calle'], 'numero_exterior' => $datosExpediente['numero_exterior'], 'colonia' => $datosExpediente['colonia'], 'codigo_postal' => $datosExpediente['codigo_postal'], 'municipio_id' => $datosExpediente['municipio_id'], 'regimen_fiscal_id' => $datosExpediente['regimen_fiscal_id'], 'flujo_pago' => $tramite->flujo_pago ?? 'SIN_PAGO', 'importe_pago' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->costo_pago, 'pago_vigencia_dias' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->pago_vigencia_dias, 'fecha_envio' => now(), 'aviso_privacidad_aceptado_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
             foreach ($campos as $campo) {
                 $valor = $respuestas[$campo->id] ?? null;
                 if ($campo->tipo === 'FILE' && request()->hasFile('respuestas.'.$campo->id)) {
@@ -694,6 +783,54 @@ class PublicoController extends Controller
         }
 
         return $acceso;
+    }
+
+    private function sincronizarExpediente(Request $request, array $datos): string
+    {
+        $campos = [
+            'email_contacto',
+            'telefono_contacto',
+            'nombres_solicitante',
+            'apellido_paterno_solicitante',
+            'apellido_materno_solicitante',
+            'razon_social',
+            'calle',
+            'numero_exterior',
+            'colonia',
+            'codigo_postal',
+            'municipio_id',
+            'regimen_fiscal_id',
+        ];
+        $expediente = Expediente::query()
+            ->where('curp_consulta', $datos['curp_consulta'])
+            ->where('tipo_persona', $datos['tipo_persona'])
+            ->lockForUpdate()
+            ->first();
+
+        if (! $expediente) {
+            $expediente = Expediente::query()->create(['id' => (string) Str::uuid()] + $datos);
+            Auditoria::registrar($request, 'EXPEDIENTE_CREADO', 'EXPEDIENTE', $expediente->id, null, $expediente->only(array_merge(['curp_consulta', 'tipo_persona'], $campos)));
+
+            return $expediente->id;
+        }
+
+        $anteriores = $expediente->only($campos);
+        $nuevos = array_intersect_key($datos, array_flip($campos));
+        $cambiosAnteriores = [];
+        $cambiosNuevos = [];
+        foreach ($nuevos as $campo => $valor) {
+            if ($anteriores[$campo] != $valor) {
+                $cambiosAnteriores[$campo] = $anteriores[$campo];
+                $cambiosNuevos[$campo] = $valor;
+            }
+        }
+
+        if ($cambiosNuevos) {
+            $expediente->update($cambiosNuevos);
+            Auditoria::registrar($request, 'EXPEDIENTE_ACTUALIZADO', 'EXPEDIENTE', $expediente->id, $cambiosAnteriores, $cambiosNuevos);
+        }
+
+        return $expediente->id;
     }
 
     private function modalidadEtiqueta(Tramite $tramite): string

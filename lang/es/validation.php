@@ -170,6 +170,12 @@ return [
         'email_contacto' => [
             'email' => 'Ingresa un correo electrónico válido.',
         ],
+        'tipo_persona' => [
+            'in' => 'Selecciona si el trámite es para persona física o moral.',
+        ],
+        'codigo_postal' => [
+            'regex' => 'El código postal debe contener 5 dígitos.',
+        ],
     ],
 
     'attributes' => [
@@ -187,6 +193,14 @@ return [
         'nombres_solicitante' => 'nombre(s)',
         'apellido_paterno_solicitante' => 'apellido paterno',
         'apellido_materno_solicitante' => 'apellido materno',
+        'tipo_persona' => 'tipo de persona',
+        'razon_social' => 'razón social',
+        'calle' => 'calle',
+        'numero_exterior' => 'número exterior',
+        'colonia' => 'colonia',
+        'codigo_postal' => 'código postal',
+        'municipio_id' => 'municipio',
+        'regimen_fiscal_id' => 'régimen fiscal',
         'token' => 'código de verificación',
         'comentario' => 'comentario',
         'comprobante' => 'comprobante de pago',

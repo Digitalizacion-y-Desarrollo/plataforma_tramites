@@ -22,12 +22,20 @@
         $tieneRespuestas = $respuestasPorSeccion->isNotEmpty();
         $tieneDocumentos = $documentos->isNotEmpty();
         $datosPersonales = collect([
+            'Tipo de persona' => $solicitud->tipo_persona ? ($solicitud->tipo_persona === 'MORAL' ? 'Moral' : 'Física') : null,
+            'Razón social' => $solicitud->razon_social,
             'Nombre(s)' => $solicitud->nombres_solicitante,
             'Apellido paterno' => $solicitud->apellido_paterno_solicitante,
             'Apellido materno' => $solicitud->apellido_materno_solicitante,
             'CURP' => $solicitud->curp_consulta,
             'Correo electrónico' => $solicitud->email_contacto,
             'Teléfono' => $solicitud->telefono_contacto,
+            'Calle' => $solicitud->calle,
+            'Número exterior' => $solicitud->numero_exterior,
+            'Colonia' => $solicitud->colonia,
+            'Código postal' => $solicitud->codigo_postal,
+            'Municipio' => (int) $solicitud->municipio_id === 715 ? 'Nezahualcóyotl' : null,
+            'Régimen fiscal' => $solicitud->regimenFiscal ? $solicitud->regimenFiscal->clave.' · '.$solicitud->regimenFiscal->nombre : null,
         ])->filter(fn ($valor) => filled($valor));
         $tieneDatosProporcionados = $datosPersonales->isNotEmpty() || $tieneRespuestas;
         $capturasAdministrativasPendientes = $capturasAdministrativas->contains('incompleta', true);
@@ -258,21 +266,34 @@
                         @csrf
                         @method('PUT')
                         <input type="hidden" name="formulario" value="datos-personales">
-                        <div class="grid gap-4 sm:grid-cols-2">
-                            <div class="sm:col-span-2">
-                                <label for="editar-nombres-solicitante" class="block text-sm font-semibold text-neza-ink">Nombre(s) <span class="text-rose-700">*</span></label>
-                                <input id="editar-nombres-solicitante" name="nombres_solicitante" value="{{ old('nombres_solicitante', $solicitud->nombres_solicitante) }}" maxlength="100" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('nombres_solicitante') border-rose-600 @enderror">
-                                @error('nombres_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                        <div class="mb-4 rounded-lg border border-neza-line bg-neza-canvas px-4 py-3 text-sm"><span class="font-semibold text-neza-ink">Tipo de persona:</span> <span class="text-neza-muted">{{ $solicitud->tipo_persona === 'MORAL' ? 'Persona moral' : 'Persona física' }}</span></div>
+                        <div class="grid gap-4 sm:grid-cols-2" data-edicion-datos data-tipo-persona="{{ $solicitud->tipo_persona === 'MORAL' ? 'MORAL' : 'FISICA' }}">
+                            <div data-datos-tipo="FISICA" @class(['grid gap-4 sm:grid-cols-2 sm:col-span-2', 'hidden' => $solicitud->tipo_persona === 'MORAL'])>
+                                <div class="sm:col-span-2">
+                                    <label for="editar-nombres-solicitante" class="block text-sm font-semibold text-neza-ink">Nombre(s) <span class="text-rose-700">*</span></label>
+                                    <input id="editar-nombres-solicitante" name="nombres_solicitante" value="{{ old('nombres_solicitante', $solicitud->nombres_solicitante) }}" maxlength="100" required data-requerido-original="true" class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('nombres_solicitante') border-rose-600 @enderror">
+                                    @error('nombres_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="editar-paterno-solicitante" class="block text-sm font-semibold text-neza-ink">Apellido paterno <span class="text-rose-700">*</span></label>
+                                    <input id="editar-paterno-solicitante" name="apellido_paterno_solicitante" value="{{ old('apellido_paterno_solicitante', $solicitud->apellido_paterno_solicitante) }}" maxlength="100" required data-requerido-original="true" class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('apellido_paterno_solicitante') border-rose-600 @enderror">
+                                    @error('apellido_paterno_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="editar-materno-solicitante" class="block text-sm font-semibold text-neza-ink">Apellido materno <span class="text-rose-700">*</span></label>
+                                    <input id="editar-materno-solicitante" name="apellido_materno_solicitante" value="{{ old('apellido_materno_solicitante', $solicitud->apellido_materno_solicitante) }}" maxlength="100" required data-requerido-original="true" class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('apellido_materno_solicitante') border-rose-600 @enderror">
+                                    @error('apellido_materno_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                                </div>
+                                <div class="sm:col-span-2">
+                                    <label for="editar-telefono-contacto" class="block text-sm font-semibold text-neza-ink">Número telefónico <span class="text-rose-700">*</span></label>
+                                    <input id="editar-telefono-contacto" name="telefono_contacto" type="tel" value="{{ old('telefono_contacto', $solicitud->telefono_contacto) }}" maxlength="30" required data-requerido-original="true" class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('telefono_contacto') border-rose-600 @enderror">
+                                    @error('telefono_contacto')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                                </div>
                             </div>
-                            <div>
-                                <label for="editar-paterno-solicitante" class="block text-sm font-semibold text-neza-ink">Apellido paterno <span class="text-rose-700">*</span></label>
-                                <input id="editar-paterno-solicitante" name="apellido_paterno_solicitante" value="{{ old('apellido_paterno_solicitante', $solicitud->apellido_paterno_solicitante) }}" maxlength="100" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('apellido_paterno_solicitante') border-rose-600 @enderror">
-                                @error('apellido_paterno_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
-                            </div>
-                            <div>
-                                <label for="editar-materno-solicitante" class="block text-sm font-semibold text-neza-ink">Apellido materno <span class="text-rose-700">*</span></label>
-                                <input id="editar-materno-solicitante" name="apellido_materno_solicitante" value="{{ old('apellido_materno_solicitante', $solicitud->apellido_materno_solicitante) }}" maxlength="100" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('apellido_materno_solicitante') border-rose-600 @enderror">
-                                @error('apellido_materno_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                            <div data-datos-tipo="MORAL" @class(['sm:col-span-2', 'hidden' => $solicitud->tipo_persona !== 'MORAL'])>
+                                <label for="editar-razon-social" class="block text-sm font-semibold text-neza-ink">Razón social <span class="text-rose-700">*</span></label>
+                                <input id="editar-razon-social" name="razon_social" value="{{ old('razon_social', $solicitud->razon_social) }}" maxlength="200" required data-requerido-original="true" class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('razon_social') border-rose-600 @enderror">
+                                @error('razon_social')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
                             </div>
                             <div>
                                 <label for="editar-curp-consulta" class="block text-sm font-semibold text-neza-ink">CURP <span class="text-rose-700">*</span></label>
@@ -285,9 +306,40 @@
                                 @error('email_contacto')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
                             </div>
                             <div class="sm:col-span-2">
-                                <label for="editar-telefono-contacto" class="block text-sm font-semibold text-neza-ink">Número telefónico <span class="text-rose-700">*</span></label>
-                                <input id="editar-telefono-contacto" name="telefono_contacto" type="tel" value="{{ old('telefono_contacto', $solicitud->telefono_contacto) }}" maxlength="30" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('telefono_contacto') border-rose-600 @enderror">
-                                @error('telefono_contacto')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                                <label for="editar-calle" class="block text-sm font-semibold text-neza-ink">Calle <span class="text-rose-700">*</span></label>
+                                <input id="editar-calle" name="calle" value="{{ old('calle', $solicitud->calle) }}" maxlength="200" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('calle') border-rose-600 @enderror">
+                                @error('calle')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="editar-numero-exterior" class="block text-sm font-semibold text-neza-ink">Número exterior <span class="text-rose-700">*</span></label>
+                                <input id="editar-numero-exterior" name="numero_exterior" value="{{ old('numero_exterior', $solicitud->numero_exterior) }}" maxlength="30" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('numero_exterior') border-rose-600 @enderror">
+                                @error('numero_exterior')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="editar-colonia" class="block text-sm font-semibold text-neza-ink">Colonia <span class="text-rose-700">*</span></label>
+                                <input id="editar-colonia" name="colonia" value="{{ old('colonia', $solicitud->colonia) }}" maxlength="200" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('colonia') border-rose-600 @enderror">
+                                @error('colonia')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="editar-codigo-postal" class="block text-sm font-semibold text-neza-ink">Código postal <span class="text-rose-700">*</span></label>
+                                <input id="editar-codigo-postal" name="codigo_postal" value="{{ old('codigo_postal', $solicitud->codigo_postal) }}" maxlength="5" inputmode="numeric" pattern="[0-9]{5}" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('codigo_postal') border-rose-600 @enderror">
+                                @error('codigo_postal')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="editar-municipio-nombre" class="block text-sm font-semibold text-neza-ink">Municipio</label>
+                                <input type="hidden" name="municipio_id" value="715">
+                                <input id="editar-municipio-nombre" value="Nezahualcóyotl" disabled class="mt-2 w-full rounded-lg border border-neza-line bg-neza-canvas px-3 py-2.5 text-sm text-neza-muted">
+                                @error('municipio_id')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                            </div>
+                            <div>
+                                <label for="editar-regimen-fiscal-id" class="block text-sm font-semibold text-neza-ink">Régimen fiscal <span class="text-rose-700">*</span></label>
+                                <select id="editar-regimen-fiscal-id" name="regimen_fiscal_id" required class="mt-2 w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm focus:border-neza-wine focus:outline-none focus:ring-2 focus:ring-neza-wine-soft @error('regimen_fiscal_id') border-rose-600 @enderror">
+                                    <option value="">Selecciona un régimen fiscal</option>
+                                    @foreach ($regimenesFiscales as $regimenFiscal)
+                                        <option value="{{ $regimenFiscal->id }}" @selected(old('regimen_fiscal_id', (string) $solicitud->regimen_fiscal_id) === $regimenFiscal->id)>{{ $regimenFiscal->clave }} · {{ $regimenFiscal->nombre }}</option>
+                                    @endforeach
+                                </select>
+                                @error('regimen_fiscal_id')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
                             </div>
                         </div>
                         <p class="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">La CURP y el correo son la llave de consulta de la ciudadanía. Si los corriges, la persona deberá usar los nuevos datos para consultar su trámite.</p>
@@ -391,6 +443,19 @@
     </div>
 
     <script>
+        document.querySelectorAll('[data-edicion-datos]').forEach((bloque) => {
+            const grupos = [...bloque.querySelectorAll('[data-datos-tipo]')];
+            const tipo = bloque.dataset.tipoPersona === 'MORAL' ? 'MORAL' : 'FISICA';
+            grupos.forEach((grupo) => {
+                const visible = grupo.dataset.datosTipo === tipo;
+                grupo.hidden = !visible;
+                grupo.querySelectorAll('input, select').forEach((input) => {
+                    input.required = visible && input.dataset.requeridoOriginal === 'true';
+                    input.disabled = !visible;
+                });
+            });
+        });
+
         document.querySelectorAll('[data-domicilio-admin]').forEach((bloque) => {
             const url = bloque.dataset.indiceUrl;
             const codigoPostal = bloque.querySelector('[data-domicilio-campo="codigo_postal"]');
@@ -434,4 +499,3 @@
         });
     </script>
 @endsection
-

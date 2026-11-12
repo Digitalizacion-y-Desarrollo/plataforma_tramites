@@ -14,7 +14,7 @@ class Solicitud extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['folio', 'tramite_id', 'departamento_accesos_id_snapshot', 'departamento_nombre_snapshot', 'formulario_version_id', 'solicitud_estado_id', 'curp_consulta', 'email_contacto', 'telefono_contacto', 'nombre_solicitante_snapshot', 'nombres_solicitante', 'apellido_paterno_solicitante', 'apellido_materno_solicitante', 'flujo_pago', 'importe_pago', 'pago_vigencia_dias', 'fecha_envio', 'fecha_terminacion', 'aviso_privacidad_aceptado_at'];
+    protected $fillable = ['folio', 'expediente_id', 'tramite_id', 'departamento_accesos_id_snapshot', 'departamento_nombre_snapshot', 'formulario_version_id', 'solicitud_estado_id', 'curp_consulta', 'email_contacto', 'telefono_contacto', 'nombre_solicitante_snapshot', 'nombres_solicitante', 'apellido_paterno_solicitante', 'apellido_materno_solicitante', 'tipo_persona', 'razon_social', 'calle', 'numero_exterior', 'colonia', 'codigo_postal', 'municipio_id', 'regimen_fiscal_id', 'flujo_pago', 'importe_pago', 'pago_vigencia_dias', 'fecha_envio', 'fecha_terminacion', 'aviso_privacidad_aceptado_at'];
 
     protected function casts(): array
     {
@@ -26,9 +26,19 @@ class Solicitud extends Model
         return $this->belongsTo(Tramite::class);
     }
 
+    public function expediente(): BelongsTo
+    {
+        return $this->belongsTo(Expediente::class);
+    }
+
     public function estado(): BelongsTo
     {
         return $this->belongsTo(EstadoSolicitud::class, 'solicitud_estado_id');
+    }
+
+    public function regimenFiscal(): BelongsTo
+    {
+        return $this->belongsTo(RegimenFiscal::class);
     }
 
     public function documentoEmitido(): HasOne

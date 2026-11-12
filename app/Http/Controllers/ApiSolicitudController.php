@@ -62,6 +62,17 @@ class ApiSolicitudController extends Controller
                 'curp' => $solicitud->curp_consulta,
                 'email' => $solicitud->email_contacto,
                 'telefono' => $solicitud->telefono_contacto,
+                'tipo_persona' => $solicitud->tipo_persona,
+                'razon_social' => $solicitud->razon_social,
+                'calle' => $solicitud->calle,
+                'numero_exterior' => $solicitud->numero_exterior,
+                'colonia' => $solicitud->colonia,
+                'codigo_postal' => $solicitud->codigo_postal,
+                'municipio' => (int) $solicitud->municipio_id === 715 ? 'Nezahualcóyotl' : null,
+                'regimen_fiscal' => $solicitud->regimenFiscal ? [
+                    'clave' => $solicitud->regimenFiscal->clave,
+                    'nombre' => $solicitud->regimenFiscal->nombre,
+                ] : null,
             ],
             'area' => [
                 'id' => $solicitud->departamento_accesos_id_snapshot,

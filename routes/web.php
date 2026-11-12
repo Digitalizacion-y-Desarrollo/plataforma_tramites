@@ -27,6 +27,7 @@ Route::post('/admin/login', [AccesosSesionController::class, 'store'])->name('ac
 Route::get('/admin/cerrar-sesion', [AccesosSesionController::class, 'confirmarCierre'])->name('accesos.logout.confirm');
 Route::prefix('tramites')->name('portal.tramites.')->controller(PublicoController::class)->group(function () {
     Route::get('/', 'tramites')->name('index');
+    Route::get('/expedientes/verificar', 'verificarExpediente')->middleware('throttle:5,1')->name('expedientes.verificar');
     Route::get('/{tramite}/iniciar', 'iniciar')->name('iniciar');
     Route::post('/{tramite}/solicitudes', 'storeSolicitud')->name('solicitudes.store');
     Route::get('/{tramite}', 'detalle')->name('detalle');

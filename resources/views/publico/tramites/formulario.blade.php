@@ -47,10 +47,36 @@
                     <input type="hidden" name="formulario_version_id" value="{{ $formularioVersion->id }}">
                     <fieldset id="seccion-0" data-formulario-seccion class="space-y-5 border-b border-neza-line pb-6">
                         <legend class="flex flex-wrap items-center gap-3 text-lg font-bold">Datos para seguimiento <span class="rounded-full bg-neza-wine-soft px-3 py-1 text-xs font-bold text-neza-wine">Sección 1 de {{ $totalSecciones + 1 }}</span></legend>
-                        <div class="grid gap-5 sm:grid-cols-2"><div class="sm:col-span-2"><label for="nombres_solicitante" class="block text-sm font-semibold">Nombre(s) <span class="text-rose-700">*</span></label><input id="nombres_solicitante" name="nombres_solicitante" value="{{ old('nombres_solicitante') }}" maxlength="100" autocomplete="given-name" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('nombres_solicitante') border-rose-600 @enderror">@error('nombres_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div><div><label for="apellido_paterno_solicitante" class="block text-sm font-semibold">Apellido paterno <span class="text-rose-700">*</span></label><input id="apellido_paterno_solicitante" name="apellido_paterno_solicitante" value="{{ old('apellido_paterno_solicitante') }}" maxlength="100" autocomplete="family-name" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('apellido_paterno_solicitante') border-rose-600 @enderror">@error('apellido_paterno_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div><div><label for="apellido_materno_solicitante" class="block text-sm font-semibold">Apellido materno <span class="text-rose-700">*</span></label><input id="apellido_materno_solicitante" name="apellido_materno_solicitante" value="{{ old('apellido_materno_solicitante') }}" maxlength="100" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('apellido_materno_solicitante') border-rose-600 @enderror">@error('apellido_materno_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div></div>
-                        <div><label for="curp_consulta" class="block text-sm font-semibold">CURP <span class="text-rose-700">*</span></label><input id="curp_consulta" name="curp_consulta" value="{{ old('curp_consulta') }}" maxlength="18" required @error('curp_consulta') aria-invalid="true" aria-describedby="curp_consulta-error" @enderror class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm uppercase @error('curp_consulta') border-rose-600 @enderror">@error('curp_consulta')<p id="curp_consulta-error" class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
+                        <div data-expediente-paso="1">
+                            <label for="curp_consulta" class="block text-sm font-semibold">CURP <span class="text-rose-700">*</span></label>
+                            <input id="curp_consulta" name="curp_consulta" value="{{ old('curp_consulta') }}" maxlength="18" required data-expediente-curp data-expediente-url="{{ route('portal.tramites.expedientes.verificar') }}" @error('curp_consulta') aria-invalid="true" aria-describedby="curp_consulta-error" @enderror class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm uppercase @error('curp_consulta') border-rose-600 @enderror">
+                            <p class="mt-2 text-xs text-neza-muted">Tu CURP se usará únicamente para dar seguimiento a este trámite.</p>
+                            <p data-expediente-mensaje class="mt-2 hidden rounded-lg border px-3 py-2 text-xs" aria-live="polite"></p>
+                            @error('curp_consulta')<p id="curp_consulta-error" class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                        </div>
+                        <div data-expediente-paso="2" hidden>
+                            <label class="block text-sm font-semibold">¿El trámite es para una persona física o moral? <span class="text-rose-700">*</span></label>
+                            <div class="mt-2 flex flex-wrap gap-x-6 gap-y-2">
+                                <label class="flex items-center gap-2 text-sm text-neza-ink"><input type="radio" name="tipo_persona" value="FISICA" @checked(old('tipo_persona') === 'FISICA') required data-datos-tipo-control class="size-4 border-neza-line text-neza-wine focus:ring-neza-wine"> Persona física</label>
+                                <label class="flex items-center gap-2 text-sm text-neza-ink"><input type="radio" name="tipo_persona" value="MORAL" @checked(old('tipo_persona') === 'MORAL') required data-datos-tipo-control class="size-4 border-neza-line text-neza-wine focus:ring-neza-wine"> Persona moral</label>
+                            </div>
+                            @error('tipo_persona')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror
+                        </div>
+                        <div data-expediente-paso="3" hidden class="space-y-5">
                         <div><label for="email_contacto" class="block text-sm font-semibold">Correo electrónico <span class="text-rose-700">*</span></label><input id="email_contacto" type="email" name="email_contacto" value="{{ old('email_contacto') }}" required @error('email_contacto') aria-invalid="true" aria-describedby="email_contacto-error" @enderror class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('email_contacto') border-rose-600 @enderror">@error('email_contacto')<p id="email_contacto-error" class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
-                        <div><label for="telefono_contacto" class="block text-sm font-semibold">Número telefónico <span class="text-rose-700">*</span></label><input id="telefono_contacto" type="tel" name="telefono_contacto" value="{{ old('telefono_contacto') }}" maxlength="30" autocomplete="tel" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('telefono_contacto') border-rose-600 @enderror">@error('telefono_contacto')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
+                        <div data-datos-tipo="FISICA" hidden class="grid gap-5 sm:grid-cols-2">
+                            <div class="sm:col-span-2"><label for="nombres_solicitante" class="block text-sm font-semibold">Nombre(s) <span class="text-rose-700">*</span></label><input id="nombres_solicitante" name="nombres_solicitante" value="{{ old('nombres_solicitante') }}" maxlength="100" autocomplete="given-name" required data-requerido-original="true" class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('nombres_solicitante') border-rose-600 @enderror">@error('nombres_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
+                            <div><label for="apellido_paterno_solicitante" class="block text-sm font-semibold">Apellido paterno <span class="text-rose-700">*</span></label><input id="apellido_paterno_solicitante" name="apellido_paterno_solicitante" value="{{ old('apellido_paterno_solicitante') }}" maxlength="100" autocomplete="family-name" required data-requerido-original="true" class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('apellido_paterno_solicitante') border-rose-600 @enderror">@error('apellido_paterno_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
+                            <div><label for="apellido_materno_solicitante" class="block text-sm font-semibold">Apellido materno <span class="text-rose-700">*</span></label><input id="apellido_materno_solicitante" name="apellido_materno_solicitante" value="{{ old('apellido_materno_solicitante') }}" maxlength="100" required data-requerido-original="true" class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('apellido_materno_solicitante') border-rose-600 @enderror">@error('apellido_materno_solicitante')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
+                            <div class="sm:col-span-2"><label for="telefono_contacto" class="block text-sm font-semibold">Número telefónico <span class="text-rose-700">*</span></label><input id="telefono_contacto" type="tel" name="telefono_contacto" value="{{ old('telefono_contacto') }}" maxlength="30" autocomplete="tel" required data-requerido-original="true" class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('telefono_contacto') border-rose-600 @enderror">@error('telefono_contacto')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
+                        </div>
+                        <div data-datos-tipo="MORAL" hidden><label for="razon_social" class="block text-sm font-semibold">Razón social <span class="text-rose-700">*</span></label><input id="razon_social" name="razon_social" value="{{ old('razon_social') }}" maxlength="200" required data-requerido-original="true" class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('razon_social') border-rose-600 @enderror">@error('razon_social')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
+                        <div class="grid gap-5 sm:grid-cols-2"><div class="sm:col-span-2"><label for="calle" class="block text-sm font-semibold">Calle <span class="text-rose-700">*</span></label><input id="calle" name="calle" value="{{ old('calle') }}" maxlength="200" autocomplete="street-address" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('calle') border-rose-600 @enderror">@error('calle')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div><div><label for="numero_exterior" class="block text-sm font-semibold">Número exterior <span class="text-rose-700">*</span></label><input id="numero_exterior" name="numero_exterior" value="{{ old('numero_exterior') }}" maxlength="30" inputmode="text" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('numero_exterior') border-rose-600 @enderror">@error('numero_exterior')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div><div><label for="colonia" class="block text-sm font-semibold">Colonia <span class="text-rose-700">*</span></label><input id="colonia" name="colonia" value="{{ old('colonia') }}" maxlength="200" autocomplete="address-level3" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('colonia') border-rose-600 @enderror">@error('colonia')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div><div><label for="codigo_postal" class="block text-sm font-semibold">Código postal <span class="text-rose-700">*</span></label><input id="codigo_postal" name="codigo_postal" value="{{ old('codigo_postal') }}" maxlength="5" inputmode="numeric" pattern="[0-9]{5}" autocomplete="postal-code" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('codigo_postal') border-rose-600 @enderror">@error('codigo_postal')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div></div>
+                        <div class="grid gap-5 sm:grid-cols-2">
+                            <div><label for="municipio_nombre" class="block text-sm font-semibold">Municipio</label><input type="hidden" name="municipio_id" value="715"><input id="municipio_nombre" value="Nezahualcóyotl" disabled class="mt-2 w-full rounded-lg border border-neza-line bg-neza-canvas px-3 py-2.5 text-sm text-neza-muted">@error('municipio_id')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
+                            <div><label for="regimen_fiscal_id" class="block text-sm font-semibold">Régimen fiscal <span class="text-rose-700">*</span></label><select id="regimen_fiscal_id" name="regimen_fiscal_id" required @error('regimen_fiscal_id') aria-invalid="true" @enderror class="mt-2 w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm @error('regimen_fiscal_id') border-rose-600 @enderror"><option value="">Selecciona un régimen fiscal</option>@foreach ($regimenesFiscales as $regimenFiscal)<option value="{{ $regimenFiscal->id }}" @selected(old('regimen_fiscal_id') === $regimenFiscal->id)>{{ $regimenFiscal->clave }} · {{ $regimenFiscal->nombre }}</option>@endforeach</select>@error('regimen_fiscal_id')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
+                        </div>
+                        </div>
                     </fieldset>
                     @forelse ($secciones as $seccion)
                         <fieldset id="seccion-{{ $loop->iteration }}" data-formulario-seccion class="space-y-5 border-t border-neza-line pt-6 first:border-0 first:pt-0">
@@ -166,9 +192,61 @@ document.addEventListener('DOMContentLoaded', function () {
     if (form.dataset.asistenteSeccionesInicializado === 'true') return;
     form.dataset.asistenteSeccionesInicializado = 'true';
 
-    ['nombres_solicitante', 'apellido_paterno_solicitante', 'apellido_materno_solicitante'].forEach((name) => { form.elements[name].minLength = 2; });
+    ['nombres_solicitante', 'apellido_paterno_solicitante', 'apellido_materno_solicitante', 'razon_social'].forEach((name) => { form.elements[name].minLength = 2; });
     form.elements.curp_consulta.pattern = '[A-Za-z]{4}[0-9]{6}[A-Za-z]{6}[A-Za-z0-9][0-9]';
     form.elements.telefono_contacto.pattern = '[0-9+()\\-\\s]{7,30}';
+    const gruposTipo = [...form.querySelectorAll('[data-datos-tipo]')];
+    const aplicarTipoPersona = () => {
+        const tipo = form.querySelector('input[name="tipo_persona"]:checked')?.value ?? '';
+        gruposTipo.forEach((grupo) => {
+            const visible = grupo.dataset.datosTipo === tipo;
+            grupo.hidden = !visible;
+            grupo.querySelectorAll('input, select').forEach((input) => {
+                input.required = visible && input.dataset.requeridoOriginal === 'true';
+                input.disabled = !visible;
+            });
+        });
+    };
+    const curpExpediente = form.querySelector('[data-expediente-curp]');
+    const mensajeExpediente = form.querySelector('[data-expediente-mensaje]');
+    let consultaExpediente = 0;
+    const mostrarMensajeExpediente = (texto, existe) => {
+        if (!mensajeExpediente) return;
+        mensajeExpediente.textContent = texto;
+        mensajeExpediente.className = 'mt-2 rounded-lg border px-3 py-2 text-xs ' + (existe ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-neza-line bg-neza-canvas text-neza-muted');
+    };
+    const verificarExpediente = () => {
+        const curp = (curpExpediente?.value ?? '').trim().toUpperCase();
+        const tipo = form.querySelector('input[name="tipo_persona"]:checked')?.value;
+        const curpValida = /^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/.test(curp);
+        if (!curpValida || !tipo || !curpExpediente?.dataset.expedienteUrl) return;
+        curpExpediente.value = curp;
+        const consultaActual = ++consultaExpediente;
+        mostrarMensajeExpediente('Buscando tus datos de seguimiento…', false);
+        const url = new URL(curpExpediente.dataset.expedienteUrl, window.location.origin);
+        url.searchParams.set('curp', curp);
+        url.searchParams.set('tipo_persona', tipo);
+        fetch(url, { headers: { Accept: 'application/json' } })
+            .then((respuesta) => respuesta.ok ? respuesta.json() : Promise.reject())
+            .then((respuesta) => {
+                if (consultaActual !== consultaExpediente) return;
+                if (!respuesta.existe) {
+                    mostrarMensajeExpediente('No encontramos un expediente previo. Completa tus datos para crear uno.', false);
+                    return;
+                }
+                Object.entries(respuesta.datos).forEach(([nombre, valor]) => {
+                    const control = form.elements[nombre];
+                    if (control && valor !== null) control.value = valor;
+                });
+                mostrarMensajeExpediente('Ya encontramos tu expediente. Verifica y actualiza los datos antes de continuar.', true);
+            })
+            .catch(() => {
+                if (consultaActual === consultaExpediente) mostrarMensajeExpediente('No fue posible consultar el expediente. Puedes capturar tus datos y continuar.', false);
+            });
+    };
+    curpExpediente?.addEventListener('blur', verificarExpediente);
+    form.querySelectorAll('input[name="tipo_persona"]').forEach((radio) => radio.addEventListener('change', aplicarTipoPersona));
+    aplicarTipoPersona();
     form.querySelectorAll('[data-campo-destino] input, [data-campo-destino] select, [data-campo-destino] textarea').forEach((input) => {
         input.dataset.requeridoOriginal = input.required ? 'true' : 'false';
     });
@@ -202,15 +280,26 @@ document.addEventListener('DOMContentLoaded', function () {
     const anterior = form.querySelector('[data-seccion-anterior]');
     const siguiente = form.querySelector('[data-seccion-siguiente]');
     const enviar = form.querySelector('[data-seccion-enviar]');
+    const pasosExpediente = [...form.querySelectorAll('[data-expediente-paso]')];
+    let pasoExpediente = 1;
+    const mostrarPasoExpediente = (paso) => {
+        pasoExpediente = paso;
+        pasosExpediente.forEach((contenedor) => { contenedor.hidden = Number(contenedor.dataset.expedientePaso) !== paso; });
+        if (actual === 0) {
+            anterior.hidden = paso === 1;
+            siguiente.textContent = paso === 3 ? 'Continuar al trámite' : 'Continuar';
+        }
+    };
     const primeraSeccionConError = secciones.findIndex((seccion) => seccion.querySelector('[aria-invalid="true"], p.text-rose-700'));
     let actual = primeraSeccionConError >= 0 ? primeraSeccionConError : (privacidad.querySelector('p.text-rose-700') ? secciones.length - 1 : 0);
     const mostrar = (indice, enfocar = true) => {
         actual = indice;
         secciones.forEach((seccion, i) => { seccion.hidden = i !== actual; });
         privacidad.hidden = actual !== secciones.length - 1;
-        anterior.hidden = actual === 0;
+        anterior.hidden = actual === 0 && pasoExpediente === 1;
         siguiente.hidden = actual === secciones.length - 1;
         enviar.hidden = actual !== secciones.length - 1;
+        siguiente.textContent = actual === 0 && pasoExpediente === 3 ? 'Continuar al trámite' : 'Siguiente';
         if (enfocar) {
             const titulo = secciones[actual].querySelector('legend');
             titulo.setAttribute('tabindex', '-1');
@@ -244,7 +333,10 @@ document.addEventListener('DOMContentLoaded', function () {
 
         avanzandoSeccion = true;
         const seccionActual = actual;
-        const invalido = [...secciones[seccionActual].querySelectorAll('input, select, textarea')].find((input) => input.willValidate && !input.checkValidity());
+        const controles = seccionActual === 0
+            ? pasosExpediente.find((contenedor) => Number(contenedor.dataset.expedientePaso) === pasoExpediente)?.querySelectorAll('input, select, textarea') ?? []
+            : secciones[seccionActual].querySelectorAll('input, select, textarea');
+        const invalido = [...controles].find((input) => input.willValidate && !input.checkValidity());
         if (invalido) {
             mostrarError(invalido);
             invalido.focus();
@@ -253,15 +345,33 @@ document.addEventListener('DOMContentLoaded', function () {
             return;
         }
 
+        if (seccionActual === 0 && pasoExpediente < 3) {
+            if (pasoExpediente === 2) verificarExpediente();
+            mostrarPasoExpediente(pasoExpediente + 1);
+            window.requestAnimationFrame(() => { avanzandoSeccion = false; });
+
+            return;
+        }
+
         mostrar(seccionActual + 1);
         window.requestAnimationFrame(() => { avanzandoSeccion = false; });
     });
-    anterior.addEventListener('click', () => mostrar(actual - 1));
+    anterior.addEventListener('click', () => {
+        if (actual === 0 && pasoExpediente > 1) {
+            mostrarPasoExpediente(pasoExpediente - 1);
+
+            return;
+        }
+        mostrar(actual - 1);
+    });
     form.addEventListener('invalid', (event) => {
         const indice = secciones.findIndex((seccion) => seccion.contains(event.target));
+        const pasoConError = pasosExpediente.find((contenedor) => contenedor.contains(event.target));
+        if (pasoConError) mostrarPasoExpediente(Number(pasoConError.dataset.expedientePaso));
         if (indice >= 0 && indice !== actual) mostrar(indice, false);
         mostrarError(event.target);
     }, true);
+    mostrarPasoExpediente(pasosExpediente.find((contenedor) => contenedor.querySelector('[aria-invalid="true"], p.text-rose-700')) ? Number(pasosExpediente.find((contenedor) => contenedor.querySelector('[aria-invalid="true"], p.text-rose-700')).dataset.expedientePaso) : 1);
     mostrar(actual, false);
     const primerError = secciones[actual].querySelector('[aria-invalid="true"]');
     if (primerError && typeof primerError.focus === 'function') { primerError.focus(); primerError.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
