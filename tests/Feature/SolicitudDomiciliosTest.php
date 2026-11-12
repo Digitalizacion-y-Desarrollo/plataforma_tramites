@@ -7,6 +7,7 @@ use App\Models\Tramite;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -29,6 +30,15 @@ class SolicitudDomiciliosTest extends TestCase
         $this->withoutVite();
         $this->crearEsquemaDeSolicitud();
         Mail::fake();
+        config([
+            'services.tesoreria.url' => 'https://tesoreria.test/api',
+            'services.tesoreria.email' => 'integracion@municipio.gob.mx',
+            'services.tesoreria.password' => 'secreto',
+        ]);
+        Http::fake([
+            'https://tesoreria.test/api/auth/login' => Http::response(['access_token' => 'token-prueba'], 200),
+            'https://tesoreria.test/api/contribuyentes' => Http::response(['success' => true, 'data' => ['id' => 125]], 201),
+        ]);
         $this->withSession(['accesos' => ['id' => 'superuser-1', 'roles' => ['superuser']]]);
     }
 
@@ -103,6 +113,7 @@ class SolicitudDomiciliosTest extends TestCase
         $this->assertDatabaseCount('solicitudes', 1);
         $this->assertDatabaseCount('expedientes', 1);
         $this->assertDatabaseHas('solicitudes', ['expediente_id' => DB::table('expedientes')->value('id')]);
+        $this->assertDatabaseHas('expedientes', ['id_externo' => '125']);
         $this->assertDatabaseHas('auditorias', ['accion' => 'EXPEDIENTE_CREADO', 'entidad' => 'EXPEDIENTE']);
     }
 

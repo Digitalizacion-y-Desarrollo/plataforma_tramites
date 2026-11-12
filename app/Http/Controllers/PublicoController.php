@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Integrations\TesoreriaClient;
 use App\Mail\SolicitudEnviadaMail;
 use App\Mail\TokenConsultaMail;
 use App\Models\Auditoria;
@@ -164,7 +165,23 @@ class PublicoController extends Controller
             return response()->json(['existe' => false]);
         }
 
+        if ($expediente->tipo_persona === 'FISICA' && blank($expediente->id_externo)) {
+            try {
+                $expediente = DB::transaction(function () use ($request, $expediente): Expediente {
+                    $bloqueado = Expediente::query()->lockForUpdate()->findOrFail($expediente->id);
+                    $this->registrarExpedienteEnTesoreria($request, $bloqueado);
+
+                    return $bloqueado->fresh();
+                });
+            } catch (\RuntimeException $exception) {
+                Log::warning('No se pudo registrar el expediente en Tesorería durante su consulta.', ['expediente_id' => $expediente->id, 'exception' => $exception->getMessage()]);
+
+                return response()->json(['message' => 'No fue posible registrar tus datos en Tesorería. Intenta nuevamente más tarde.'], 422);
+            }
+        }
+
         $datosExpediente = $expediente->only([
+            'id_externo',
             'email_contacto',
             'telefono_contacto',
             'nombres_solicitante',
@@ -331,65 +348,71 @@ class PublicoController extends Controller
             return back()->withErrors($errores)->withInput();
         }
 
-        [$solicitudId, $notificacionId] = DB::transaction(function () use ($request, $tramite, $formularioVersion, $campos, $respuestas, $base) {
-            $estadoId = DB::table('solicitud_estados')->where('clave', 'ENVIADA')->where('activo', true)->value('id');
-            abort_unless($estadoId, 500);
-            $notificacionPendienteId = DB::table('notificacion_estados')->where('clave', 'PENDIENTE')->where('activo', true)->value('id');
-            abort_unless($notificacionPendienteId, 500);
-            $id = (string) Str::uuid();
-            do {
-                $folio = 'SOL-'.now()->format('Ymd').'-'.Str::upper(Str::random(6));
-            } while (DB::table('solicitudes')->where('folio', $folio)->exists());
-            $nombres = trim((string) ($base['nombres_solicitante'] ?? ''));
-            $paterno = trim((string) ($base['apellido_paterno_solicitante'] ?? ''));
-            $materno = trim((string) ($base['apellido_materno_solicitante'] ?? ''));
-            $nombreSnapshot = $base['tipo_persona'] === 'FISICA'
-                ? implode(' ', array_filter([$nombres, $paterno, $materno], fn ($valor) => filled($valor)))
-                : trim((string) $base['razon_social']);
-            $datosExpediente = [
-                'curp_consulta' => Str::upper($base['curp_consulta']),
-                'tipo_persona' => $base['tipo_persona'],
-                'email_contacto' => Str::lower(trim($base['email_contacto'])),
-                'telefono_contacto' => filled($base['telefono_contacto'] ?? null) ? trim($base['telefono_contacto']) : null,
-                'nombres_solicitante' => filled($nombres) ? $nombres : null,
-                'apellido_paterno_solicitante' => filled($paterno) ? $paterno : null,
-                'apellido_materno_solicitante' => filled($materno) ? $materno : null,
-                'razon_social' => filled($base['razon_social'] ?? null) ? trim($base['razon_social']) : null,
-                'calle' => trim($base['calle']),
-                'numero_exterior' => trim($base['numero_exterior']),
-                'colonia' => trim($base['colonia']),
-                'codigo_postal' => trim($base['codigo_postal']),
-                'municipio_id' => $base['municipio_id'],
-                'regimen_fiscal_id' => $base['regimen_fiscal_id'],
-            ];
-            $expedienteId = $this->sincronizarExpediente($request, $datosExpediente);
-            DB::table('solicitudes')->insert(['id' => $id, 'expediente_id' => $expedienteId, 'folio' => $folio, 'tramite_id' => $tramite->id, 'departamento_accesos_id_snapshot' => $tramite->departamento_accesos_id, 'departamento_nombre_snapshot' => $tramite->departamento_nombre_snapshot, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => $datosExpediente['curp_consulta'], 'email_contacto' => $datosExpediente['email_contacto'], 'telefono_contacto' => $datosExpediente['telefono_contacto'], 'nombre_solicitante_snapshot' => $nombreSnapshot, 'nombres_solicitante' => $datosExpediente['nombres_solicitante'], 'apellido_paterno_solicitante' => $datosExpediente['apellido_paterno_solicitante'], 'apellido_materno_solicitante' => $datosExpediente['apellido_materno_solicitante'], 'tipo_persona' => $datosExpediente['tipo_persona'], 'razon_social' => $datosExpediente['razon_social'], 'calle' => $datosExpediente['calle'], 'numero_exterior' => $datosExpediente['numero_exterior'], 'colonia' => $datosExpediente['colonia'], 'codigo_postal' => $datosExpediente['codigo_postal'], 'municipio_id' => $datosExpediente['municipio_id'], 'regimen_fiscal_id' => $datosExpediente['regimen_fiscal_id'], 'flujo_pago' => $tramite->flujo_pago ?? 'SIN_PAGO', 'importe_pago' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->costo_pago, 'pago_vigencia_dias' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->pago_vigencia_dias, 'fecha_envio' => now(), 'aviso_privacidad_aceptado_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
-            foreach ($campos as $campo) {
-                $valor = $respuestas[$campo->id] ?? null;
-                if ($campo->tipo === 'FILE' && request()->hasFile('respuestas.'.$campo->id)) {
-                    $archivo = request()->file('respuestas.'.$campo->id);
-                    $valor = ['nombre_original' => $archivo->getClientOriginalName(), 'storage_key' => $archivo->store('solicitudes/'.$id, 'local'), 'mime_type' => $archivo->getMimeType(), 'tamano_bytes' => $archivo->getSize()];
+        try {
+            [$solicitudId, $notificacionId] = DB::transaction(function () use ($request, $tramite, $formularioVersion, $campos, $respuestas, $base) {
+                $estadoId = DB::table('solicitud_estados')->where('clave', 'ENVIADA')->where('activo', true)->value('id');
+                abort_unless($estadoId, 500);
+                $notificacionPendienteId = DB::table('notificacion_estados')->where('clave', 'PENDIENTE')->where('activo', true)->value('id');
+                abort_unless($notificacionPendienteId, 500);
+                $id = (string) Str::uuid();
+                do {
+                    $folio = 'SOL-'.now()->format('Ymd').'-'.Str::upper(Str::random(6));
+                } while (DB::table('solicitudes')->where('folio', $folio)->exists());
+                $nombres = trim((string) ($base['nombres_solicitante'] ?? ''));
+                $paterno = trim((string) ($base['apellido_paterno_solicitante'] ?? ''));
+                $materno = trim((string) ($base['apellido_materno_solicitante'] ?? ''));
+                $nombreSnapshot = $base['tipo_persona'] === 'FISICA'
+                    ? implode(' ', array_filter([$nombres, $paterno, $materno], fn ($valor) => filled($valor)))
+                    : trim((string) $base['razon_social']);
+                $datosExpediente = [
+                    'curp_consulta' => Str::upper($base['curp_consulta']),
+                    'tipo_persona' => $base['tipo_persona'],
+                    'email_contacto' => Str::lower(trim($base['email_contacto'])),
+                    'telefono_contacto' => filled($base['telefono_contacto'] ?? null) ? trim($base['telefono_contacto']) : null,
+                    'nombres_solicitante' => filled($nombres) ? $nombres : null,
+                    'apellido_paterno_solicitante' => filled($paterno) ? $paterno : null,
+                    'apellido_materno_solicitante' => filled($materno) ? $materno : null,
+                    'razon_social' => filled($base['razon_social'] ?? null) ? trim($base['razon_social']) : null,
+                    'calle' => trim($base['calle']),
+                    'numero_exterior' => trim($base['numero_exterior']),
+                    'colonia' => trim($base['colonia']),
+                    'codigo_postal' => trim($base['codigo_postal']),
+                    'municipio_id' => $base['municipio_id'],
+                    'regimen_fiscal_id' => $base['regimen_fiscal_id'],
+                ];
+                $expedienteId = $this->sincronizarExpediente($request, $datosExpediente);
+                DB::table('solicitudes')->insert(['id' => $id, 'expediente_id' => $expedienteId, 'folio' => $folio, 'tramite_id' => $tramite->id, 'departamento_accesos_id_snapshot' => $tramite->departamento_accesos_id, 'departamento_nombre_snapshot' => $tramite->departamento_nombre_snapshot, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => $datosExpediente['curp_consulta'], 'email_contacto' => $datosExpediente['email_contacto'], 'telefono_contacto' => $datosExpediente['telefono_contacto'], 'nombre_solicitante_snapshot' => $nombreSnapshot, 'nombres_solicitante' => $datosExpediente['nombres_solicitante'], 'apellido_paterno_solicitante' => $datosExpediente['apellido_paterno_solicitante'], 'apellido_materno_solicitante' => $datosExpediente['apellido_materno_solicitante'], 'tipo_persona' => $datosExpediente['tipo_persona'], 'razon_social' => $datosExpediente['razon_social'], 'calle' => $datosExpediente['calle'], 'numero_exterior' => $datosExpediente['numero_exterior'], 'colonia' => $datosExpediente['colonia'], 'codigo_postal' => $datosExpediente['codigo_postal'], 'municipio_id' => $datosExpediente['municipio_id'], 'regimen_fiscal_id' => $datosExpediente['regimen_fiscal_id'], 'flujo_pago' => $tramite->flujo_pago ?? 'SIN_PAGO', 'importe_pago' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->costo_pago, 'pago_vigencia_dias' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->pago_vigencia_dias, 'fecha_envio' => now(), 'aviso_privacidad_aceptado_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+                foreach ($campos as $campo) {
+                    $valor = $respuestas[$campo->id] ?? null;
+                    if ($campo->tipo === 'FILE' && request()->hasFile('respuestas.'.$campo->id)) {
+                        $archivo = request()->file('respuestas.'.$campo->id);
+                        $valor = ['nombre_original' => $archivo->getClientOriginalName(), 'storage_key' => $archivo->store('solicitudes/'.$id, 'local'), 'mime_type' => $archivo->getMimeType(), 'tamano_bytes' => $archivo->getSize()];
+                    }
+                    if (filled($valor)) {
+                        DB::table('solicitud_respuestas')->insert(['id' => (string) Str::uuid(), 'solicitud_id' => $id, 'campo_id' => $campo->id, 'valor' => json_encode($valor), 'created_at' => now(), 'updated_at' => now()]);
+                    }
                 }
-                if (filled($valor)) {
-                    DB::table('solicitud_respuestas')->insert(['id' => (string) Str::uuid(), 'solicitud_id' => $id, 'campo_id' => $campo->id, 'valor' => json_encode($valor), 'created_at' => now(), 'updated_at' => now()]);
-                }
-            }
-            DB::table('solicitud_historial_estados')->insert(['id' => (string) Str::uuid(), 'solicitud_id' => $id, 'estado_nuevo_id' => $estadoId, 'comentario' => 'Solicitud enviada por la ciudadanía.', 'actor_tipo' => 'CIUDADANO', 'fecha' => now()]);
-            $notificacionId = (string) Str::uuid();
-            DB::table('notificacion_emails')->insert([
-                'id' => $notificacionId,
-                'solicitud_id' => $id,
-                'notificacion_estado_id' => $notificacionPendienteId,
-                'destinatario' => Str::lower(trim($base['email_contacto'])),
-                'tipo' => 'SOLICITUD_ENVIADA',
-                'asunto' => 'Solicitud enviada correctamente · Folio '.$folio,
-                'intentos' => 0,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
+                DB::table('solicitud_historial_estados')->insert(['id' => (string) Str::uuid(), 'solicitud_id' => $id, 'estado_nuevo_id' => $estadoId, 'comentario' => 'Solicitud enviada por la ciudadanía.', 'actor_tipo' => 'CIUDADANO', 'fecha' => now()]);
+                $notificacionId = (string) Str::uuid();
+                DB::table('notificacion_emails')->insert([
+                    'id' => $notificacionId,
+                    'solicitud_id' => $id,
+                    'notificacion_estado_id' => $notificacionPendienteId,
+                    'destinatario' => Str::lower(trim($base['email_contacto'])),
+                    'tipo' => 'SOLICITUD_ENVIADA',
+                    'asunto' => 'Solicitud enviada correctamente · Folio '.$folio,
+                    'intentos' => 0,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
 
-            return [$id, $notificacionId];
-        });
+                return [$id, $notificacionId];
+            });
+        } catch (\RuntimeException $exception) {
+            Log::warning('No se pudo registrar el contribuyente en Tesorería.', ['exception' => $exception->getMessage()]);
+
+            return back()->withInput()->withErrors(['tesoreria' => 'No fue posible registrar tus datos en Tesorería. Intenta nuevamente más tarde.']);
+        }
         $solicitud = Solicitud::query()->with('tramite')->findOrFail($solicitudId);
         $this->enviarConfirmacionSolicitud($solicitud, $notificacionId);
 
@@ -809,6 +832,7 @@ class PublicoController extends Controller
 
         if (! $expediente) {
             $expediente = Expediente::query()->create(['id' => (string) Str::uuid()] + $datos);
+            $this->registrarExpedienteEnTesoreria($request, $expediente);
             Auditoria::registrar($request, 'EXPEDIENTE_CREADO', 'EXPEDIENTE', $expediente->id, null, $expediente->only(array_merge(['curp_consulta', 'tipo_persona'], $campos)));
 
             return $expediente->id;
@@ -830,7 +854,20 @@ class PublicoController extends Controller
             Auditoria::registrar($request, 'EXPEDIENTE_ACTUALIZADO', 'EXPEDIENTE', $expediente->id, $cambiosAnteriores, $cambiosNuevos);
         }
 
+        $this->registrarExpedienteEnTesoreria($request, $expediente);
+
         return $expediente->id;
+    }
+
+    private function registrarExpedienteEnTesoreria(Request $request, Expediente $expediente): void
+    {
+        if ($expediente->tipo_persona !== 'FISICA' || filled($expediente->id_externo)) {
+            return;
+        }
+
+        $idExterno = app(TesoreriaClient::class)->registrarContribuyente($expediente);
+        $expediente->update(['id_externo' => $idExterno]);
+        Auditoria::registrar($request, 'EXPEDIENTE_REGISTRADO_TESORERIA', 'EXPEDIENTE', $expediente->id, ['id_externo' => null], ['id_externo' => $idExterno]);
     }
 
     private function modalidadEtiqueta(Tramite $tramite): string

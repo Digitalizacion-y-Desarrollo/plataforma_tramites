@@ -48,6 +48,13 @@ return [
         'system_key' => env('ACCESOS_SYSTEM_KEY'),
     ],
 
+    'tesoreria' => [
+        'url' => env('TESORERIA_API_URL', 'https://api-tramites-uat.tesoreria-neza.gob.mx/api'),
+        'email' => env('TESORERIA_API_EMAIL'),
+        'password' => env('TESORERIA_API_PASSWORD'),
+        'timeout' => (int) env('TESORERIA_API_TIMEOUT', 15),
+    ],
+
     'openai' => [
         'api_key' => env('OPENAI_API_KEY'),
         'model' => env('OPENAI_ACTA_MODEL', 'gpt-4o'),

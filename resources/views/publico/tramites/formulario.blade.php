@@ -227,7 +227,7 @@ document.addEventListener('DOMContentLoaded', function () {
         url.searchParams.set('curp', curp);
         url.searchParams.set('tipo_persona', tipo);
         fetch(url, { headers: { Accept: 'application/json' } })
-            .then((respuesta) => respuesta.ok ? respuesta.json() : Promise.reject())
+            .then((respuesta) => respuesta.ok ? respuesta.json() : respuesta.json().then((error) => Promise.reject(error.message ?? 'No fue posible consultar el expediente.')))
             .then((respuesta) => {
                 if (consultaActual !== consultaExpediente) return;
                 if (!respuesta.existe) {
@@ -240,8 +240,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
                 mostrarMensajeExpediente('Ya encontramos tu expediente. Verifica y actualiza los datos antes de continuar.', true);
             })
-            .catch(() => {
-                if (consultaActual === consultaExpediente) mostrarMensajeExpediente('No fue posible consultar el expediente. Puedes capturar tus datos y continuar.', false);
+            .catch((mensaje) => {
+                if (consultaActual === consultaExpediente) mostrarMensajeExpediente(typeof mensaje === 'string' ? mensaje : 'No fue posible consultar el expediente. Puedes capturar tus datos y continuar.', false);
             });
     };
     curpExpediente?.addEventListener('blur', verificarExpediente);
