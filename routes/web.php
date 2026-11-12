@@ -28,6 +28,8 @@ Route::get('/admin/cerrar-sesion', [AccesosSesionController::class, 'confirmarCi
 Route::prefix('tramites')->name('portal.tramites.')->controller(PublicoController::class)->group(function () {
     Route::get('/', 'tramites')->name('index');
     Route::get('/expedientes/verificar', 'verificarExpediente')->middleware('throttle:5,1')->name('expedientes.verificar');
+    Route::post('/expedientes/token', 'solicitarTokenExpediente')->middleware('throttle:5,15')->name('expedientes.token.solicitar');
+    Route::post('/expedientes/token/verificar', 'verificarTokenExpediente')->middleware('throttle:10,1')->name('expedientes.token.verificar');
     Route::get('/{tramite}/iniciar', 'iniciar')->name('iniciar');
     Route::post('/{tramite}/solicitudes', 'storeSolicitud')->name('solicitudes.store');
     Route::get('/{tramite}', 'detalle')->name('detalle');

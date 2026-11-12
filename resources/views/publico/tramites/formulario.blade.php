@@ -42,7 +42,7 @@
                     </nav>
                 @endif
 
-                <form action="{{ route('portal.tramites.solicitudes.store', $tramite) }}" method="POST" enctype="multipart/form-data" class="mt-8 space-y-8" aria-label="Formulario de {{ $tramite->nombre }}" data-formulario-preview>
+                <form action="{{ route('portal.tramites.solicitudes.store', $tramite) }}" method="POST" enctype="multipart/form-data" class="mt-8 space-y-8" aria-label="Formulario de {{ $tramite->nombre }}" data-formulario-preview data-submit-lock data-expediente-token-url="{{ route('portal.tramites.expedientes.token.solicitar') }}" data-expediente-token-verificar-url="{{ route('portal.tramites.expedientes.token.verificar') }}" data-csrf-token="{{ csrf_token() }}">
                     @csrf
                     <input type="hidden" name="formulario_version_id" value="{{ $formularioVersion->id }}">
                     <fieldset id="seccion-0" data-formulario-seccion class="space-y-5 border-b border-neza-line pb-6">
@@ -74,7 +74,6 @@
                         <div class="grid gap-5 sm:grid-cols-2"><div class="sm:col-span-2"><label for="calle" class="block text-sm font-semibold">Calle <span class="text-rose-700">*</span></label><input id="calle" name="calle" value="{{ old('calle') }}" maxlength="200" autocomplete="street-address" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('calle') border-rose-600 @enderror">@error('calle')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div><div><label for="numero_exterior" class="block text-sm font-semibold">Número exterior <span class="text-rose-700">*</span></label><input id="numero_exterior" name="numero_exterior" value="{{ old('numero_exterior') }}" maxlength="30" inputmode="text" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('numero_exterior') border-rose-600 @enderror">@error('numero_exterior')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div><div><label for="colonia" class="block text-sm font-semibold">Colonia <span class="text-rose-700">*</span></label><input id="colonia" name="colonia" value="{{ old('colonia') }}" maxlength="200" autocomplete="address-level3" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('colonia') border-rose-600 @enderror">@error('colonia')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div><div><label for="codigo_postal" class="block text-sm font-semibold">Código postal <span class="text-rose-700">*</span></label><input id="codigo_postal" name="codigo_postal" value="{{ old('codigo_postal') }}" maxlength="5" inputmode="numeric" pattern="[0-9]{5}" autocomplete="postal-code" required class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm @error('codigo_postal') border-rose-600 @enderror">@error('codigo_postal')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div></div>
                         <div class="grid gap-5 sm:grid-cols-2">
                             <div><label for="municipio_nombre" class="block text-sm font-semibold">Municipio</label><input type="hidden" name="municipio_id" value="715"><input id="municipio_nombre" value="Nezahualcóyotl" disabled class="mt-2 w-full rounded-lg border border-neza-line bg-neza-canvas px-3 py-2.5 text-sm text-neza-muted">@error('municipio_id')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
-                            <div><label for="regimen_fiscal_id" class="block text-sm font-semibold">Régimen fiscal <span class="text-rose-700">*</span></label><select id="regimen_fiscal_id" name="regimen_fiscal_id" required @error('regimen_fiscal_id') aria-invalid="true" @enderror class="mt-2 w-full rounded-lg border border-neza-line bg-white px-3 py-2.5 text-sm @error('regimen_fiscal_id') border-rose-600 @enderror"><option value="">Selecciona un régimen fiscal</option>@foreach ($regimenesFiscales as $regimenFiscal)<option value="{{ $regimenFiscal->id }}" @selected(old('regimen_fiscal_id') === $regimenFiscal->id)>{{ $regimenFiscal->clave }} · {{ $regimenFiscal->nombre }}</option>@endforeach</select>@error('regimen_fiscal_id')<p class="mt-2 text-sm text-rose-700">{{ $message }}</p>@enderror</div>
                         </div>
                         </div>
                     </fieldset>
@@ -182,6 +181,33 @@
                         <button type="submit" data-seccion-enviar class="h-12 rounded-xl bg-neza-wine px-6 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Enviar solicitud</button>
                     </div>
                 </form>
+                <div data-expediente-identidad-modal hidden class="fixed inset-0 z-50 grid place-items-center bg-neza-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="expediente-identidad-titulo">
+                    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                        <p class="text-xs font-bold uppercase tracking-wide text-neza-wine">Datos encontrados</p>
+                        <h2 id="expediente-identidad-titulo" class="mt-2 text-xl font-bold text-neza-ink">¿Eres esta persona?</h2>
+                        <p data-expediente-identidad-nombre class="mt-4 text-lg font-semibold text-neza-ink"></p>
+                        <p class="mt-3 text-sm leading-relaxed text-neza-muted">Para proteger tus datos, enviaremos un código al correo registrado si confirmas tu identidad.</p>
+                        <p data-expediente-identidad-error class="mt-3 text-sm text-rose-700" role="alert" hidden></p>
+                        <div class="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                            <button type="button" data-expediente-identidad-no class="h-11 rounded-xl border border-neza-line px-4 text-sm font-bold text-neza-wine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">No soy yo</button>
+                            <button type="button" data-expediente-identidad-si class="h-11 rounded-xl bg-neza-wine px-4 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Sí, enviar código</button>
+                        </div>
+                    </div>
+                </div>
+                <div data-expediente-token-modal hidden class="fixed inset-0 z-50 grid place-items-center bg-neza-ink/50 p-4" role="dialog" aria-modal="true" aria-labelledby="expediente-token-titulo">
+                    <div class="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+                        <p class="text-xs font-bold uppercase tracking-wide text-neza-wine">Verifica tu identidad</p>
+                        <h2 id="expediente-token-titulo" class="mt-2 text-xl font-bold text-neza-ink">Ingresa tu código</h2>
+                        <p class="mt-3 text-sm leading-relaxed text-neza-muted">Enviamos un código de seis dígitos al correo registrado.</p>
+                        <label for="expediente_token" class="mt-5 block text-sm font-semibold text-neza-ink">Código de verificación</label>
+                        <input id="expediente_token" data-expediente-token-input inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]{6}" class="mt-2 w-full rounded-lg border border-neza-line px-3 py-2.5 text-sm tracking-[0.3em] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">
+                        <p data-expediente-token-error class="mt-3 text-sm text-rose-700" role="alert" hidden></p>
+                        <div class="mt-6 flex justify-end gap-3">
+                            <button type="button" data-expediente-token-cancelar class="h-11 rounded-xl border border-neza-line px-4 text-sm font-bold text-neza-wine focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Cancelar</button>
+                            <button type="button" data-expediente-token-verificar class="h-11 rounded-xl bg-neza-wine px-4 text-sm font-bold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Verificar código</button>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </section>
@@ -209,41 +235,109 @@ document.addEventListener('DOMContentLoaded', function () {
     };
     const curpExpediente = form.querySelector('[data-expediente-curp]');
     const mensajeExpediente = form.querySelector('[data-expediente-mensaje]');
+    const modalIdentidad = form.parentElement.querySelector('[data-expediente-identidad-modal]');
+    const modalToken = form.parentElement.querySelector('[data-expediente-token-modal]');
+    const nombreIdentidad = form.parentElement.querySelector('[data-expediente-identidad-nombre]');
+    const errorIdentidad = form.parentElement.querySelector('[data-expediente-identidad-error]');
+    const errorToken = form.parentElement.querySelector('[data-expediente-token-error]');
+    const inputToken = form.parentElement.querySelector('[data-expediente-token-input]');
+    const botonIdentidadSi = form.parentElement.querySelector('[data-expediente-identidad-si]');
+    const botonTokenVerificar = form.parentElement.querySelector('[data-expediente-token-verificar]');
     let consultaExpediente = 0;
     const mostrarMensajeExpediente = (texto, existe) => {
         if (!mensajeExpediente) return;
         mensajeExpediente.textContent = texto;
         mensajeExpediente.className = 'mt-2 rounded-lg border px-3 py-2 text-xs ' + (existe ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-neza-line bg-neza-canvas text-neza-muted');
     };
-    const verificarExpediente = () => {
+    const cerrarModal = (modal) => { if (modal) modal.hidden = true; };
+    const abrirModal = (modal, foco) => { if (modal) { modal.hidden = false; window.requestAnimationFrame(() => foco?.focus()); } };
+    const mostrarErrorModal = (elemento, mensaje = '') => { if (!elemento) return; elemento.textContent = mensaje; elemento.hidden = mensaje === ''; };
+    const solicitudJson = async (url, datos) => {
+        const respuesta = await fetch(url, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', 'X-CSRF-TOKEN': form.dataset.csrfToken }, body: JSON.stringify(datos) });
+        const contenido = await respuesta.json().catch(() => ({}));
+        if (!respuesta.ok) throw new Error(contenido.message || contenido.errors?.token?.[0] || 'No fue posible completar la solicitud.');
+        return contenido;
+    };
+    const verificarExpediente = async () => {
         const curp = (curpExpediente?.value ?? '').trim().toUpperCase();
         const tipo = form.querySelector('input[name="tipo_persona"]:checked')?.value;
         const curpValida = /^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/.test(curp);
-        if (!curpValida || !tipo || !curpExpediente?.dataset.expedienteUrl) return;
+        if (!curpValida || !tipo || !curpExpediente?.dataset.expedienteUrl) return false;
         curpExpediente.value = curp;
         const consultaActual = ++consultaExpediente;
         mostrarMensajeExpediente('Buscando tus datos de seguimiento…', false);
         const url = new URL(curpExpediente.dataset.expedienteUrl, window.location.origin);
         url.searchParams.set('curp', curp);
         url.searchParams.set('tipo_persona', tipo);
-        fetch(url, { headers: { Accept: 'application/json' } })
-            .then((respuesta) => respuesta.ok ? respuesta.json() : Promise.reject())
-            .then((respuesta) => {
-                if (consultaActual !== consultaExpediente) return;
-                if (!respuesta.existe) {
-                    mostrarMensajeExpediente('No encontramos un expediente previo. Completa tus datos para crear uno.', false);
-                    return;
-                }
-                Object.entries(respuesta.datos).forEach(([nombre, valor]) => {
-                    const control = form.elements[nombre];
-                    if (control && valor !== null) control.value = valor;
-                });
-                mostrarMensajeExpediente('Ya encontramos tu expediente. Verifica y actualiza los datos antes de continuar.', true);
-            })
-            .catch(() => {
-                if (consultaActual === consultaExpediente) mostrarMensajeExpediente('No fue posible consultar el expediente. Puedes capturar tus datos y continuar.', false);
-            });
+        try {
+            const respuestaHttp = await fetch(url, { headers: { Accept: 'application/json' } });
+            if (!respuestaHttp.ok) throw new Error();
+            const respuesta = await respuestaHttp.json();
+            if (consultaActual !== consultaExpediente) return false;
+            if (!respuesta.existe) {
+                mostrarMensajeExpediente('No encontramos un expediente previo. Completa tus datos para crear uno.', false);
+
+                return true;
+            }
+            nombreIdentidad.textContent = respuesta.nombre;
+            mostrarErrorModal(errorIdentidad);
+            abrirModal(modalIdentidad, botonIdentidadSi);
+
+            return false;
+        } catch {
+            if (consultaActual === consultaExpediente) mostrarMensajeExpediente('No fue posible comprobar el expediente. Intenta nuevamente para continuar.', false);
+
+            return false;
+        }
     };
+    botonIdentidadSi?.addEventListener('click', async () => {
+        const tipo = form.querySelector('input[name="tipo_persona"]:checked')?.value;
+        botonIdentidadSi.disabled = true;
+        botonIdentidadSi.textContent = 'Enviando…';
+        mostrarErrorModal(errorIdentidad);
+        try {
+            await solicitudJson(form.dataset.expedienteTokenUrl, { curp: curpExpediente.value, tipo_persona: tipo });
+            cerrarModal(modalIdentidad);
+            inputToken.value = '';
+            mostrarErrorModal(errorToken);
+            abrirModal(modalToken, inputToken);
+        } catch (error) {
+            mostrarErrorModal(errorIdentidad, error.message);
+        } finally {
+            botonIdentidadSi.disabled = false;
+            botonIdentidadSi.textContent = 'Sí, enviar código';
+        }
+    });
+    form.parentElement.querySelector('[data-expediente-identidad-no]')?.addEventListener('click', () => {
+        cerrarModal(modalIdentidad);
+        curpExpediente.value = '';
+        mostrarMensajeExpediente('Verifica tu CURP para continuar.', false);
+        mostrarPasoExpediente(1);
+        curpExpediente.focus();
+    });
+    form.parentElement.querySelector('[data-expediente-token-cancelar]')?.addEventListener('click', () => cerrarModal(modalToken));
+    botonTokenVerificar?.addEventListener('click', async () => {
+        const token = inputToken.value.trim();
+        if (!/^[0-9]{6}$/.test(token)) { mostrarErrorModal(errorToken, 'Ingresa los seis dígitos del código.'); inputToken.focus(); return; }
+        botonTokenVerificar.disabled = true;
+        botonTokenVerificar.textContent = 'Verificando…';
+        mostrarErrorModal(errorToken);
+        try {
+            const respuesta = await solicitudJson(form.dataset.expedienteTokenVerificarUrl, { token });
+            Object.entries(respuesta.datos).forEach(([nombre, valor]) => {
+                const control = form.elements[nombre];
+                if (control && valor !== null) control.value = valor;
+            });
+            cerrarModal(modalToken);
+            mostrarMensajeExpediente('Confirmamos tu identidad. Revisamos y precargamos tus datos personales.', true);
+            mostrarPasoExpediente(3);
+        } catch (error) {
+            mostrarErrorModal(errorToken, error.message);
+        } finally {
+            botonTokenVerificar.disabled = false;
+            botonTokenVerificar.textContent = 'Verificar código';
+        }
+    });
     curpExpediente?.addEventListener('blur', verificarExpediente);
     form.querySelectorAll('input[name="tipo_persona"]').forEach((radio) => radio.addEventListener('change', aplicarTipoPersona));
     aplicarTipoPersona();
@@ -326,7 +420,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (mensaje && input.validity.valid) { mensaje.remove(); input.removeAttribute('aria-invalid'); }
     });
     let avanzandoSeccion = false;
-    siguiente.addEventListener('click', (event) => {
+    siguiente.addEventListener('click', async (event) => {
         event.preventDefault();
         event.stopPropagation();
         if (avanzandoSeccion) return;
@@ -346,7 +440,17 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (seccionActual === 0 && pasoExpediente < 3) {
-            if (pasoExpediente === 2) verificarExpediente();
+            if (pasoExpediente === 2) {
+                siguiente.disabled = true;
+                siguiente.textContent = 'Comprobando…';
+                const puedeContinuar = await verificarExpediente();
+                siguiente.disabled = false;
+                siguiente.textContent = 'Continuar';
+                if (puedeContinuar) mostrarPasoExpediente(3);
+                avanzandoSeccion = false;
+
+                return;
+            }
             mostrarPasoExpediente(pasoExpediente + 1);
             window.requestAnimationFrame(() => { avanzandoSeccion = false; });
 

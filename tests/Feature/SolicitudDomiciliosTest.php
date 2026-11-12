@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Mail\TokenExpedienteMail;
 use App\Models\Formulario;
 use App\Models\Tramite;
 use Illuminate\Database\Schema\Blueprint;
@@ -43,6 +44,7 @@ class SolicitudDomiciliosTest extends TestCase
             ->assertSee('Municipio')
             ->assertSee('Calle')
             ->assertSee('Número')
+            ->assertDontSee('Régimen fiscal')
             ->assertSee('respuestas['.$campoId.'][codigo_postal]', false)
             ->assertSee('respuestas['.$campoId.'][municipio]', false)
             ->assertDontSee('data-domicilio')
@@ -58,7 +60,7 @@ class SolicitudDomiciliosTest extends TestCase
             ->assertDontSee('data-domicilio');
     }
 
-    public function test_consulta_el_expediente_por_curp_y_tipo_de_persona_para_prellenar_datos(): void
+    public function test_reconoce_el_expediente_sin_exponer_datos_y_lo_precarga_despues_del_token(): void
     {
         DB::table('expedientes')->insert([
             'id' => (string) Str::uuid(),
@@ -82,12 +84,28 @@ class SolicitudDomiciliosTest extends TestCase
         $this->getJson(route('portal.tramites.expedientes.verificar', ['curp' => self::CURP, 'tipo_persona' => 'FISICA']))
             ->assertOk()
             ->assertJsonPath('existe', true)
-            ->assertJsonPath('datos.email_contacto', 'ana@example.test')
-            ->assertJsonPath('datos.municipio_id', 715);
+            ->assertJsonPath('nombre', 'A***** G***** L*****')
+            ->assertJsonMissingPath('datos');
 
         $this->getJson(route('portal.tramites.expedientes.verificar', ['curp' => self::CURP, 'tipo_persona' => 'MORAL']))
             ->assertOk()
             ->assertJsonPath('existe', false);
+
+        $this->postJson(route('portal.tramites.expedientes.token.solicitar'), ['curp' => self::CURP, 'tipo_persona' => 'FISICA'])
+            ->assertOk();
+        $token = '';
+        Mail::assertSent(TokenExpedienteMail::class, function (TokenExpedienteMail $correo) use (&$token): bool {
+            $token = $correo->token;
+
+            return true;
+        });
+
+        $this->postJson(route('portal.tramites.expedientes.token.verificar'), ['token' => $token])
+            ->assertOk()
+            ->assertJsonPath('datos.email_contacto', 'ana@example.test')
+            ->assertJsonPath('datos.nombres_solicitante', 'Ana')
+            ->assertJsonPath('datos.telefono_contacto', '5512345678')
+            ->assertJsonMissingPath('datos.calle');
     }
 
     public function test_documento_de_diez_megabytes_es_aceptado(): void
@@ -104,6 +122,34 @@ class SolicitudDomiciliosTest extends TestCase
         $this->assertDatabaseCount('expedientes', 1);
         $this->assertDatabaseHas('solicitudes', ['expediente_id' => DB::table('expedientes')->value('id')]);
         $this->assertDatabaseHas('auditorias', ['accion' => 'EXPEDIENTE_CREADO', 'entidad' => 'EXPEDIENTE']);
+    }
+
+    public function test_solicitud_con_expediente_existente_exige_verificacion_de_identidad(): void
+    {
+        [$tramite, , $campoId] = $this->crearFormulario();
+        DB::table('expedientes')->insert([
+            'id' => (string) Str::uuid(),
+            'curp_consulta' => self::CURP,
+            'tipo_persona' => 'FISICA',
+            'email_contacto' => 'ana@example.test',
+            'telefono_contacto' => '5512345678',
+            'nombres_solicitante' => 'Ana',
+            'apellido_paterno_solicitante' => 'García',
+            'apellido_materno_solicitante' => 'López',
+            'calle' => 'Avenida Nezahualcóyotl',
+            'numero_exterior' => '120',
+            'colonia' => 'Benito Juárez',
+            'codigo_postal' => '57000',
+            'municipio_id' => $this->municipioId,
+            'regimen_fiscal_id' => $this->regimenFiscalId,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        $this->post(route('portal.tramites.solicitudes.store', $tramite), $this->datosSolicitud($campoId, []))
+            ->assertSessionHasErrors('curp_consulta');
+
+        $this->assertDatabaseCount('solicitudes', 0);
     }
 
     public function test_documento_mayor_a_diez_megabytes_es_rechazado(): void
@@ -402,7 +448,6 @@ class SolicitudDomiciliosTest extends TestCase
             'colonia' => 'Benito Juárez',
             'codigo_postal' => '57000',
             'municipio_id' => 715,
-            'regimen_fiscal_id' => $this->regimenFiscalId,
             'acepto_aviso_privacidad' => '1',
             'respuestas' => [$campoId => $domicilio],
         ];
@@ -645,7 +690,7 @@ class SolicitudDomiciliosTest extends TestCase
             $table->string('colonia', 200);
             $table->string('codigo_postal', 10);
             $table->uuid('municipio_id');
-            $table->uuid('regimen_fiscal_id');
+            $table->uuid('regimen_fiscal_id')->nullable();
             $table->timestamps();
             $table->unique(['curp_consulta', 'tipo_persona']);
         });
@@ -724,6 +769,18 @@ class SolicitudDomiciliosTest extends TestCase
             $table->unsignedInteger('intentos')->default(0);
             $table->timestamp('fecha_envio')->nullable();
             $table->text('error')->nullable();
+            $table->timestamps();
+        });
+        Schema::create('token_consultas', function (Blueprint $table): void {
+            $table->uuid('id')->primary();
+            $table->string('curp', 18);
+            $table->string('email_destino', 200);
+            $table->string('proposito', 30)->default('CONSULTA');
+            $table->string('token_hash', 255);
+            $table->timestamp('fecha_expiracion');
+            $table->timestamp('fecha_utilizacion')->nullable();
+            $table->unsignedInteger('intentos')->default(0);
+            $table->boolean('utilizado')->default(false);
             $table->timestamps();
         });
 

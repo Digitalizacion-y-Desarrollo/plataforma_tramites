@@ -4,11 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Mail\SolicitudEnviadaMail;
 use App\Mail\TokenConsultaMail;
+use App\Mail\TokenExpedienteMail;
 use App\Models\Auditoria;
 use App\Models\CanalAyuda;
 use App\Models\EstadoSolicitud;
 use App\Models\Expediente;
-use App\Models\RegimenFiscal;
 use App\Models\ServicioInteres;
 use App\Models\Solicitud;
 use App\Models\SolicitudDocumentoEmitido;
@@ -143,9 +143,7 @@ class PublicoController extends Controller
         $formularioVersion = $this->formularioActivo($tramite);
         abort_unless($formularioVersion, 404);
 
-        $regimenesFiscales = RegimenFiscal::query()->where('activo', true)->orderBy('clave')->get(['id', 'clave', 'nombre']);
-
-        return view('publico.tramites.formulario', compact('tramite', 'formularioVersion', 'regimenesFiscales'));
+        return view('publico.tramites.formulario', compact('tramite', 'formularioVersion'));
     }
 
     public function verificarExpediente(Request $request)
@@ -158,32 +156,121 @@ class PublicoController extends Controller
         $expediente = Expediente::query()
             ->where('curp_consulta', Str::upper(trim($datos['curp'])))
             ->where('tipo_persona', $datos['tipo_persona'])
+            ->latest('updated_at')
             ->first();
 
         if (! $expediente) {
             return response()->json(['existe' => false]);
         }
 
-        $datosExpediente = $expediente->only([
-            'email_contacto',
-            'telefono_contacto',
-            'nombres_solicitante',
-            'apellido_paterno_solicitante',
-            'apellido_materno_solicitante',
-            'razon_social',
-            'calle',
-            'numero_exterior',
-            'colonia',
-            'codigo_postal',
-            'municipio_id',
-            'regimen_fiscal_id',
-        ]);
-        $datosExpediente['municipio_id'] = (int) $datosExpediente['municipio_id'];
-
         return response()->json([
             'existe' => true,
-            'datos' => $datosExpediente,
+            'nombre' => $this->nombreExpedienteEnmascarado($expediente),
         ]);
+    }
+
+    public function solicitarTokenExpediente(Request $request)
+    {
+        $datos = $request->validate([
+            'curp' => ['required', 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'],
+            'tipo_persona' => ['required', 'in:FISICA,MORAL'],
+        ]);
+        $curp = Str::upper(trim($datos['curp']));
+        $expediente = Expediente::query()->where('curp_consulta', $curp)
+            ->where('tipo_persona', $datos['tipo_persona'])->latest('updated_at')->first();
+
+        abort_unless($expediente, 404);
+
+        $clave = 'expediente-token:'.hash('sha256', $expediente->id);
+        if (RateLimiter::tooManyAttempts($clave, 3)) {
+            return response()->json(['message' => 'Espera unos minutos antes de solicitar otro código.'], 429);
+        }
+        RateLimiter::hit($clave, 900);
+
+        $token = (string) random_int(100000, 999999);
+        $tokenId = (string) Str::uuid();
+        DB::transaction(function () use ($expediente, $token, $tokenId): void {
+            DB::table('token_consultas')->where('curp', $expediente->curp_consulta)
+                ->where('email_destino', Str::lower($expediente->email_contacto))
+                ->where('proposito', 'EXPEDIENTE')
+                ->where('utilizado', false)
+                ->update(['utilizado' => true, 'updated_at' => now()]);
+            DB::table('token_consultas')->insert([
+                'id' => $tokenId,
+                'curp' => $expediente->curp_consulta,
+                'email_destino' => Str::lower($expediente->email_contacto),
+                'proposito' => 'EXPEDIENTE',
+                'token_hash' => hash_hmac('sha256', $token, (string) config('app.key')),
+                'fecha_expiracion' => now()->addMinutes(15),
+                'intentos' => 0,
+                'utilizado' => false,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+        });
+
+        try {
+            Mail::to($expediente->email_contacto)->send(new TokenExpedienteMail($token));
+        } catch (\Throwable $exception) {
+            DB::table('token_consultas')->where('id', $tokenId)->update(['utilizado' => true, 'updated_at' => now()]);
+            Log::error('No se pudo enviar el token de expediente.', ['token_consulta_id' => $tokenId, 'exception' => $exception]);
+
+            return response()->json(['message' => 'No fue posible enviar el código. Intenta nuevamente más tarde.'], 503);
+        }
+
+        $request->session()->put('expediente_token_pendiente', [
+            'id' => $expediente->id,
+            'curp' => $expediente->curp_consulta,
+            'email' => Str::lower($expediente->email_contacto),
+            'tipo_persona' => $expediente->tipo_persona,
+            'expira' => now()->addMinutes(15)->timestamp,
+        ]);
+
+        return response()->json(['message' => 'Te enviamos un código de verificación al correo registrado.']);
+    }
+
+    public function verificarTokenExpediente(Request $request)
+    {
+        $datos = $request->validate(['token' => ['required', 'digits:6']]);
+        $pendiente = $request->session()->get('expediente_token_pendiente');
+        if (! is_array($pendiente) || ! isset($pendiente['id'], $pendiente['curp'], $pendiente['email'], $pendiente['tipo_persona'], $pendiente['expira']) || now()->timestamp >= $pendiente['expira']) {
+            $request->session()->forget('expediente_token_pendiente');
+
+            return response()->json(['message' => 'El código venció. Solicita uno nuevo.'], 422);
+        }
+
+        $resultado = DB::transaction(function () use ($pendiente, $datos) {
+            $registro = DB::table('token_consultas')->where('curp', $pendiente['curp'])
+                ->where('email_destino', $pendiente['email'])->where('proposito', 'EXPEDIENTE')
+                ->where('utilizado', false)->latest('created_at')->lockForUpdate()->first();
+            if (! $registro || now()->greaterThanOrEqualTo($registro->fecha_expiracion) || $registro->intentos >= 5) {
+                return null;
+            }
+            if (! hash_equals($registro->token_hash, hash_hmac('sha256', $datos['token'], (string) config('app.key')))) {
+                $intentos = $registro->intentos + 1;
+                DB::table('token_consultas')->where('id', $registro->id)->update(['intentos' => $intentos, 'utilizado' => $intentos >= 5, 'updated_at' => now()]);
+
+                return null;
+            }
+            DB::table('token_consultas')->where('id', $registro->id)->update(['utilizado' => true, 'fecha_utilizacion' => now(), 'updated_at' => now()]);
+
+            return Expediente::query()->find($pendiente['id']);
+        });
+
+        if (! $resultado) {
+            return response()->json(['message' => 'El código es inválido, venció o alcanzó el límite de intentos.'], 422);
+        }
+
+        $datosExpediente = $resultado->only(['email_contacto', 'telefono_contacto', 'nombres_solicitante', 'apellido_paterno_solicitante', 'apellido_materno_solicitante']);
+        $request->session()->forget('expediente_token_pendiente');
+        $request->session()->put('expediente_verificado', [
+            'id' => $resultado->id,
+            'curp' => $resultado->curp_consulta,
+            'tipo_persona' => $resultado->tipo_persona,
+            'expira' => now()->addMinutes(30)->timestamp,
+        ]);
+
+        return response()->json(['datos' => $datosExpediente]);
     }
 
     public function storeSolicitud(Request $request, Tramite $tramite)
@@ -201,7 +288,6 @@ class PublicoController extends Controller
             'colonia' => ['required', 'string', 'min:2', 'max:200'],
             'codigo_postal' => ['required', 'string', 'regex:/^[0-9]{5}$/'],
             'municipio_id' => ['required', 'integer', 'in:715'],
-            'regimen_fiscal_id' => ['required', 'uuid', 'exists:regimenes_fiscales,id'],
             'nombres_solicitante' => ['nullable', 'string', 'min:2', 'max:100'],
             'apellido_paterno_solicitante' => ['nullable', 'string', 'min:2', 'max:100'],
             'apellido_materno_solicitante' => ['nullable', 'string', 'min:2', 'max:100'],
@@ -232,6 +318,20 @@ class PublicoController extends Controller
             return back()
                 ->withInput()
                 ->withErrors(['formulario_version_id' => 'El formulario cambió mientras lo llenabas. Recarga la página para continuar con la versión vigente.']);
+        }
+
+        $curp = Str::upper(trim($base['curp_consulta']));
+        $expedienteExistente = Expediente::query()->where('curp_consulta', $curp)->where('tipo_persona', $base['tipo_persona'])->first();
+        if ($expedienteExistente) {
+            $verificado = $request->session()->get('expediente_verificado');
+            $esVerificacionVigente = is_array($verificado)
+                && ($verificado['id'] ?? null) === $expedienteExistente->id
+                && ($verificado['curp'] ?? null) === $curp
+                && ($verificado['tipo_persona'] ?? null) === $base['tipo_persona']
+                && now()->timestamp < ($verificado['expira'] ?? 0);
+            if (! $esVerificacionVigente) {
+                return back()->withInput()->withErrors(['curp_consulta' => 'Confirma tu identidad con el código enviado al correo registrado para continuar.']);
+            }
         }
 
         $solicitudActiva = Solicitud::query()
@@ -360,10 +460,9 @@ class PublicoController extends Controller
                 'colonia' => trim($base['colonia']),
                 'codigo_postal' => trim($base['codigo_postal']),
                 'municipio_id' => $base['municipio_id'],
-                'regimen_fiscal_id' => $base['regimen_fiscal_id'],
             ];
             $expedienteId = $this->sincronizarExpediente($request, $datosExpediente);
-            DB::table('solicitudes')->insert(['id' => $id, 'expediente_id' => $expedienteId, 'folio' => $folio, 'tramite_id' => $tramite->id, 'departamento_accesos_id_snapshot' => $tramite->departamento_accesos_id, 'departamento_nombre_snapshot' => $tramite->departamento_nombre_snapshot, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => $datosExpediente['curp_consulta'], 'email_contacto' => $datosExpediente['email_contacto'], 'telefono_contacto' => $datosExpediente['telefono_contacto'], 'nombre_solicitante_snapshot' => $nombreSnapshot, 'nombres_solicitante' => $datosExpediente['nombres_solicitante'], 'apellido_paterno_solicitante' => $datosExpediente['apellido_paterno_solicitante'], 'apellido_materno_solicitante' => $datosExpediente['apellido_materno_solicitante'], 'tipo_persona' => $datosExpediente['tipo_persona'], 'razon_social' => $datosExpediente['razon_social'], 'calle' => $datosExpediente['calle'], 'numero_exterior' => $datosExpediente['numero_exterior'], 'colonia' => $datosExpediente['colonia'], 'codigo_postal' => $datosExpediente['codigo_postal'], 'municipio_id' => $datosExpediente['municipio_id'], 'regimen_fiscal_id' => $datosExpediente['regimen_fiscal_id'], 'flujo_pago' => $tramite->flujo_pago ?? 'SIN_PAGO', 'importe_pago' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->costo_pago, 'pago_vigencia_dias' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->pago_vigencia_dias, 'fecha_envio' => now(), 'aviso_privacidad_aceptado_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
+            DB::table('solicitudes')->insert(['id' => $id, 'expediente_id' => $expedienteId, 'folio' => $folio, 'tramite_id' => $tramite->id, 'departamento_accesos_id_snapshot' => $tramite->departamento_accesos_id, 'departamento_nombre_snapshot' => $tramite->departamento_nombre_snapshot, 'formulario_version_id' => $formularioVersion->id, 'solicitud_estado_id' => $estadoId, 'curp_consulta' => $datosExpediente['curp_consulta'], 'email_contacto' => $datosExpediente['email_contacto'], 'telefono_contacto' => $datosExpediente['telefono_contacto'], 'nombre_solicitante_snapshot' => $nombreSnapshot, 'nombres_solicitante' => $datosExpediente['nombres_solicitante'], 'apellido_paterno_solicitante' => $datosExpediente['apellido_paterno_solicitante'], 'apellido_materno_solicitante' => $datosExpediente['apellido_materno_solicitante'], 'tipo_persona' => $datosExpediente['tipo_persona'], 'razon_social' => $datosExpediente['razon_social'], 'calle' => $datosExpediente['calle'], 'numero_exterior' => $datosExpediente['numero_exterior'], 'colonia' => $datosExpediente['colonia'], 'codigo_postal' => $datosExpediente['codigo_postal'], 'municipio_id' => $datosExpediente['municipio_id'], 'flujo_pago' => $tramite->flujo_pago ?? 'SIN_PAGO', 'importe_pago' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->costo_pago, 'pago_vigencia_dias' => $tramite->flujo_pago === 'SIN_PAGO' ? null : $tramite->pago_vigencia_dias, 'fecha_envio' => now(), 'aviso_privacidad_aceptado_at' => now(), 'created_at' => now(), 'updated_at' => now()]);
             foreach ($campos as $campo) {
                 $valor = $respuestas[$campo->id] ?? null;
                 if ($campo->tipo === 'FILE' && request()->hasFile('respuestas.'.$campo->id)) {
@@ -391,6 +490,7 @@ class PublicoController extends Controller
             return [$id, $notificacionId];
         });
         $solicitud = Solicitud::query()->with('tramite')->findOrFail($solicitudId);
+        $request->session()->forget('expediente_verificado');
         $this->enviarConfirmacionSolicitud($solicitud, $notificacionId);
 
         return redirect()->route('portal.tramites.iniciar', $tramite)->with('solicitud_enviada', [
@@ -785,6 +885,25 @@ class PublicoController extends Controller
         return $acceso;
     }
 
+    private function nombreExpedienteEnmascarado(Expediente $expediente): string
+    {
+        $partes = $expediente->tipo_persona === 'MORAL'
+            ? [$expediente->razon_social]
+            : [$expediente->nombres_solicitante, $expediente->apellido_paterno_solicitante, $expediente->apellido_materno_solicitante];
+
+        $enmascaradas = collect($partes)
+            ->filter(fn ($parte) => filled($parte))
+            ->map(function (string $parte): string {
+                return collect(preg_split('/\s+/u', trim($parte)))
+                    ->filter()
+                    ->map(fn (string $palabra) => mb_substr($palabra, 0, 1).'*****')
+                    ->implode(' ');
+            })
+            ->implode(' ');
+
+        return $enmascaradas !== '' ? $enmascaradas : 'Persona registrada';
+    }
+
     private function sincronizarExpediente(Request $request, array $datos): string
     {
         $campos = [
@@ -799,7 +918,6 @@ class PublicoController extends Controller
             'colonia',
             'codigo_postal',
             'municipio_id',
-            'regimen_fiscal_id',
         ];
         $expediente = Expediente::query()
             ->where('curp_consulta', $datos['curp_consulta'])
