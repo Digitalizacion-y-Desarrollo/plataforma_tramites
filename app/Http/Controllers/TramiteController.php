@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Integrations\AccesosClient;
+use App\Integrations\TesoreriaClient;
 use App\Models\AreaOperativa;
 use App\Models\Auditoria;
 use App\Models\FormularioVersion;
@@ -10,6 +11,7 @@ use App\Models\Tramite;
 use App\Models\TramiteEstado;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -95,6 +97,17 @@ class TramiteController extends Controller
         return $this->index($accesos);
     }
 
+    public function tramitesTesoreria(TesoreriaClient $tesoreria)
+    {
+        try {
+            return response()->json(['data' => $tesoreria->tramitesCatalogo()]);
+        } catch (\Throwable $exception) {
+            Log::warning('No fue posible consultar el catálogo de trámites de Tesorería.', ['exception' => $exception]);
+
+            return response()->json(['message' => 'No fue posible cargar los trámites de Tesorería. Intenta nuevamente.'], 503);
+        }
+    }
+
     /**
      * Show the form for creating a new resource.
      */
@@ -111,6 +124,7 @@ class TramiteController extends Controller
         $request->merge(['requisitos' => $this->normalizarRequisitos($request->input('requisitos', []))]);
         $datos = $request->validate([
             'nombre' => ['required', 'string', 'max:200'],
+            'id_tramite_tesoreria' => ['nullable', 'integer', 'min:1'],
             'descripcion' => ['nullable', 'string'],
             'departamento_accesos_id' => ['required', 'string', 'max:100'],
             'formulario_version_id' => ['nullable', 'uuid'],
@@ -141,7 +155,7 @@ class TramiteController extends Controller
 
         DB::transaction(function () use ($datos, $request, $departamento): void {
             $tramite = Tramite::create([
-                'clave' => $this->generarClave(), 'nombre' => $datos['nombre'], 'descripcion' => $datos['descripcion'] ?? null,
+                'clave' => $this->generarClave(), 'id_tramite_tesoreria' => $datos['id_tramite_tesoreria'] ?? null, 'nombre' => $datos['nombre'], 'descripcion' => $datos['descripcion'] ?? null,
                 'departamento_accesos_id' => $departamento['id'], 'departamento_nombre_snapshot' => $departamento['nombre'],
                 ...$this->datosPublicos($datos), ...$this->datosDetalleAdministrativo($datos), 'activo' => $request->boolean('activo'),
                 'tramite_estado_id' => $this->estadoId('BORRADOR'),
@@ -179,6 +193,7 @@ class TramiteController extends Controller
         $request->merge(['requisitos' => $this->normalizarRequisitos($request->input('requisitos', []))]);
         $datos = $request->validate([
             'nombre' => ['required', 'string', 'max:200'],
+            'id_tramite_tesoreria' => ['nullable', 'integer', 'min:1'],
             'descripcion' => ['nullable', 'string'],
             'departamento_accesos_id' => ['required', 'string', 'max:100'],
             'formulario_version_id' => ['nullable', 'uuid'],
@@ -210,7 +225,7 @@ class TramiteController extends Controller
         DB::transaction(function () use ($catalogo_tramite, $datos, $request, $departamento): void {
             $anteriores = $this->datosAuditoria($catalogo_tramite);
             $catalogo_tramite->update([
-                'nombre' => $datos['nombre'], 'descripcion' => $datos['descripcion'] ?? null,
+                'id_tramite_tesoreria' => $datos['id_tramite_tesoreria'] ?? null, 'nombre' => $datos['nombre'], 'descripcion' => $datos['descripcion'] ?? null,
                 'departamento_accesos_id' => $departamento['id'], 'departamento_nombre_snapshot' => $departamento['nombre'],
                 ...$this->datosPublicos($datos), ...$this->datosDetalleAdministrativo($datos), 'activo' => $request->boolean('activo'),
             ]);
@@ -292,7 +307,7 @@ class TramiteController extends Controller
     private function datosAuditoria(Tramite $tramite): array
     {
         return $tramite->only([
-            'clave', 'nombre', 'descripcion', 'departamento_accesos_id', 'departamento_nombre_snapshot',
+            'clave', 'id_tramite_tesoreria', 'nombre', 'descripcion', 'departamento_accesos_id', 'departamento_nombre_snapshot',
             'activo', 'tramite_estado_id', 'duracion', 'costo', 'costo_pago', 'flujo_pago',
             'pago_vigencia_dias', 'tiempo_estimado', 'modalidades', 'requisitos', 'proceso',
             'preguntas_frecuentes', 'descarga_expira_dias',

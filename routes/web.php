@@ -135,6 +135,7 @@ Route::prefix('admin')->middleware('accesos.auth')->group(function () {
             Route::delete('grupos-campos/{grupo}/campos/{campo}', 'destroyCampoGrupo')->name('formulario.grupos-campos.campos.destroy');
             Route::post('grupos-campos/{grupo}/condiciones', 'storeCondicionGrupo')->name('formulario.grupos-campos.condiciones.store');
         });
+        Route::get('catalogo-tramites/tesoreria', [TramiteController::class, 'tramitesTesoreria'])->name('catalogo-tramites.tesoreria');
         Route::resource('catalogo-tramites', TramiteController::class);
         Route::get('catalogo-servicios', [TramiteController::class, 'servicios'])->name('catalogo-servicios.index');
         Route::patch('catalogo-tramites/{catalogo_tramite}/estado', [TramiteController::class, 'cambiarEstado'])->name('catalogo-tramites.estado');

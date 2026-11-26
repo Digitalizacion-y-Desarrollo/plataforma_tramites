@@ -13,6 +13,7 @@ class Tramite extends Model
 
     protected $fillable = [
         'clave',
+        'id_tramite_tesoreria',
         'nombre',
         'descripcion',
         'departamento_accesos_id',
@@ -42,6 +43,7 @@ class Tramite extends Model
     {
         return [
             'activo' => 'boolean',
+            'id_tramite_tesoreria' => 'integer',
             'costo' => 'array',
             'modalidades' => 'array',
             'requisitos' => 'array',

@@ -49,4 +49,32 @@ class TesoreriaClientTest extends TestCase
                 && $request['regimen_fiscal_id'] === 616;
         });
     }
+
+    public function test_it_reads_the_procedures_catalog_with_a_bearer_token(): void
+    {
+        config()->set('services.tesoreria.url', 'https://tesoreria.example.test/api');
+        config()->set('services.tesoreria.email', 'integracion@example.test');
+        config()->set('services.tesoreria.password', 'secreto');
+        config()->set('services.tesoreria.ca_bundle', null);
+
+        Http::fake([
+            'tesoreria.example.test/api/auth/login' => Http::response(['access_token' => 'token-prueba']),
+            'tesoreria.example.test/api/catalogo/tramites' => Http::response(['data' => [[
+                'id_area' => 46,
+                'nombre' => 'Secretaría del Ayuntamiento',
+                'tramites' => [['id_tramite' => 715, 'nombre' => 'Constancia de identidad']],
+            ]]]),
+        ]);
+
+        $tramites = app(TesoreriaClient::class)->tramitesCatalogo();
+
+        $this->assertSame([[
+            'id' => 715,
+            'nombre' => 'Constancia de identidad',
+            'area_nombre' => 'Secretaría del Ayuntamiento',
+        ]], $tramites);
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'GET'
+            && $request->url() === 'https://tesoreria.example.test/api/catalogo/tramites'
+            && $request->hasHeader('Authorization', 'Bearer token-prueba'));
+    }
 }

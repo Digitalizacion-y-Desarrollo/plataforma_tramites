@@ -225,6 +225,38 @@ document.querySelectorAll('[data-tramite-departamento]').forEach((departamento) 
     actualizarFormulariosDeTramite(departamento.closest('form'));
 });
 
+document.querySelectorAll('[data-tesoreria-tramites-url]').forEach(async (campo) => {
+    const lista = document.getElementById(campo.getAttribute('list'));
+    const estado = document.getElementById(campo.dataset.tesoreriaTramitesStatus);
+    if (!lista) return;
+
+    try {
+        const respuesta = await fetch(campo.dataset.tesoreriaTramitesUrl, { headers: { Accept: 'application/json' } });
+        const contenido = await respuesta.json().catch(() => ({}));
+        if (!respuesta.ok) throw new Error(contenido.message);
+
+        const tramites = Array.isArray(contenido.data) ? contenido.data : [];
+        const normalizarSeleccion = () => {
+            const coincidencia = campo.value.match(/^([0-9]+)\s+-/);
+            if (coincidencia) campo.value = coincidencia[1];
+        };
+        lista.replaceChildren(...tramites.map((tramite) => {
+            const id = tramite.id ?? tramite.id_tramite ?? tramite.tramite_id;
+            const nombre = tramite.nombre ?? tramite.descripcion ?? tramite.name ?? '';
+            const opcion = document.createElement('option');
+            opcion.value = nombre ? `${id} - ${nombre}` : String(id);
+            opcion.label = tramite.area_nombre ? `${nombre} (${tramite.area_nombre})` : nombre;
+
+            return opcion;
+        }).filter((opcion) => opcion.value !== 'undefined'));
+        campo.addEventListener('change', normalizarSeleccion);
+        campo.closest('form')?.addEventListener('submit', normalizarSeleccion);
+        if (estado) estado.textContent = tramites.length ? 'Escribe para buscar y selecciona un trámite de Tesorería.' : 'No hay trámites disponibles en Tesorería.';
+    } catch {
+        if (estado) estado.textContent = 'No fue posible cargar el catálogo de Tesorería. Puedes capturar el identificador manualmente.';
+    }
+});
+
 const botonMenu = document.querySelector('[data-menu-movil-toggle]');
 const menuMovil = document.querySelector('[data-menu-movil]');
 const iconoMenuAbierto = document.querySelector('[data-menu-movil-abierto]');
@@ -495,6 +527,7 @@ document.querySelectorAll('[data-modal-open]').forEach((boton) => {
             formulario.querySelector('[name="update_url"]').value = boton.dataset.tramiteUpdateUrl;
             formulario.querySelector('[name="clave_visual"]').value = boton.dataset.tramiteClave;
             clave.value = boton.dataset.tramiteClave;
+            modal.querySelector('#editar-id-tramite-tesoreria').value = boton.dataset.tramiteIdTramiteTesoreria || '';
             nombre.value = boton.dataset.tramiteNombre;
             descripcion.value = boton.dataset.tramiteDescripcion;
             modal.querySelector('#editar-departamento').value = boton.dataset.tramiteDepartamento || '';

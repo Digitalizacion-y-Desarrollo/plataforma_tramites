@@ -30,6 +30,30 @@ class TesoreriaClient
             ->json('data', []);
     }
 
+    public function tramitesCatalogo(): array
+    {
+        $respuesta = $this->autenticada()->get($this->url('/catalogo/tramites'))->throw();
+        $datos = $respuesta->json('data', $respuesta->json());
+
+        $datos = is_array($datos) ? ($datos['data'] ?? $datos) : [];
+        $catalogoPorAreas = collect($datos)->contains(fn ($elemento) => is_array($elemento) && array_key_exists('tramites', $elemento));
+
+        if (! $catalogoPorAreas) {
+            return $datos;
+        }
+
+        return collect($datos)
+            ->flatMap(fn (array $area) => collect($area['tramites'] ?? [])
+                ->map(fn (array $tramite) => [
+                    'id' => $tramite['id_tramite'] ?? null,
+                    'nombre' => $tramite['nombre'] ?? null,
+                    'area_nombre' => $area['nombre'] ?? null,
+                ]))
+            ->filter(fn (array $tramite) => filled($tramite['id']))
+            ->values()
+            ->all();
+    }
+
     public function registrarContribuyente(Expediente $expediente): string
     {
         $respuesta = $this->autenticada()->post($this->url('/contribuyentes'), $this->datosContribuyente($expediente))->throw();
