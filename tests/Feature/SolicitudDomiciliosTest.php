@@ -6,8 +6,11 @@ use App\Mail\TokenExpedienteMail;
 use App\Models\Formulario;
 use App\Models\Tramite;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Http\Client\Factory as HttpFactory;
+use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
@@ -30,6 +33,24 @@ class SolicitudDomiciliosTest extends TestCase
         $this->withoutVite();
         $this->crearEsquemaDeSolicitud();
         Mail::fake();
+        Http::fake([
+            '*/api/auth/login' => Http::response(['access_token' => 'token-prueba']),
+            '*/api/contribuyentes/buscar/curp/*' => Http::response(['existe' => false]),
+            '*/api/contribuyentes/*' => Http::response(['data' => [
+                'correo' => 'ana@example.test',
+                'celular' => '5512345678',
+                'nombre' => 'Ana',
+                'apellidoPaterno' => 'García',
+                'apellidoMaterno' => 'López',
+                'calle' => 'Avenida Nezahualcóyotl',
+                'numeroExterior' => '120',
+                'colonia' => 'Benito Juárez',
+                'codigoPostal' => '57000',
+                'regimenFiscalId' => 605,
+            ]]),
+            '*/api/contribuyentes' => Http::response(['contribuyente_id' => 125]),
+            '*/api/catalogo/regimenes-fiscales*' => Http::response(['data' => []]),
+        ]);
         $this->withSession(['accesos' => ['id' => 'superuser-1', 'roles' => ['superuser']]]);
     }
 
@@ -44,7 +65,7 @@ class SolicitudDomiciliosTest extends TestCase
             ->assertSee('Municipio')
             ->assertSee('Calle')
             ->assertSee('Número')
-            ->assertDontSee('Régimen fiscal')
+            ->assertSee('Régimen fiscal')
             ->assertSee('respuestas['.$campoId.'][codigo_postal]', false)
             ->assertSee('respuestas['.$campoId.'][municipio]', false)
             ->assertDontSee('data-domicilio')
@@ -66,6 +87,7 @@ class SolicitudDomiciliosTest extends TestCase
             'id' => (string) Str::uuid(),
             'curp_consulta' => self::CURP,
             'tipo_persona' => 'FISICA',
+            'id_externo' => '125',
             'email_contacto' => 'ana@example.test',
             'telefono_contacto' => '5512345678',
             'nombres_solicitante' => 'Ana',
@@ -77,6 +99,7 @@ class SolicitudDomiciliosTest extends TestCase
             'codigo_postal' => '57000',
             'municipio_id' => 715,
             'regimen_fiscal_id' => $this->regimenFiscalId,
+            'regimen_fiscal_externo_id' => 605,
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -105,7 +128,26 @@ class SolicitudDomiciliosTest extends TestCase
             ->assertJsonPath('datos.email_contacto', 'ana@example.test')
             ->assertJsonPath('datos.nombres_solicitante', 'Ana')
             ->assertJsonPath('datos.telefono_contacto', '5512345678')
-            ->assertJsonMissingPath('datos.calle');
+            ->assertJsonPath('datos.calle', 'Avenida Nezahualcóyotl');
+
+        $this->postJson(route('portal.tramites.expedientes.sincronizar'), [
+            'curp_consulta' => self::CURP,
+            'tipo_persona' => 'FISICA',
+            'email_contacto' => 'actualizado@example.test',
+            'telefono_contacto' => '5599999999',
+            'nombres_solicitante' => 'Ana',
+            'apellido_paterno_solicitante' => 'García',
+            'apellido_materno_solicitante' => 'López',
+            'calle' => 'Avenida Nezahualcóyotl',
+            'numero_exterior' => '120',
+            'colonia' => 'Benito Juárez',
+            'codigo_postal' => '57000',
+            'municipio_id' => 715,
+            'regimen_fiscal_externo_id' => 605,
+        ])->assertOk()->assertJsonPath('sincronizado', true);
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'PUT'
+            && $request->url() === 'https://api-tramites-uat.tesoreria-neza.gob.mx/api/contribuyentes/125'
+            && $request['correo'] === 'actualizado@example.test');
     }
 
     public function test_documento_de_diez_megabytes_es_aceptado(): void
@@ -122,6 +164,48 @@ class SolicitudDomiciliosTest extends TestCase
         $this->assertDatabaseCount('expedientes', 1);
         $this->assertDatabaseHas('solicitudes', ['expediente_id' => DB::table('expedientes')->value('id')]);
         $this->assertDatabaseHas('auditorias', ['accion' => 'EXPEDIENTE_CREADO', 'entidad' => 'EXPEDIENTE']);
+    }
+
+    public function test_crea_el_expediente_local_con_datos_de_tesoreria_al_encontrar_la_curp(): void
+    {
+        $curp = 'ABCD900101HDFXXX01';
+
+        Http::swap(new HttpFactory);
+        Http::fake([
+            '*' => Http::sequence()
+                ->push(['access_token' => 'token-prueba'])
+                ->push([
+                    'existe' => true,
+                    'contribuyente_id' => 886572,
+                ])
+                ->push(['access_token' => 'token-prueba'])
+                ->push(['data' => [
+                    'correo' => 'ana@example.test',
+                    'celular' => '5512345678',
+                    'nombre' => 'Ana',
+                    'apellidoPaterno' => 'García',
+                    'apellidoMaterno' => 'López',
+                    'calle' => 'Avenida Nezahualcóyotl',
+                    'numeroExterior' => '120',
+                    'colonia' => 'Benito Juárez',
+                    'codigoPostal' => '57000',
+                    'regimenFiscalId' => 616,
+                ]]),
+        ]);
+
+        $this->getJson(route('portal.tramites.expedientes.verificar', ['curp' => $curp, 'tipo_persona' => 'FISICA']))
+            ->assertOk()
+            ->assertJsonPath('existe', true);
+
+        $this->assertDatabaseHas('expedientes', [
+            'curp_consulta' => $curp,
+            'id_externo' => '886572',
+            'municipio_id' => 715,
+            'regimen_fiscal_externo_id' => 616,
+            'apellido_paterno_solicitante' => 'García',
+            'numero_exterior' => '120',
+            'codigo_postal' => '57000',
+        ]);
     }
 
     public function test_solicitud_con_expediente_existente_exige_verificacion_de_identidad(): void
@@ -448,6 +532,7 @@ class SolicitudDomiciliosTest extends TestCase
             'colonia' => 'Benito Juárez',
             'codigo_postal' => '57000',
             'municipio_id' => 715,
+            'regimen_fiscal_externo_id' => 605,
             'acepto_aviso_privacidad' => '1',
             'respuestas' => [$campoId => $domicilio],
         ];
@@ -677,6 +762,7 @@ class SolicitudDomiciliosTest extends TestCase
         Schema::create('expedientes', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->string('curp_consulta', 18);
+            $table->string('rfc', 13)->nullable();
             $table->string('tipo_persona', 10);
             $table->string('id_externo', 100)->nullable();
             $table->string('email_contacto', 200);
@@ -691,6 +777,7 @@ class SolicitudDomiciliosTest extends TestCase
             $table->string('codigo_postal', 10);
             $table->uuid('municipio_id');
             $table->uuid('regimen_fiscal_id')->nullable();
+            $table->unsignedBigInteger('regimen_fiscal_externo_id')->nullable();
             $table->timestamps();
             $table->unique(['curp_consulta', 'tipo_persona']);
         });
@@ -717,6 +804,7 @@ class SolicitudDomiciliosTest extends TestCase
             $table->uuid('formulario_version_id');
             $table->unsignedBigInteger('solicitud_estado_id');
             $table->string('curp_consulta', 18);
+            $table->string('rfc', 13)->nullable();
             $table->string('email_contacto', 200);
             $table->string('telefono_contacto', 30)->nullable();
             $table->string('nombre_solicitante_snapshot')->nullable();
@@ -731,6 +819,7 @@ class SolicitudDomiciliosTest extends TestCase
             $table->string('codigo_postal', 10)->nullable();
             $table->uuid('municipio_id')->nullable();
             $table->uuid('regimen_fiscal_id')->nullable();
+            $table->unsignedBigInteger('regimen_fiscal_externo_id')->nullable();
             $table->string('flujo_pago', 30)->default('SIN_PAGO');
             $table->decimal('importe_pago', 12, 2)->nullable();
             $table->unsignedSmallInteger('pago_vigencia_dias')->nullable();

@@ -14,7 +14,7 @@ class Solicitud extends Model
 
     protected $keyType = 'string';
 
-    protected $fillable = ['folio', 'expediente_id', 'tramite_id', 'departamento_accesos_id_snapshot', 'departamento_nombre_snapshot', 'formulario_version_id', 'solicitud_estado_id', 'curp_consulta', 'email_contacto', 'telefono_contacto', 'nombre_solicitante_snapshot', 'nombres_solicitante', 'apellido_paterno_solicitante', 'apellido_materno_solicitante', 'tipo_persona', 'razon_social', 'calle', 'numero_exterior', 'colonia', 'codigo_postal', 'municipio_id', 'regimen_fiscal_id', 'flujo_pago', 'importe_pago', 'pago_vigencia_dias', 'fecha_envio', 'fecha_terminacion', 'aviso_privacidad_aceptado_at'];
+    protected $fillable = ['folio', 'expediente_id', 'tramite_id', 'departamento_accesos_id_snapshot', 'departamento_nombre_snapshot', 'formulario_version_id', 'solicitud_estado_id', 'curp_consulta', 'rfc', 'email_contacto', 'telefono_contacto', 'nombre_solicitante_snapshot', 'nombres_solicitante', 'apellido_paterno_solicitante', 'apellido_materno_solicitante', 'tipo_persona', 'razon_social', 'calle', 'numero_exterior', 'colonia', 'codigo_postal', 'municipio_id', 'regimen_fiscal_id', 'regimen_fiscal_externo_id', 'flujo_pago', 'importe_pago', 'pago_vigencia_dias', 'fecha_envio', 'fecha_terminacion', 'aviso_privacidad_aceptado_at'];
 
     protected function casts(): array
     {

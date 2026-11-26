@@ -19,7 +19,7 @@
         @if ($campo->tipo === 'TEXTAREA')
             <textarea id="{{ $idBase }}" name="respuestas[{{ $campo->id }}]" rows="4" @required($campo->requerido) class="{{ $claseControl }} @error($clave) {{ $claseError }} @enderror">{{ old($clave, $valorEscalar) }}</textarea>
         @elseif ($campo->tipo === 'DOMICILIO')
-            <div class="mt-2 space-y-3" data-domicilio-admin data-indice-url="{{ asset('data/capa.json') }}">
+            <div class="mt-2 space-y-3" data-domicilio-admin data-indice-url="{{ request()->getBaseUrl() }}/data/capa.json">
                 <div class="grid gap-3 sm:grid-cols-2">
                     @foreach (config('formulario.campos_domicilio') as $subclave => $subcampo)
                         <div @class(['sm:col-span-2' => $subclave === 'calle'])>

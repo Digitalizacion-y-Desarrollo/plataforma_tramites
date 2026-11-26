@@ -36,5 +36,6 @@
             <button type="submit" data-submit-lock class="inline-flex min-h-11 w-full items-center justify-center rounded-lg bg-neza-wine px-4 py-2.5 text-sm font-semibold text-white">Iniciar sesión</button>
         </form>
     </main>
+    @include('partials.loading-overlay')
 </body>
 </html>

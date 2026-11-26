@@ -30,7 +30,7 @@ class TramiteController extends Controller
         ]);
 
         $tramites = Tramite::query()
-            ->with(['estado', 'formularioActivo.formulario'])
+            ->with(['estado', 'formularioActivo.formulario', 'ultimoFormularioAsociado.formulario'])
             ->where('tipo', $tipoCatalogo)
             ->when($filtros['q'] ?? null, function ($consulta, string $busqueda): void {
                 $consulta->where(function ($subconsulta) use ($busqueda): void {
@@ -73,7 +73,9 @@ class TramiteController extends Controller
         }
 
         $versionesActuales = $tramites->getCollection()
-            ->flatMap(fn (Tramite $tramite) => $tramite->formularioActivo)
+            ->flatMap(fn (Tramite $tramite) => $tramite->formularioActivo->isNotEmpty()
+                ? $tramite->formularioActivo
+                : $tramite->ultimoFormularioAsociado)
             ->pluck('id');
 
         $formularios = FormularioVersion::query()

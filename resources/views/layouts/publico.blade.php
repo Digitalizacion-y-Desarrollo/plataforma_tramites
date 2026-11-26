@@ -19,5 +19,6 @@
 
     @include('partials.publico.footer')
     @include('partials.accesibilidad')
+    @include('partials.loading-overlay')
 </body>
 </html>

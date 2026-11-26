@@ -50,7 +50,7 @@
                 <span class="text-sm font-bold leading-tight text-neza-ink">Portal de Trámites</span>
                 <span class="text-xs font-medium leading-tight text-neza-muted">Portal del Servidor Público</span>
             </div>
-            <nav class="nav min-w-0 grid-cols-[minmax(0,1fr)] [&_details]:min-w-0 [&_details_div]:min-w-0 [&_details_div]:grid-cols-[minmax(0,1fr)] [&_details_div_a]:block [&_details_div_a]:min-w-0 [&_details_div_a]:truncate" aria-label="Navegación principal">
+            <nav data-admin-navigation class="nav min-w-0 grid-cols-[minmax(0,1fr)] [&_details]:min-w-0 [&_details_div]:min-w-0 [&_details_div]:grid-cols-[minmax(0,1fr)] [&_details_div_a]:block [&_details_div_a]:min-w-0 [&_details_div_a]:truncate" aria-label="Navegación principal">
                 <span class="side-label">Principal</span>
                 @if (! $isColaborador)
                 <a @class(['active' => request()->routeIs('admin.dashboard')]) href="{{ route('admin.dashboard') }}"><svg class="nav-icon" aria-hidden="true" fill="none"
@@ -204,6 +204,7 @@
         </div>
     </div>
     @include('partials.accesibilidad')
+    @include('partials.loading-overlay')
 </body>
 
 </html>

@@ -16,6 +16,7 @@ class Expediente extends Model
     protected $fillable = [
         'id',
         'curp_consulta',
+        'rfc',
         'tipo_persona',
         'id_externo',
         'email_contacto',
@@ -30,6 +31,7 @@ class Expediente extends Model
         'codigo_postal',
         'municipio_id',
         'regimen_fiscal_id',
+        'regimen_fiscal_externo_id',
     ];
 
     public function regimenFiscal(): BelongsTo

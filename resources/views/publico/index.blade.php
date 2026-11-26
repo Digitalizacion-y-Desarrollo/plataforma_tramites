@@ -157,14 +157,14 @@
                             @csrf
                             <input type="hidden" name="curp" value="{{ $consultaPendiente['curp'] }}">
                             <input type="hidden" name="email_contacto" value="{{ $consultaPendiente['email'] }}">
-                            <button type="submit" data-reenviar-en="{{ $consultaPendiente['reenviar_en'] }}" class="font-bold text-neza-wine underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Reenviar código</button>
+                            <button type="submit" class="font-bold text-neza-wine underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Reenviar código</button>
                         </form>
                         <form action="{{ route('consulta.cancelar') }}" method="POST">
                             @csrf
                             <button type="submit" class="font-bold text-neza-muted underline-offset-2 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">Cambiar CURP o correo</button>
                         </form>
                     </div>
-                    <p class="mt-4 text-xs text-neza-muted">¿No llegó? Revisa spam o vuelve a solicitarlo después de un minuto.</p>
+                    <p class="mt-4 text-xs text-neza-muted">¿No llegó? Revisa la carpeta de spam o solicita un nuevo código.</p>
                 @else
                     <h3 class="mt-2 text-xl font-bold">Confirma tus datos</h3>
                     <p class="mt-2 text-sm text-neza-muted">Usa la CURP y el correo que proporcionaste al enviar tu solicitud.</p>
@@ -222,7 +222,7 @@
                 @forelse ($servicios as $servicio)
                     <a href="{{ $servicio->enlace }}" target="_blank" rel="noopener noreferrer"
                         class="group flex min-h-36 flex-col gap-3 rounded-xl border border-neza-line bg-neza-canvas p-4 transition hover:border-neza-wine/40 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neza-wine">
-                        <img src="{{ asset('storage/'.$servicio->logo_storage_key) }}" alt="" class="size-10 rounded-lg object-contain" loading="lazy">
+                        <img src="{{ request()->getSchemeAndHttpHost().request()->getBaseUrl().'/storage/'.$servicio->logo_storage_key }}" alt="" class="size-10 rounded-lg object-contain" loading="lazy">
                         <span class="text-sm font-bold text-neza-ink">{{ $servicio->titulo }}</span>
                         <span class="line-clamp-3 text-xs leading-relaxed text-neza-muted">{{ $servicio->descripcion }}</span>
                         <span class="sr-only">Abre en una pestaña nueva</span>

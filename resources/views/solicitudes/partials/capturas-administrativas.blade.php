@@ -78,7 +78,7 @@
                             <label for="captura-{{ $campo->id }}" class="block text-sm font-semibold text-neza-ink">{{ $campo->etiqueta }} @if ($campo->requerido)<span class="text-rose-700">*</span>@endif</label>
                             @if ($campo->tipo === 'DOMICILIO')
                                 @php($domicilio = old('respuestas.'.$campo->id, is_array($campo->valor) ? $campo->valor : []))
-                                <div class="mt-2" data-domicilio data-indice-url="{{ asset('data/capa.json') }}">
+                                <div class="mt-2" data-domicilio data-indice-url="{{ request()->getBaseUrl() }}/data/capa.json">
                                     <div class="grid gap-3 sm:grid-cols-2">
                                         @foreach (config('formulario.campos_domicilio') as $clave => $subcampo)
                                             <div @class(['sm:col-span-2' => $clave === 'calle'])>

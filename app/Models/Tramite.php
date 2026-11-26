@@ -88,4 +88,9 @@ class Tramite extends Model
     {
         return $this->formulariosVersiones()->wherePivot('activo', true);
     }
+
+    public function ultimoFormularioAsociado(): BelongsToMany
+    {
+        return $this->formulariosVersiones()->orderByPivot('fecha_inicio_vigencia', 'desc');
+    }
 }

@@ -27,15 +27,16 @@ Route::post('/admin/login', [AccesosSesionController::class, 'store'])->name('ac
 Route::get('/admin/cerrar-sesion', [AccesosSesionController::class, 'confirmarCierre'])->name('accesos.logout.confirm');
 Route::prefix('tramites')->name('portal.tramites.')->controller(PublicoController::class)->group(function () {
     Route::get('/', 'tramites')->name('index');
-    Route::get('/expedientes/verificar', 'verificarExpediente')->middleware('throttle:5,1')->name('expedientes.verificar');
-    Route::post('/expedientes/token', 'solicitarTokenExpediente')->middleware('throttle:5,15')->name('expedientes.token.solicitar');
+    Route::get('/expedientes/verificar', 'verificarExpediente')->name('expedientes.verificar');
+    Route::post('/expedientes/sincronizar', 'sincronizarExpedienteTesoreria')->name('expedientes.sincronizar');
+    Route::post('/expedientes/token', 'solicitarTokenExpediente')->name('expedientes.token.solicitar');
     Route::post('/expedientes/token/verificar', 'verificarTokenExpediente')->middleware('throttle:10,1')->name('expedientes.token.verificar');
     Route::get('/{tramite}/iniciar', 'iniciar')->name('iniciar');
     Route::post('/{tramite}/solicitudes', 'storeSolicitud')->name('solicitudes.store');
     Route::get('/{tramite}', 'detalle')->name('detalle');
 });
 Route::prefix('consulta')->name('consulta.')->controller(PublicoController::class)->group(function () {
-    Route::post('/token', 'solicitarToken')->middleware('throttle:5,15')->name('token.solicitar');
+    Route::post('/token', 'solicitarToken')->name('token.solicitar');
     Route::post('/verificar', 'verificarToken')->middleware('throttle:10,1')->name('token.verificar');
     Route::post('/cancelar', 'cancelarConsultaPendiente')->name('cancelar');
     Route::get('/solicitudes', 'solicitudesConsulta')->name('solicitudes');

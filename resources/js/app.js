@@ -3,6 +3,114 @@ import './accessibility';
 import Swal from 'sweetalert2';
 import 'sweetalert2/dist/sweetalert2.min.css';
 
+const overlayCarga = document.querySelector('[data-global-loading]');
+const tituloCarga = overlayCarga?.querySelector('[data-global-loading-title]');
+const mensajeCarga = overlayCarga?.querySelector('[data-global-loading-message]');
+let solicitudesEnCurso = 0;
+
+const mostrarCargaGlobal = (mensaje = 'Espera un momento, por favor.', titulo = 'Cargando información') => {
+    if (!overlayCarga) return;
+    if (tituloCarga) tituloCarga.textContent = titulo;
+    if (mensajeCarga) mensajeCarga.textContent = mensaje;
+    overlayCarga.hidden = false;
+};
+
+const ocultarCargaGlobal = () => {
+    if (!overlayCarga || solicitudesEnCurso > 0) return;
+    overlayCarga.hidden = true;
+};
+
+window.nezaLoading = {
+    show: mostrarCargaGlobal,
+    hide: ocultarCargaGlobal,
+};
+
+const fetchOriginal = window.fetch.bind(window);
+window.fetch = async (...argumentos) => {
+    const cargaTesoreriaVisible = document.querySelector('[data-tesoreria-loader]:not([hidden])');
+    const mostrarOverlay = !cargaTesoreriaVisible;
+    if (mostrarOverlay) {
+        solicitudesEnCurso += 1;
+        mostrarCargaGlobal('Estamos obteniendo la información solicitada.');
+    }
+
+    try {
+        return await fetchOriginal(...argumentos);
+    } finally {
+        if (mostrarOverlay) {
+            solicitudesEnCurso -= 1;
+            ocultarCargaGlobal();
+        }
+    }
+};
+
+document.addEventListener('submit', (event) => {
+    if (event.defaultPrevented || !(event.target instanceof HTMLFormElement)) return;
+
+    const formulario = event.target;
+    const esBusqueda = formulario.method.toLowerCase() === 'get';
+    mostrarCargaGlobal(
+        formulario.dataset.loadingMessage ?? (esBusqueda ? 'Estamos buscando la información solicitada.' : 'Estamos guardando la información.'),
+        esBusqueda ? 'Buscando información' : 'Guardando información',
+    );
+});
+
+document.querySelectorAll('[data-admin-navigation] a[href]').forEach((enlace) => {
+    enlace.addEventListener('click', (event) => {
+        if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+        if (enlace.target === '_blank' || enlace.hasAttribute('download')) return;
+
+        const destino = new URL(enlace.href, window.location.origin);
+        if (destino.origin !== window.location.origin || destino.pathname === window.location.pathname && destino.search === window.location.search) return;
+
+        mostrarCargaGlobal('Estamos preparando la sección seleccionada.', 'Cargando sección');
+    });
+});
+
+const mensajeValidacionEnEspanol = (campo) => {
+    if (!(campo instanceof HTMLInputElement || campo instanceof HTMLSelectElement || campo instanceof HTMLTextAreaElement)) return '';
+
+    const { validity } = campo;
+    if (validity.valid) {
+        if (campo.dataset.mensajeValidacionNativo === 'true') {
+            campo.setCustomValidity('');
+            delete campo.dataset.mensajeValidacionNativo;
+        }
+
+        return '';
+    }
+
+    if (validity.customError && campo.dataset.mensajeValidacionNativo !== 'true') return campo.validationMessage;
+
+    let mensaje = 'El valor ingresado no es válido.';
+    if (validity.valueMissing) mensaje = 'Este campo es obligatorio.';
+    else if (validity.typeMismatch && campo.type === 'email') mensaje = 'Ingresa un correo electrónico válido.';
+    else if (validity.typeMismatch && campo.type === 'url') mensaje = 'Ingresa una URL válida.';
+    else if (validity.patternMismatch) mensaje = 'El formato ingresado no es válido.';
+    else if (validity.tooShort) mensaje = `Ingresa al menos ${campo.minLength} caracteres.`;
+    else if (validity.tooLong) mensaje = `Ingresa como máximo ${campo.maxLength} caracteres.`;
+    else if (validity.rangeUnderflow) mensaje = `Ingresa un valor mayor o igual a ${campo.min}.`;
+    else if (validity.rangeOverflow) mensaje = `Ingresa un valor menor o igual a ${campo.max}.`;
+    else if (validity.stepMismatch || validity.badInput) mensaje = 'Ingresa un valor válido.';
+
+    campo.dataset.mensajeValidacionNativo = 'true';
+    campo.setCustomValidity(mensaje);
+
+    return mensaje;
+};
+
+document.addEventListener('invalid', (event) => {
+    mensajeValidacionEnEspanol(event.target);
+}, true);
+
+document.addEventListener('input', (event) => {
+    const campo = event.target;
+    if (campo?.dataset?.mensajeValidacionNativo === 'true') {
+        campo.setCustomValidity('');
+        delete campo.dataset.mensajeValidacionNativo;
+    }
+});
+
 document.querySelectorAll('[data-password-toggle]').forEach((boton) => {
     const campo = document.getElementById(boton.getAttribute('aria-controls'));
     if (!campo) return;
@@ -99,6 +207,8 @@ document.querySelectorAll('[data-referencia-pago-preview]').forEach((dialogo) =>
 });
 
 const actualizarFormulariosDeTramite = (contenedor) => {
+    if (!contenedor) return;
+
     const departamento = contenedor.querySelector('[data-tramite-departamento]');
     const formulario = contenedor.querySelector('[data-tramite-formulario]');
     if (!departamento || !formulario) return;
@@ -913,8 +1023,10 @@ document.querySelectorAll('[data-domicilio]').forEach((domicilio) => {
     const numero = domicilio.querySelector('[data-domicilio-campo="numero"]');
     const colonias = domicilio.querySelector('[data-domicilio-colonias]');
     const calles = domicilio.querySelector('[data-domicilio-calles]');
+    const numeros = domicilio.querySelector('[data-domicilio-numeros]');
     const latitud = domicilio.querySelector('[data-domicilio-latitud]');
     const longitud = domicilio.querySelector('[data-domicilio-longitud]');
+    const mensaje = domicilio.querySelector('[data-domicilio-mensaje]');
     const url = domicilio.dataset.indiceUrl;
     const coordenadasUrl = domicilio.dataset.coordenadasUrl;
     let indice;
@@ -923,9 +1035,32 @@ document.querySelectorAll('[data-domicilio]').forEach((domicilio) => {
 
     if (!codigoPostal || !colonia || !calle || !colonias || !calles || !latitud || !longitud || !url) return;
 
-    const normalizar = (valor) => String(valor).trim().toLocaleUpperCase();
-    const opciones = (lista, valores) => lista.replaceChildren(...valores.map((valor) => Object.assign(document.createElement('option'), { value: String(valor) })));
-    const limpiarDerivados = () => { calle.value = ''; opciones(calles, []); latitud.value = ''; longitud.value = ''; };
+    const normalizar = (valor) => String(valor ?? '')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .trim()
+        .replace(/\s+/g, ' ')
+        .toLocaleUpperCase();
+    const opciones = (lista, valores) => {
+        if (!lista) return;
+        const unicos = [...new Set(valores.map(String))].sort((a, b) => a.localeCompare(b, 'es'));
+        lista.replaceChildren(...unicos.map((valor) => Object.assign(document.createElement('option'), { value: valor })));
+    };
+    const informar = (texto, estado = 'normal') => {
+        if (!mensaje) return;
+        mensaje.textContent = texto;
+        mensaje.className = `mt-3 rounded-lg border px-3 py-2 text-sm ${estado === 'correcto' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-neza-line bg-white text-neza-muted'}`;
+    };
+    const limpiarUbicacion = () => { latitud.value = ''; longitud.value = ''; };
+    const limpiarCalleYNumeros = () => {
+        calle.value = '';
+        if (numero) numero.value = '';
+        opciones(calles, []);
+        opciones(numeros, []);
+        limpiarUbicacion();
+    };
+    let coloniaSeleccionada = '';
+    let calleSeleccionada = '';
     const cargarIndice = async () => {
         if (indice) return indice;
         if (!cargaIndice) {
@@ -939,13 +1074,25 @@ document.querySelectorAll('[data-domicilio]').forEach((domicilio) => {
         try {
             const coloniasDisponibles = await cargarIndice();
             const nombre = Object.keys(coloniasDisponibles).find((clave) => normalizar(clave) === normalizar(colonia.value));
-            limpiarDerivados();
-            if (!nombre) { codigoPostal.value = ''; return; }
+            if (!nombre) {
+                if (coloniaSeleccionada) {
+                    codigoPostal.value = '';
+                    limpiarCalleYNumeros();
+                    coloniaSeleccionada = '';
+                }
+                informar('Selecciona una colonia de la lista para completar automáticamente el código postal y las calles.');
+
+                return;
+            }
             const datos = coloniasDisponibles[nombre];
+            if (coloniaSeleccionada === nombre) return;
+            limpiarCalleYNumeros();
+            coloniaSeleccionada = nombre;
             codigoPostal.value = (datos.codigosPostales ?? [])[0] ?? '';
             opciones(calles, datos.calles ?? []);
+            informar(`Colonia seleccionada. Código postal ${codigoPostal.value || 'no disponible'} y ${datos.calles?.length ?? 0} calles disponibles.`, 'correcto');
         } catch {
-            codigoPostal.value = ''; limpiarDerivados();
+            informar('No fue posible cargar las opciones de domicilio. Intenta nuevamente.', 'normal');
         }
     };
     const cargarCoordenadas = async () => {
@@ -969,9 +1116,35 @@ document.querySelectorAll('[data-domicilio]').forEach((domicilio) => {
             longitud.value = punto ? String(punto.properties.longitud ?? punto.geometry?.coordinates?.[0] ?? '') : '';
         } catch { latitud.value = ''; longitud.value = ''; }
     };
+    const actualizarCalle = async () => {
+        if (!calle.value) return;
+        const calleElegida = normalizar(calle.value);
+        if (calleElegida === calleSeleccionada) return;
+        calleSeleccionada = calleElegida;
+        if (numero) numero.value = '';
+        opciones(numeros, []);
+        limpiarUbicacion();
+        if (!codigoPostal.value) return;
+        try {
+            const numerosDisponibles = (await cargarCoordenadas())
+                .filter(({ properties }) => normalizar(properties.NOMVIAL) === calleElegida
+                    && normalizar(properties.CP) === normalizar(codigoPostal.value))
+                .map(({ properties }) => properties.NUMEXT)
+                .filter(Boolean);
+            opciones(numeros, numerosDisponibles);
+            informar(numerosDisponibles.length
+                ? 'Calle seleccionada. Puedes elegir un número de la lista o escribirlo manualmente.'
+                : 'Calle seleccionada. Escribe tu número exterior.', 'correcto');
+        } catch {
+            informar('Calle seleccionada. Escribe tu número exterior.', 'correcto');
+        }
+    };
 
     cargarIndice().then((coloniasDisponibles) => opciones(colonias, Object.keys(coloniasDisponibles))).catch(() => {});
     colonia.addEventListener('input', actualizarColonia);
+    colonia.addEventListener('change', actualizarColonia);
+    calle.addEventListener('input', actualizarCalle);
+    calle.addEventListener('change', actualizarCalle);
     calle.addEventListener('input', actualizarCoordenadas);
     numero?.addEventListener('input', actualizarCoordenadas);
     if (colonia.value) actualizarColonia();

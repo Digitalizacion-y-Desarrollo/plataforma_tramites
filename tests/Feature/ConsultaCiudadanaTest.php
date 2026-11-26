@@ -287,15 +287,12 @@ class ConsultaCiudadanaTest extends TestCase
         $this->post(route('consulta.token.verificar'), ['token' => $token])->assertSessionHasErrors('token');
     }
 
-    public function test_resend_waits_one_minute_and_cancel_returns_to_first_step(): void
+    public function test_resend_is_available_immediately_and_cancel_returns_to_first_step(): void
     {
         $this->crearSolicitud('ana@example.test', 'SOL-ANA');
         $datos = ['curp' => self::CURP, 'email_contacto' => 'ana@example.test'];
         $this->post(route('consulta.token.solicitar'), $datos);
         $this->post(route('consulta.token.solicitar'), $datos)->assertSessionHas('consulta_pendiente');
-        Mail::assertSent(TokenConsultaMail::class, 1);
-        $this->travel(61)->seconds();
-        $this->post(route('consulta.token.solicitar'), $datos);
         Mail::assertSent(TokenConsultaMail::class, 2);
         $this->post(route('consulta.cancelar'))->assertRedirect(route('portal.publico').'#consulta');
         $this->get(route('portal.publico'))->assertOk()->assertSee('Paso 1 de 2');
