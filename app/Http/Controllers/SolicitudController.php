@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Integrations\TesoreriaClient;
 use App\Mail\SolicitudAprobadaMail;
 use App\Mail\SolicitudComentarioMail;
 use App\Mail\SolicitudCorreccionDocumentosMail;
@@ -21,6 +22,8 @@ use App\Models\SolicitudPago;
 use App\Models\SolicitudPagoFicha;
 use App\Models\Tramite;
 use Barryvdh\DomPDF\Facade\Pdf;
+use chillerlan\QRCode\QRCode;
+use chillerlan\QRCode\QROptions;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -142,7 +145,7 @@ class SolicitudController extends Controller
         $consulta = $this->aplicarFiltroEstadisticas($this->consultaPorActor($request), $this->filtroEstadisticas([]));
 
         return view('solicitudes.resumen-dependencia', [
-            'dependencia' => ['etiqueta' => $this->esSuperuser($request) || $this->esSuperadmin($request) ? 'Todas las áreas operativas' : 'Mi área', 'slug' => null],
+            'dependencia' => ['etiqueta' => $this->esSuperuser($request) || $this->esSuperadmin($request) ? 'Todas las Ã¡reas operativas' : 'Mi Ã¡rea', 'slug' => null],
             'totalSolicitudes' => (clone $consulta)->count(),
             'solicitudesEnviadas' => (clone $consulta)->whereHas('estado', fn ($query) => $query->where('clave', 'ENVIADA'))->count(),
             'solicitudesAprobadas' => (clone $consulta)->whereHas('estado', fn ($query) => $query->where('clave', 'APROBADA'))->count(),
@@ -228,8 +231,8 @@ class SolicitudController extends Controller
     private function dependencia(string $slug): array
     {
         $dependencias = [
-            'desarrollo-urbano' => ['slug' => 'desarrollo-urbano', 'nombre' => 'DIRECCIÓN DE DESARROLLO URBANO', 'etiqueta' => 'Desarrollo Urbano'],
-            'secretaria-del-ayuntamiento' => ['slug' => 'secretaria-del-ayuntamiento', 'nombre' => 'SECRETARÍA DEL H. AYUNTAMIENTO', 'etiqueta' => 'Secretaría del H. Ayuntamiento'],
+            'desarrollo-urbano' => ['slug' => 'desarrollo-urbano', 'nombre' => 'DIRECCIÃ“N DE DESARROLLO URBANO', 'etiqueta' => 'Desarrollo Urbano'],
+            'secretaria-del-ayuntamiento' => ['slug' => 'secretaria-del-ayuntamiento', 'nombre' => 'SECRETARÃA DEL H. AYUNTAMIENTO', 'etiqueta' => 'SecretarÃ­a del H. Ayuntamiento'],
         ];
 
         abort_unless(isset($dependencias[$slug]), 404);
@@ -401,7 +404,7 @@ class SolicitudController extends Controller
                 'estado_nuevo.nombre as estado_nuevo',
             ])
             ->map(function ($movimiento) {
-                if (in_array($movimiento->actor_nombre_snapshot, [null, '', 'Servidor público pendiente de integración con Accesos'], true)) {
+                if (in_array($movimiento->actor_nombre_snapshot, [null, '', 'Servidor pÃºblico pendiente de integraciÃ³n con Accesos'], true)) {
                     $movimiento->actor_nombre_snapshot = null;
                 }
 
@@ -628,7 +631,7 @@ class SolicitudController extends Controller
             Auditoria::registrar($request, 'SOLICITUD_RESPUESTAS_EDITADAS', 'SOLICITUD', $bloqueada->id, ['seccion' => $seccion->clave, 'respuestas' => $anteriores], ['seccion' => $seccion->clave, 'respuestas' => $nuevos]);
         });
 
-        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'Los datos de la sección se actualizaron correctamente.');
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'Los datos de la secciÃ³n se actualizaron correctamente.');
     }
 
     private function autorizarEdicionRespuestas(Solicitud $solicitud): void
@@ -645,12 +648,12 @@ class SolicitudController extends Controller
         $mensajes[$clave.'.required'] = 'El campo "'.$campo->etiqueta.'" es obligatorio.';
         $mensajes[$clave.'.string'] = 'El campo "'.$campo->etiqueta.'" debe ser texto.';
         $mensajes[$clave.'.array'] = 'El campo "'.$campo->etiqueta.'" debe ser una lista.';
-        $mensajes[$clave.'.in'] = 'Selecciona una opción válida en "'.$campo->etiqueta.'".';
-        $mensajes[$clave.'.*.in'] = 'Selecciona solo opciones válidas en "'.$campo->etiqueta.'".';
-        $mensajes[$clave.'.email'] = 'Captura un correo electrónico válido.';
-        $mensajes[$clave.'.numeric'] = 'Captura un valor numérico en "'.$campo->etiqueta.'".';
-        $mensajes[$clave.'.date'] = 'Captura una fecha válida en "'.$campo->etiqueta.'".';
-        $mensajes[$clave.'.regex'] = 'El formato de "'.$campo->etiqueta.'" no es válido.';
+        $mensajes[$clave.'.in'] = 'Selecciona una opciÃ³n vÃ¡lida en "'.$campo->etiqueta.'".';
+        $mensajes[$clave.'.*.in'] = 'Selecciona solo opciones vÃ¡lidas en "'.$campo->etiqueta.'".';
+        $mensajes[$clave.'.email'] = 'Captura un correo electrÃ³nico vÃ¡lido.';
+        $mensajes[$clave.'.numeric'] = 'Captura un valor numÃ©rico en "'.$campo->etiqueta.'".';
+        $mensajes[$clave.'.date'] = 'Captura una fecha vÃ¡lida en "'.$campo->etiqueta.'".';
+        $mensajes[$clave.'.regex'] = 'El formato de "'.$campo->etiqueta.'" no es vÃ¡lido.';
         $mensajes[$clave.'.max'] = 'El campo "'.$campo->etiqueta.'" excede la longitud permitida.';
 
         switch ($campo->tipo) {
@@ -675,7 +678,7 @@ class SolicitudController extends Controller
                 $reglas[$clave] = [...$base, 'string', 'regex:/^[A-Z]{4}[0-9]{6}[A-Z]{6}[A-Z0-9][0-9]$/i'];
                 break;
             case 'RFC':
-                $reglas[$clave] = [...$base, 'string', 'regex:/^[A-ZÑ&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i'];
+                $reglas[$clave] = [...$base, 'string', 'regex:/^[A-ZÃ‘&]{3,4}[0-9]{6}[A-Z0-9]{3}$/i'];
                 break;
             case 'CP':
                 $reglas[$clave] = [...$base, 'string', 'regex:/^[0-9]{5}$/'];
@@ -741,8 +744,8 @@ class SolicitudController extends Controller
 
             $reglas[$claveSubcampo] = $reglasSubcampo;
             $mensajes[$claveSubcampo.'.required'] = 'Captura '.mb_strtolower($subcampo['etiqueta'], 'UTF-8').' del domicilio.';
-            $mensajes[$claveSubcampo.'.regex'] = 'El formato de '.mb_strtolower($subcampo['etiqueta'], 'UTF-8').' no es válido.';
-            $mensajes[$claveSubcampo.'.in'] = 'Selecciona un valor válido en '.mb_strtolower($subcampo['etiqueta'], 'UTF-8').'.';
+            $mensajes[$claveSubcampo.'.regex'] = 'El formato de '.mb_strtolower($subcampo['etiqueta'], 'UTF-8').' no es vÃ¡lido.';
+            $mensajes[$claveSubcampo.'.in'] = 'Selecciona un valor vÃ¡lido en '.mb_strtolower($subcampo['etiqueta'], 'UTF-8').'.';
             $mensajes[$claveSubcampo.'.max'] = $subcampo['etiqueta'].' excede la longitud permitida.';
         }
 
@@ -817,14 +820,14 @@ class SolicitudController extends Controller
     public function validarParaPago(Request $request, Solicitud $solicitud)
     {
         abort_unless($solicitud->flujo_pago === 'PAGO_POST_VALIDACION' && $solicitud->estado?->clave === 'ENVIADA', 422, 'Esta solicitud no puede validarse para pago.');
-        $this->moverEstado($request, $solicitud, 'VALIDADA_PARA_PAGO', 'SOLICITUD_VALIDADA_PARA_PAGO', 'La información fue validada y no podrá revertirse.');
+        $this->moverEstado($request, $solicitud, 'VALIDADA_PARA_PAGO', 'SOLICITUD_VALIDADA_PARA_PAGO', 'La informaciÃ³n fue validada y no podrÃ¡ revertirse.');
 
-        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La información fue validada; ya puedes enviar la ficha de pago.');
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La informaciÃ³n fue validada; ya puedes enviar la ficha de pago.');
     }
 
     public function enviarFichaPago(Request $request, Solicitud $solicitud)
     {
-        abort_unless($this->origenFichaPago() === 'SISTEMA_EXTERNO', 422, 'La configuración actual genera la ficha de pago desde el portal.');
+        abort_unless($this->origenFichaPago() === 'SISTEMA_EXTERNO', 422, 'La configuraciÃ³n actual genera la ficha de pago desde el portal.');
         $solicitud->load('estado');
         $this->autorizarFichaPago($solicitud);
         abort_if(SolicitudPago::query()->where('solicitud_id', $solicitud->id)->exists(), 422, 'La solicitud ya tiene una ficha de pago.');
@@ -852,7 +855,7 @@ class SolicitudController extends Controller
                 $nuevo = $this->estadoId('EN_ESPERA_DE_PAGO');
                 $bloqueada->update(['solicitud_estado_id' => $nuevo]);
                 $this->registrarMovimiento($bloqueada, $anterior, $nuevo, 'Ficha de pago enviada.', $actor, 'SOLICITUD_FICHA_PAGO_ENVIADA', $request);
-                $notificacionId = $this->notificacionPendiente($bloqueada, 'SOLICITUD_FICHA_PAGO_ENVIADA', 'Ficha de pago · Folio '.$bloqueada->folio);
+                $notificacionId = $this->notificacionPendiente($bloqueada, 'SOLICITUD_FICHA_PAGO_ENVIADA', 'Ficha de pago Â· Folio '.$bloqueada->folio);
 
                 return [$pago, $ficha, $notificacionId];
             });
@@ -867,12 +870,12 @@ class SolicitudController extends Controller
         $solicitud->refresh()->load('tramite');
         $this->enviarFichaPagoPorCorreo($solicitud, $ficha, $notificacionId, false);
 
-        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La ficha de pago se envió por correo.');
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La ficha de pago se enviÃ³ por correo.');
     }
 
     public function reemplazarFichaPago(Request $request, Solicitud $solicitud)
     {
-        abort_unless($this->origenFichaPago() === 'SISTEMA_EXTERNO', 422, 'La configuración actual genera la ficha de pago desde el portal.');
+        abort_unless($this->origenFichaPago() === 'SISTEMA_EXTERNO', 422, 'La configuraciÃ³n actual genera la ficha de pago desde el portal.');
         $solicitud->load(['estado', 'pago']);
         $this->autorizarReemplazoFichaPago($solicitud);
         $datos = $request->validate([
@@ -894,7 +897,7 @@ class SolicitudController extends Controller
                 $version = ((int) SolicitudPagoFicha::query()->where('solicitud_pago_id', $pago->id)->max('version')) + 1;
                 $ficha = $this->guardarFichaPago($datos['ficha'], $datos['indicaciones'], $pago, $version, trim($datos['motivo_reemplazo']), $actor, $archivoGuardado);
                 Auditoria::registrar($request, 'SOLICITUD_FICHA_PAGO_REEMPLAZADA', 'SOLICITUD_PAGO_FICHA', $ficha->id, ['ficha_id' => $fichaAnterior->id, 'version' => $fichaAnterior->version], ['ficha_id' => $ficha->id, 'version' => $ficha->version, 'motivo_reemplazo' => $ficha->motivo_reemplazo]);
-                $notificacionId = $this->notificacionPendiente($bloqueada, 'SOLICITUD_FICHA_PAGO_REEMPLAZADA', 'Ficha de pago actualizada · Folio '.$bloqueada->folio);
+                $notificacionId = $this->notificacionPendiente($bloqueada, 'SOLICITUD_FICHA_PAGO_REEMPLAZADA', 'Ficha de pago actualizada Â· Folio '.$bloqueada->folio);
 
                 return [$ficha, $notificacionId];
             });
@@ -909,18 +912,18 @@ class SolicitudController extends Controller
         $solicitud->refresh()->load('tramite');
         $this->enviarFichaPagoPorCorreo($solicitud, $ficha, $notificacionId, true);
 
-        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La ficha de pago se reemplazó y envió por correo.');
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La ficha de pago se reemplazÃ³ y enviÃ³ por correo.');
     }
 
     public function generarReferenciaPago(Request $request, Solicitud $solicitud)
     {
-        abort_unless($this->origenFichaPago() === 'GENERADA_EN_PORTAL', 422, 'La configuración actual requiere cargar una ficha de pago externa.');
-        $solicitud->load(['estado', 'tramite']);
+        abort_unless($this->origenFichaPago() === 'GENERADA_EN_PORTAL', 422, 'La configuraciÃ³n actual requiere cargar una ficha de pago externa.');
+        $solicitud->load(['estado', 'tramite', 'expediente']);
         $this->autorizarReferenciaPago($solicitud);
         $vistaPrevia = $this->vistaPreviaReferenciaPago($request, $solicitud);
         abort_unless($vistaPrevia, 422, 'Primero revisa la vista previa de la referencia de pago.');
         $permitido = $vistaPrevia !== null;
-        abort_unless($permitido && $solicitud->importe_pago !== null && $solicitud->pago_vigencia_dias, 422, 'La referencia de pago no está disponible para esta solicitud.');
+        abort_unless($permitido && $solicitud->importe_pago !== null && $solicitud->pago_vigencia_dias, 422, 'La referencia de pago no estÃ¡ disponible para esta solicitud.');
         $actor = $this->actor($request);
         $archivoGuardado = null;
         try {
@@ -928,11 +931,11 @@ class SolicitudController extends Controller
                 $bloqueada = Solicitud::query()->with('estado')->lockForUpdate()->findOrFail($solicitud->id);
                 abort_if(SolicitudPago::query()->where('solicitud_id', $bloqueada->id)->exists(), 422, 'La solicitud ya tiene una referencia de pago.');
                 $origenValido = ($bloqueada->flujo_pago === 'PAGO_DIRECTO' && $bloqueada->estado?->clave === 'ENVIADA') || ($bloqueada->flujo_pago === 'PAGO_POST_VALIDACION' && $bloqueada->estado?->clave === 'VALIDADA_PARA_PAGO');
-                abort_unless($origenValido, 422, 'La solicitud cambió de estado.');
-                abort_if(SolicitudPago::query()->where('referencia', $vistaPrevia['referencia'])->exists(), 422, 'La referencia de pago ya no está disponible. Revisa una nueva vista previa.');
-                $pago = new SolicitudPago(['id' => (string) Str::uuid(), 'solicitud_id' => $bloqueada->id, 'referencia' => $vistaPrevia['referencia'], 'importe' => $bloqueada->importe_pago, 'fecha_emision' => Carbon::parse($vistaPrevia['fecha_emision']), 'fecha_vencimiento' => Carbon::parse($vistaPrevia['fecha_vencimiento']), 'emisor_accesos_id' => $actor['id'], 'emisor_nombre_snapshot' => $actor['nombre']]);
+                abort_unless($origenValido, 422, 'La solicitud cambiÃ³ de estado.');
+                abort_if(SolicitudPago::query()->where('referencia', $vistaPrevia['referencia'])->exists(), 422, 'La referencia de pago ya no estÃ¡ disponible. Revisa una nueva vista previa.');
+                $pago = new SolicitudPago(['id' => (string) Str::uuid(), 'solicitud_id' => $bloqueada->id, 'referencia' => $vistaPrevia['referencia'], 'importe' => $vistaPrevia['importe'], 'fecha_emision' => Carbon::parse($vistaPrevia['fecha_emision']), 'fecha_vencimiento' => Carbon::parse($vistaPrevia['fecha_vencimiento']), 'emisor_accesos_id' => $actor['id'], 'emisor_nombre_snapshot' => $actor['nombre']]);
                 $pago->setRelation('solicitud', $bloqueada->load('tramite'));
-                $contenido = Pdf::loadView('pdf.referencia-pago', ['solicitud' => $bloqueada, 'pago' => $pago])->output();
+                $contenido = Pdf::loadView('pdf.referencia-pago', ['solicitud' => $bloqueada, 'pago' => $pago, 'liquidacion' => $vistaPrevia['liquidacion'], 'codigoBarras' => $vistaPrevia['codigo_barras'], 'codigoQr' => $vistaPrevia['codigo_qr'], 'convenios' => $vistaPrevia['convenios']])->output();
                 $pago->pdf_nombre_original = 'referencia-pago-'.$bloqueada->folio.'.pdf';
                 $pago->pdf_storage_key = 'solicitudes/'.$bloqueada->id.'/pagos/'.Str::uuid().'.pdf';
                 $pago->pdf_hash_archivo = hash('sha256', $contenido);
@@ -943,7 +946,7 @@ class SolicitudController extends Controller
                 $nuevo = $this->estadoId('EN_ESPERA_DE_PAGO');
                 $bloqueada->update(['solicitud_estado_id' => $nuevo]);
                 $this->registrarMovimiento($bloqueada, $anterior, $nuevo, 'Referencia de pago generada: '.$pago->referencia, $actor, 'SOLICITUD_REFERENCIA_PAGO_GENERADA', $request);
-                $notificacionId = $this->notificacionPendiente($bloqueada, 'SOLICITUD_REFERENCIA_PAGO', 'Referencia de pago · Folio '.$bloqueada->folio);
+                $notificacionId = $this->notificacionPendiente($bloqueada, 'SOLICITUD_REFERENCIA_PAGO', 'Referencia de pago Â· Folio '.$bloqueada->folio);
 
                 return [$pago, $notificacionId];
             });
@@ -957,25 +960,30 @@ class SolicitudController extends Controller
         $this->enviarReferenciaPago($solicitud, $pago, $notificacionId);
         $request->session()->forget($this->llaveVistaPreviaReferenciaPago($solicitud));
 
-        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La referencia de pago se generó y envió por correo.');
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La referencia de pago se generÃ³ y enviÃ³ por correo.');
     }
 
     public function previsualizarReferenciaPago(Request $request, Solicitud $solicitud)
     {
-        abort_unless($this->origenFichaPago() === 'GENERADA_EN_PORTAL', 422, 'La configuración actual requiere cargar una ficha de pago externa.');
-        $solicitud->load(['estado', 'tramite']);
+        abort_unless($this->origenFichaPago() === 'GENERADA_EN_PORTAL', 422, 'La configuraciÃ³n actual requiere cargar una ficha de pago externa.');
+        $solicitud->load(['estado', 'tramite', 'expediente']);
         $this->autorizarReferenciaPago($solicitud);
         abort_if(SolicitudPago::query()->where('solicitud_id', $solicitud->id)->exists(), 422, 'La solicitud ya tiene una referencia de pago.');
 
         $vistaPrevia = $this->crearVistaPreviaReferenciaPago($request, $solicitud);
         $pago = new SolicitudPago([
             'referencia' => $vistaPrevia['referencia'],
-            'importe' => $solicitud->importe_pago,
+            'importe' => $vistaPrevia['importe'],
             'fecha_emision' => Carbon::parse($vistaPrevia['fecha_emision']),
             'fecha_vencimiento' => Carbon::parse($vistaPrevia['fecha_vencimiento']),
         ]);
 
-        return Pdf::loadView('pdf.referencia-pago', compact('solicitud', 'pago'))->stream('vista-previa-referencia-pago-'.$solicitud->folio.'.pdf');
+        $liquidacion = $vistaPrevia['liquidacion'];
+        $codigoBarras = $vistaPrevia['codigo_barras'];
+        $codigoQr = $vistaPrevia['codigo_qr'];
+        $convenios = $vistaPrevia['convenios'];
+
+        return Pdf::loadView('pdf.referencia-pago', compact('solicitud', 'pago', 'liquidacion', 'codigoBarras', 'codigoQr', 'convenios'))->stream('vista-previa-referencia-pago-'.$solicitud->folio.'.pdf');
     }
 
     public function validarPago(Request $request, Solicitud $solicitud)
@@ -985,7 +993,7 @@ class SolicitudController extends Controller
         DB::transaction(function () use ($request, $solicitud, $actor) {
             $bloqueada = Solicitud::query()->with('estado')->lockForUpdate()->findOrFail($solicitud->id);
             $pago = SolicitudPago::query()->where('solicitud_id', $bloqueada->id)->lockForUpdate()->firstOrFail();
-            abort_unless($bloqueada->flujo_pago !== 'PAGO_POST_VALIDACION' || $pago->tieneComprobante(), 422, 'El ciudadano aún no ha subido el comprobante de pago.');
+            abort_unless($bloqueada->flujo_pago !== 'PAGO_POST_VALIDACION' || $pago->tieneComprobante(), 422, 'El ciudadano aÃºn no ha subido el comprobante de pago.');
             abort_unless($bloqueada->estado?->clave === 'EN_ESPERA_DE_PAGO' && ! $pago->fecha_pago_validado && ! $pago->vencido(), 422, 'El pago no puede validarse.');
             $pago->update(['fecha_pago_validado' => now(), 'comentario_validacion' => null, 'validador_accesos_id' => $actor['id'], 'validador_nombre_snapshot' => $actor['nombre'], 'validador_departamento_snapshot' => $actor['departamento']]);
             $anterior = $bloqueada->solicitud_estado_id;
@@ -994,7 +1002,7 @@ class SolicitudController extends Controller
             $this->registrarMovimiento($bloqueada, $anterior, $nuevo, 'Pago validado.', $actor, 'SOLICITUD_PAGO_VALIDADO', $request);
         });
 
-        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'El pago fue validado; la solicitud pasó a revisión final.');
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'El pago fue validado; la solicitud pasÃ³ a revisiÃ³n final.');
     }
 
     public function descargarComprobantePago(Solicitud $solicitud): StreamedResponse
@@ -1015,12 +1023,12 @@ class SolicitudController extends Controller
             DB::table('solicitud_observaciones')->insert(['id' => (string) Str::uuid(), 'solicitud_id' => $solicitud->id, 'texto' => $texto, 'tipo' => 'COMENTARIO', 'visible_ciudadano' => true, 'actor_tipo' => 'SERVIDOR_PUBLICO', 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'], 'created_at' => now(), 'updated_at' => now()]);
             Auditoria::registrar($request, 'SOLICITUD_COMENTARIO_ENVIADO', 'SOLICITUD', $solicitud->id, null, ['comentario' => $texto]);
 
-            return $this->notificacionPendiente($solicitud, 'SOLICITUD_COMENTARIO', 'Actualización de tu trámite · Folio '.$solicitud->folio);
+            return $this->notificacionPendiente($solicitud, 'SOLICITUD_COMENTARIO', 'ActualizaciÃ³n de tu trÃ¡mite Â· Folio '.$solicitud->folio);
         });
         $solicitud->load('tramite', 'estado');
         $this->enviarComentario($solicitud, $texto, $notificacionId);
 
-        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'El comentario se publicó y envió por correo.');
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'El comentario se publicÃ³ y enviÃ³ por correo.');
     }
 
     public function solicitarCorreccion(Request $request, Solicitud $solicitud)
@@ -1039,7 +1047,7 @@ class SolicitudController extends Controller
             ->where('campo.tipo', 'FILE')
             ->whereIn('campo.id', $camposIds)
             ->get(['campo.id as campo_id', 'campo.etiqueta', 'respuesta.valor']);
-        abort_unless($archivos->count() === count($camposIds), 422, 'Selecciona únicamente documentos pertenecientes a esta solicitud.');
+        abort_unless($archivos->count() === count($camposIds), 422, 'Selecciona Ãºnicamente documentos pertenecientes a esta solicitud.');
 
         $actor = [
             'id' => $request->session()->get('accesos.id'),
@@ -1058,7 +1066,7 @@ class SolicitudController extends Controller
             $estadoCorreccionId = EstadoSolicitud::query()->where('clave', 'CORRECCION_SOLICITADA')->where('activo', true)->value('id');
             $pendienteId = DB::table('notificacion_estados')->where('clave', 'PENDIENTE')->where('activo', true)->value('id');
             abort_unless($estadoCorreccionId && $pendienteId, 500);
-            abort_if(DB::table('solicitud_correcciones')->where('solicitud_id', $solicitudBloqueada->id)->whereNull('completada_at')->whereNull('bloqueada_at')->exists(), 422, 'Ya existe una corrección pendiente para esta solicitud.');
+            abort_if(DB::table('solicitud_correcciones')->where('solicitud_id', $solicitudBloqueada->id)->whereNull('completada_at')->whereNull('bloqueada_at')->exists(), 422, 'Ya existe una correcciÃ³n pendiente para esta solicitud.');
 
             $correccionId = (string) Str::uuid();
             DB::table('solicitud_correcciones')->insert([
@@ -1079,7 +1087,7 @@ class SolicitudController extends Controller
             DB::table('solicitud_historial_estados')->insert([
                 'id' => (string) Str::uuid(), 'solicitud_id' => $solicitudBloqueada->id,
                 'estado_anterior_id' => $estadoAnterior, 'estado_nuevo_id' => $estadoCorreccionId,
-                'comentario' => 'Se solicitó la corrección de documentos.', 'actor_tipo' => 'SERVIDOR_PUBLICO',
+                'comentario' => 'Se solicitÃ³ la correcciÃ³n de documentos.', 'actor_tipo' => 'SERVIDOR_PUBLICO',
                 'actor_accesos_id' => $actor['id'], 'actor_nombre_snapshot' => $actor['nombre'],
                 'actor_departamento_snapshot' => $actor['departamento'], 'fecha' => now(),
             ]);
@@ -1088,7 +1096,7 @@ class SolicitudController extends Controller
             DB::table('notificacion_emails')->insert([
                 'id' => $notificacionId, 'solicitud_id' => $solicitudBloqueada->id, 'notificacion_estado_id' => $pendienteId,
                 'destinatario' => $solicitudBloqueada->email_contacto, 'tipo' => 'SOLICITUD_CORRECCION_DOCUMENTOS',
-                'asunto' => 'Corrección de documentos requerida · Folio '.$solicitudBloqueada->folio,
+                'asunto' => 'CorrecciÃ³n de documentos requerida Â· Folio '.$solicitudBloqueada->folio,
                 'intentos' => 0, 'created_at' => now(), 'updated_at' => now(),
             ]);
 
@@ -1098,7 +1106,7 @@ class SolicitudController extends Controller
         $solicitud->refresh()->load('tramite');
         $this->enviarSolicitudCorreccion($solicitud, $notificacionId, $documentosCorreo, route('correcciones.mostrar', $urlToken), $password);
 
-        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La solicitud de corrección se envió a la ciudadanía.');
+        return redirect()->route('solicitudes.show', $solicitud)->with('success', 'La solicitud de correcciÃ³n se enviÃ³ a la ciudadanÃ­a.');
     }
 
     public function aprobar(Request $request, Solicitud $solicitud)
@@ -1106,12 +1114,12 @@ class SolicitudController extends Controller
         $solicitud->load('tramite', 'estado');
         abort_if($this->hayCapturasAdministrativasIncompletas($solicitud), 422, 'Completa los datos administrativos obligatorios antes de aprobar la solicitud.');
         $estadoAprobable = $solicitud->flujo_pago === 'SIN_PAGO' ? 'ENVIADA' : 'EN_REVISION_FINAL';
-        abort_unless($solicitud->estado?->clave === $estadoAprobable, 422, 'La solicitud no está lista para aprobarse.');
+        abort_unless($solicitud->estado?->clave === $estadoAprobable, 422, 'La solicitud no estÃ¡ lista para aprobarse.');
 
         $modalidades = collect($solicitud->tramite?->modalidades ?? [])->unique()->values();
         $esEnLinea = $modalidades->count() === 1 && $modalidades->contains('EN_LINEA');
         $esPresencial = $modalidades->contains('PRESENCIAL');
-        abort_unless($esEnLinea || $esPresencial, 422, 'Este trámite no puede aprobarse desde el portal.');
+        abort_unless($esEnLinea || $esPresencial, 422, 'Este trÃ¡mite no puede aprobarse desde el portal.');
 
         $datos = $request->validate($esEnLinea ? [
             'documento_final' => ['required', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:10240'],
@@ -1176,7 +1184,7 @@ class SolicitudController extends Controller
                 ]);
                 Auditoria::registrar($request, 'SOLICITUD_APROBADA', 'SOLICITUD', $solicitudBloqueada->id, ['solicitud_estado_id' => $estadoAnterior], ['solicitud_estado_id' => $aprobadaId, 'documento_emitido_id' => $documentoEmitido?->id, 'instrucciones' => $instrucciones]);
                 $notificacionId = (string) Str::uuid();
-                DB::table('notificacion_emails')->insert(['id' => $notificacionId, 'solicitud_id' => $solicitudBloqueada->id, 'notificacion_estado_id' => $pendienteId, 'destinatario' => $solicitudBloqueada->email_contacto, 'tipo' => 'SOLICITUD_APROBADA', 'asunto' => 'Solicitud aprobada · Folio '.$solicitudBloqueada->folio, 'intentos' => 0, 'created_at' => now(), 'updated_at' => now()]);
+                DB::table('notificacion_emails')->insert(['id' => $notificacionId, 'solicitud_id' => $solicitudBloqueada->id, 'notificacion_estado_id' => $pendienteId, 'destinatario' => $solicitudBloqueada->email_contacto, 'tipo' => 'SOLICITUD_APROBADA', 'asunto' => 'Solicitud aprobada Â· Folio '.$solicitudBloqueada->folio, 'intentos' => 0, 'created_at' => now(), 'updated_at' => now()]);
 
                 return [$notificacionId, $documentoEmitido, $instrucciones];
             });
@@ -1234,7 +1242,7 @@ class SolicitudController extends Controller
             DB::table('notificacion_emails')->insert([
                 'id' => $notificacionId, 'solicitud_id' => $solicitudBloqueada->id,
                 'notificacion_estado_id' => $pendienteId, 'destinatario' => $solicitudBloqueada->email_contacto,
-                'tipo' => 'SOLICITUD_RECHAZADA', 'asunto' => 'Solicitud rechazada · Folio '.$solicitudBloqueada->folio,
+                'tipo' => 'SOLICITUD_RECHAZADA', 'asunto' => 'Solicitud rechazada Â· Folio '.$solicitudBloqueada->folio,
                 'intentos' => 0, 'created_at' => now(), 'updated_at' => now(),
             ]);
 
@@ -1361,7 +1369,7 @@ class SolicitudController extends Controller
         $permitido = ($solicitud->flujo_pago === 'PAGO_DIRECTO' && $solicitud->estado?->clave === 'ENVIADA')
             || ($solicitud->flujo_pago === 'PAGO_POST_VALIDACION' && $solicitud->estado?->clave === 'VALIDADA_PARA_PAGO');
 
-        abort_unless($permitido && $solicitud->importe_pago !== null && $solicitud->pago_vigencia_dias, 422, 'La ficha de pago no está disponible para esta solicitud.');
+        abort_unless($permitido && $solicitud->importe_pago !== null && $solicitud->pago_vigencia_dias, 422, 'La ficha de pago no estÃ¡ disponible para esta solicitud.');
     }
 
     private function autorizarReemplazoFichaPago(Solicitud $solicitud): void
@@ -1408,16 +1416,55 @@ class SolicitudController extends Controller
             return $vistaPrevia;
         }
 
-        do {
-            $referencia = 'NEZA-'.now()->format('Ymd').'-'.Str::upper(Str::random(8));
-        } while (SolicitudPago::query()->where('referencia', $referencia)->exists());
+        $tramiteTesoreriaId = $solicitud->tramite?->id_tramite_tesoreria;
+        abort_unless($tramiteTesoreriaId, 422, 'El trÃ¡mite no tiene configurado el identificador de TesorerÃ­a para generar la ficha de pago.');
+        $contribuyenteId = $solicitud->expediente?->id_externo;
+        abort_unless($contribuyenteId, 422, 'La solicitud no tiene un contribuyente de TesorerÃ­a asociado.');
 
-        $fechaEmision = now();
+        $liquidacionExistente = collect(app(TesoreriaClient::class)->liquidacionesContribuyente((string) $contribuyenteId))
+            ->first(fn (array $liquidacion): bool => ! ($liquidacion['pagado'] ?? false));
+
+        if ($liquidacionExistente) {
+            $liquidacion = $liquidacionExistente;
+        } else {
+            $respuesta = app(TesoreriaClient::class)->liquidarDiverso((int) $tramiteTesoreriaId);
+            $liquidacion = $respuesta['data'] ?? $respuesta;
+        }
+        abort_unless(is_array($liquidacion), 502, 'TesorerÃ­a devolviÃ³ una liquidaciÃ³n invÃ¡lida.');
+
+        $referencia = (string) ($liquidacion['linea_captura'] ?? $liquidacion['referencia'] ?? $liquidacion['referencia_pago'] ?? $liquidacion['folio'] ?? '');
+        abort_if(blank($referencia), 502, 'TesorerÃ­a no devolviÃ³ una referencia de pago.');
+        abort_if(SolicitudPago::query()->where('referencia', $referencia)->exists(), 422, 'TesorerÃ­a devolviÃ³ una referencia de pago que ya estÃ¡ asociada a otra solicitud.');
+
+        $fechaEmision = Carbon::parse($liquidacion['fecha_emision'] ?? $liquidacion['fechaEmision'] ?? $liquidacion['fecha'] ?? now());
+        $fechaVencimiento = Carbon::parse($liquidacion['fecha_vencimiento'] ?? $liquidacion['fechaVencimiento'] ?? $liquidacion['fecha_limite'] ?? $fechaEmision->copy()->addDays($solicitud->pago_vigencia_dias));
+        $importe = $liquidacion['importe'] ?? $liquidacion['total'] ?? $liquidacion['monto'] ?? $solicitud->importe_pago;
+        abort_unless(is_numeric($importe) && (float) $importe >= 0, 502, 'TesorerÃ­a no devolviÃ³ un importe vÃ¡lido para la ficha de pago.');
+        $tesoreria = app(TesoreriaClient::class);
+        $convenios = collect($tesoreria->convenios())
+            ->filter(fn (mixed $convenio): bool => is_array($convenio))
+            ->map(function (array $convenio) use ($tesoreria): array {
+                $logo = isset($convenio['image_url']) ? $tesoreria->logoConvenio((string) $convenio['image_url']) : null;
+
+                return [
+                    'nombre' => $convenio['alt_convenio'] ?? $convenio['titulo_convenio'] ?? 'InstituciÃ³n autorizada',
+                    'convenio' => $convenio['numero_convenio'] ?? null,
+                    'logo' => $logo,
+                ];
+            })
+            ->values()
+            ->all();
+
         $vistaPrevia = [
             'referencia' => $referencia,
+            'importe' => (float) $importe,
             'fecha_emision' => $fechaEmision->toIso8601String(),
-            'fecha_vencimiento' => $fechaEmision->copy()->addDays($solicitud->pago_vigencia_dias)->toIso8601String(),
+            'fecha_vencimiento' => $fechaVencimiento->toIso8601String(),
             'expira_en' => now()->addMinutes(15)->toIso8601String(),
+            'liquidacion' => $liquidacion,
+            'codigo_barras' => $this->codigoBarrasItf($referencia),
+            'codigo_qr' => $this->codigoQr($referencia),
+            'convenios' => $convenios,
         ];
 
         $request->session()->put($this->llaveVistaPreviaReferenciaPago($solicitud), $vistaPrevia);
@@ -1429,7 +1476,7 @@ class SolicitudController extends Controller
     {
         $vistaPrevia = $request->session()->get($this->llaveVistaPreviaReferenciaPago($solicitud));
 
-        if (! is_array($vistaPrevia) || ! isset($vistaPrevia['referencia'], $vistaPrevia['fecha_emision'], $vistaPrevia['fecha_vencimiento'], $vistaPrevia['expira_en']) || Carbon::parse($vistaPrevia['expira_en'])->isPast()) {
+        if (! is_array($vistaPrevia) || ! isset($vistaPrevia['referencia'], $vistaPrevia['importe'], $vistaPrevia['fecha_emision'], $vistaPrevia['fecha_vencimiento'], $vistaPrevia['expira_en'], $vistaPrevia['liquidacion'], $vistaPrevia['codigo_barras'], $vistaPrevia['codigo_qr'], $vistaPrevia['convenios']) || Carbon::parse($vistaPrevia['expira_en'])->isPast()) {
             $request->session()->forget($this->llaveVistaPreviaReferenciaPago($solicitud));
 
             return null;
@@ -1443,6 +1490,46 @@ class SolicitudController extends Controller
         return 'referencia_pago_previa.'.$solicitud->id;
     }
 
+    private function codigoBarrasItf(string $valor): string
+    {
+        abort_unless(ctype_digit($valor) && strlen($valor) % 2 === 0, 502, 'TesorerÃ­a devolviÃ³ una lÃ­nea de captura no compatible con el cÃ³digo de barras ITF.');
+
+        $patrones = ['nnwwn', 'wnnnw', 'nwnnw', 'wwnnn', 'nnwnw', 'wnwnn', 'nwwnn', 'nnnww', 'wnnwn', 'nwnwn'];
+        $barras = [[1, true], [1, false], [1, true], [1, false]];
+        foreach (str_split($valor, 2) as $par) {
+            foreach (str_split($patrones[(int) $par[0]]) as $indice => $ancho) {
+                $barras[] = [$ancho === 'w' ? 3 : 1, true];
+                $barras[] = [$patrones[(int) $par[1]][$indice] === 'w' ? 3 : 1, false];
+            }
+        }
+        $barras = [...$barras, [3, true], [1, false], [1, true]];
+        $x = 10;
+        $rectangulos = '';
+        foreach ($barras as [$ancho, $negro]) {
+            if ($negro) {
+                $rectangulos .= '<rect x="'.$x.'" y="0" width="'.$ancho.'" height="60" fill="#000"/>';
+            }
+            $x += $ancho;
+        }
+
+        return 'data:image/svg+xml;base64,'.base64_encode('<svg xmlns="http://www.w3.org/2000/svg" width="'.($x + 10).'" height="60" viewBox="0 0 '.($x + 10).' 60">'.$rectangulos.'</svg>');
+    }
+
+    private function codigoQr(string $valor): string
+    {
+        abort_unless(ctype_digit($valor) && strlen($valor) <= 41, 502, 'Tesoreria devolvio una linea de captura no compatible con el codigo QR.');
+
+        $opciones = new QROptions([
+            'outputType' => 'png',
+            'outputBase64' => true,
+            'scale' => 10,
+            'addQuietzone' => true,
+            'quietzoneSize' => 4,
+        ]);
+
+        return (new QRCode($opciones))->render($valor);
+    }
+
     private function actor(Request $request): array
     {
         $actorId = $request->session()->get('accesos.id');
@@ -1450,14 +1537,14 @@ class SolicitudController extends Controller
 
         return [
             'id' => filled($actorId) ? $actorId : 'PENDIENTE_INTEGRACION_ACCESOS',
-            'nombre' => filled($actorNombre) ? $actorNombre : 'Servidor público pendiente de integración con Accesos',
+            'nombre' => filled($actorNombre) ? $actorNombre : 'Servidor pÃºblico pendiente de integraciÃ³n con Accesos',
             'departamento' => $request->session()->get('accesos.departamento'),
         ];
     }
 
     private function estadoId(string $clave): int
     {
-        return EstadoSolicitud::query()->where('clave', $clave)->where('activo', true)->value('id') ?? abort(500, 'No se encontró el estado requerido.');
+        return EstadoSolicitud::query()->where('clave', $clave)->where('activo', true)->value('id') ?? abort(500, 'No se encontrÃ³ el estado requerido.');
     }
 
     private function moverEstado(Request $request, Solicitud $solicitud, string $nuevoClave, string $accion, string $comentario): void
@@ -1465,7 +1552,7 @@ class SolicitudController extends Controller
         $actor = $this->actor($request);
         DB::transaction(function () use ($request, $solicitud, $nuevoClave, $accion, $comentario, $actor) {
             $bloqueada = Solicitud::query()->with('estado')->lockForUpdate()->findOrFail($solicitud->id);
-            abort_unless($bloqueada->flujo_pago === 'PAGO_POST_VALIDACION' && $bloqueada->estado?->clave === 'ENVIADA', 422, 'La solicitud cambió de estado.');
+            abort_unless($bloqueada->flujo_pago === 'PAGO_POST_VALIDACION' && $bloqueada->estado?->clave === 'ENVIADA', 422, 'La solicitud cambiÃ³ de estado.');
             $anterior = $bloqueada->solicitud_estado_id;
             $nuevo = $this->estadoId($nuevoClave);
             $bloqueada->update(['solicitud_estado_id' => $nuevo]);
@@ -1520,7 +1607,7 @@ class SolicitudController extends Controller
             DB::table('notificacion_emails')->where('id', $notificacionId)->update(['notificacion_estado_id' => DB::table('notificacion_estados')->where('clave', 'ENVIADO')->value('id'), 'intentos' => 1, 'fecha_envio' => now(), 'updated_at' => now()]);
         } catch (\Throwable $exception) {
             DB::table('notificacion_emails')->where('id', $notificacionId)->update(['notificacion_estado_id' => DB::table('notificacion_estados')->where('clave', 'ERROR')->value('id'), 'intentos' => 1, 'error' => Str::limit($exception->getMessage(), 65535, ''), 'updated_at' => now()]);
-            Log::error('No se pudo enviar la aprobación de solicitud.', ['solicitud_id' => $solicitud->id, 'exception' => $exception]);
+            Log::error('No se pudo enviar la aprobaciÃ³n de solicitud.', ['solicitud_id' => $solicitud->id, 'exception' => $exception]);
         }
     }
 
@@ -1554,7 +1641,7 @@ class SolicitudController extends Controller
                 'notificacion_estado_id' => DB::table('notificacion_estados')->where('clave', 'ERROR')->value('id'),
                 'intentos' => 1, 'error' => Str::limit($exception->getMessage(), 65535, ''), 'updated_at' => now(),
             ]);
-            Log::error('No se pudo enviar la solicitud de corrección de documentos.', ['solicitud_id' => $solicitud->id, 'exception' => $exception]);
+            Log::error('No se pudo enviar la solicitud de correcciÃ³n de documentos.', ['solicitud_id' => $solicitud->id, 'exception' => $exception]);
         }
     }
 
@@ -1634,7 +1721,7 @@ class SolicitudController extends Controller
         }
 
         if ($tipoCampo === 'CHECKBOX') {
-            return filled($valor) ? 'Sí' : 'No';
+            return filled($valor) ? 'SÃ­' : 'No';
         }
 
         if (is_array($valor)) {

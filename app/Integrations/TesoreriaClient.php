@@ -54,6 +54,60 @@ class TesoreriaClient
             ->all();
     }
 
+    public function liquidarDiverso(int $tramiteId): array
+    {
+        try {
+            return $this->autenticada()
+                ->get($this->url('/liquidador/diversos/'.rawurlencode((string) $tramiteId)))
+                ->throw()
+                ->json();
+        } catch (RequestException $exception) {
+            throw new RuntimeException('No fue posible obtener la liquidación de Tesorería.', 0, $exception);
+        }
+    }
+
+    public function liquidacionesContribuyente(string $contribuyenteId): array
+    {
+        try {
+            return $this->autenticada()
+                ->get($this->url('/contribuyentes/'.rawurlencode($contribuyenteId).'/liquidaciones'), ['page' => 1, 'per_page' => 15])
+                ->throw()
+                ->json('data', []);
+        } catch (RequestException $exception) {
+            throw new RuntimeException('No fue posible consultar las liquidaciones existentes en Tesorería.', 0, $exception);
+        }
+    }
+
+    public function convenios(): array
+    {
+        try {
+            return $this->autenticada()->get($this->url('/convenios'))->throw()->json('data', []);
+        } catch (RequestException $exception) {
+            throw new RuntimeException('No fue posible consultar los convenios de pago de Tesorería.', 0, $exception);
+        }
+    }
+
+    public function logoConvenio(string $url): ?string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (! is_string($host) || ! in_array($host, ['tesoreria-neza.gob.mx', 'www.tesoreria-neza.gob.mx'], true)) {
+            return null;
+        }
+
+        try {
+            $respuesta = $this->peticion()->get($url)->throw();
+            $contenido = $respuesta->body();
+            $mime = $respuesta->header('Content-Type', '');
+            if (! str_starts_with($mime, 'image/') || strlen($contenido) > 2_000_000) {
+                return null;
+            }
+
+            return 'data:'.$mime.';base64,'.base64_encode($contenido);
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
     public function registrarContribuyente(Expediente $expediente): string
     {
         $respuesta = $this->autenticada()->post($this->url('/contribuyentes'), $this->datosContribuyente($expediente))->throw();

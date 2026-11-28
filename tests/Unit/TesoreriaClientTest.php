@@ -77,4 +77,64 @@ class TesoreriaClientTest extends TestCase
             && $request->url() === 'https://tesoreria.example.test/api/catalogo/tramites'
             && $request->hasHeader('Authorization', 'Bearer token-prueba'));
     }
+
+    public function test_it_gets_a_diverse_payment_settlement_with_a_bearer_token(): void
+    {
+        config()->set('services.tesoreria.url', 'https://tesoreria.example.test/api');
+        config()->set('services.tesoreria.email', 'integracion@example.test');
+        config()->set('services.tesoreria.password', 'secreto');
+        config()->set('services.tesoreria.ca_bundle', null);
+
+        Http::fake([
+            'tesoreria.example.test/api/auth/login' => Http::response(['access_token' => 'token-prueba']),
+            'tesoreria.example.test/api/liquidador/diversos/1759720' => Http::response(['data' => ['referencia' => 'TES-123']]),
+        ]);
+
+        $liquidacion = app(TesoreriaClient::class)->liquidarDiverso(1759720);
+
+        $this->assertSame(['data' => ['referencia' => 'TES-123']], $liquidacion);
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'GET'
+            && $request->url() === 'https://tesoreria.example.test/api/liquidador/diversos/1759720'
+            && $request->hasHeader('Authorization', 'Bearer token-prueba'));
+    }
+
+    public function test_it_gets_existing_contributor_settlements_with_a_bearer_token(): void
+    {
+        config()->set('services.tesoreria.url', 'https://tesoreria.example.test/api');
+        config()->set('services.tesoreria.email', 'integracion@example.test');
+        config()->set('services.tesoreria.password', 'secreto');
+        config()->set('services.tesoreria.ca_bundle', null);
+
+        Http::fake([
+            'tesoreria.example.test/api/auth/login' => Http::response(['access_token' => 'token-prueba']),
+            'tesoreria.example.test/api/contribuyentes/886572/liquidaciones?page=1&per_page=15' => Http::response(['data' => [['linea_captura' => '12345678901234567890', 'pagado' => false]]]),
+        ]);
+
+        $liquidaciones = app(TesoreriaClient::class)->liquidacionesContribuyente('886572');
+
+        $this->assertSame('12345678901234567890', $liquidaciones[0]['linea_captura']);
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'GET'
+            && $request->url() === 'https://tesoreria.example.test/api/contribuyentes/886572/liquidaciones?page=1&per_page=15'
+            && $request->hasHeader('Authorization', 'Bearer token-prueba'));
+    }
+
+    public function test_it_gets_payment_agreements_with_a_bearer_token(): void
+    {
+        config()->set('services.tesoreria.url', 'https://tesoreria.example.test/api');
+        config()->set('services.tesoreria.email', 'integracion@example.test');
+        config()->set('services.tesoreria.password', 'secreto');
+        config()->set('services.tesoreria.ca_bundle', null);
+
+        Http::fake([
+            'tesoreria.example.test/api/auth/login' => Http::response(['access_token' => 'token-prueba']),
+            'tesoreria.example.test/api/convenios' => Http::response(['data' => [['alt_convenio' => 'bancomer', 'numero_convenio' => '1534920']]]),
+        ]);
+
+        $convenios = app(TesoreriaClient::class)->convenios();
+
+        $this->assertSame('1534920', $convenios[0]['numero_convenio']);
+        Http::assertSent(fn (Request $request): bool => $request->method() === 'GET'
+            && $request->url() === 'https://tesoreria.example.test/api/convenios'
+            && $request->hasHeader('Authorization', 'Bearer token-prueba'));
+    }
 }

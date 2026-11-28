@@ -191,17 +191,24 @@ if (apiKeyGenerada?.dataset.apiKey) {
 document.querySelectorAll('[data-referencia-pago-preview]').forEach((dialogo) => {
     const vistaPrevia = dialogo.querySelector('[data-referencia-pago-preview-frame]');
     const confirmar = dialogo.querySelector('[data-referencia-pago-confirmar]');
+    const cargador = dialogo.querySelector('[data-referencia-pago-loader]');
 
     if (!vistaPrevia || !confirmar) return;
 
     vistaPrevia.addEventListener('load', () => {
+        cargador?.setAttribute('hidden', '');
         confirmar.disabled = false;
+    });
+
+    vistaPrevia.addEventListener('error', () => {
+        cargador?.setAttribute('hidden', '');
     });
 
     document.querySelectorAll('[data-modal-open="previsualizar-referencia-pago"]').forEach((boton) => {
         boton.addEventListener('click', () => {
             confirmar.disabled = true;
-            vistaPrevia.src = vistaPrevia.src;
+            cargador?.removeAttribute('hidden');
+            vistaPrevia.src = vistaPrevia.dataset.referenciaPagoPreviewUrl;
         });
     });
 });
